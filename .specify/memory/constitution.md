@@ -1,6 +1,21 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+
+--- Amendment 1.0.0 -> 1.0.1 (2026-09-08) ---
+Bump rationale: PATCH. Clarification only. No principle added, removed or redefined;
+  no previously compliant code becomes non-compliant.
+Changes:
+  - Foundational References: ADR-004's "Owns" cell now excludes environment topology and
+    names ADR-013 as its amender, matching adr/README.md. The table previously implied
+    ADR-004 still owned a topology decision ADR-013 had already replaced.
+  - Foundational References: added ADR-013 (staged hosting model) and ADR-014 (container
+    image as the unit of truth), both Accepted and both owning decisions this document
+    defers to.
+Affected specifications/modules (per the Retroactivity rule): none. No obligation changed,
+  so nothing implemented under 1.0.0 requires review or a time-bound exception.
+
+--- Initial ratification 1.0.0 ---
 Version change: [unset template] -> 1.0.0
 Bump rationale: Initial ratification. The prior file was an unfilled scaffold with no
   adopted content, so this is a first adoption rather than an amendment.
@@ -55,16 +70,18 @@ structural decision is owned by a document listed here, and this constitution de
 | [`/adr/`](../../adr/) | Every foundational technology and structural decision, with alternatives and rationale |
 | [`/adr/README.md`](../../adr/README.md) | ADR index, required contents, immutability rules, status values |
 
-Accepted ADRs at the time of ratification:
+Accepted ADRs this constitution defers to (maintained as ADRs are added or amended):
 
 | ADR | Decision it owns |
 |---|---|
 | [ADR-001: Monorepo tooling: pnpm workspaces + Turborepo](../../adr/ADR-001-monorepo-tooling.md) | Workspace layout, dependency linking, task orchestration, boundary-enforcement tooling |
 | [ADR-002: Modular monolith with a separate asynchronous worker](../../adr/ADR-002-modular-monolith.md) | Deployment topology, extraction seams, boundary-enforcement requirement |
 | [ADR-003: PostgreSQL with Prisma, and the query-builder escape hatch](../../adr/ADR-003-database-orm.md) | Database engine, data-access library, migration mechanism, raw-query policy |
-| [ADR-004: Infrastructure as Code with Pulumi](../../adr/ADR-004-infrastructure-as-code.md) | IaC tooling, environment topology, state management, apply and approval process |
+| [ADR-004: Infrastructure as Code with Pulumi](../../adr/ADR-004-infrastructure-as-code.md) | IaC tooling, state management, apply and approval process. Amended by ADR-013 on environment topology only |
 | [ADR-005: Domain events, transactional outbox, SQS](../../adr/ADR-005-event-system.md) | Event layers, outbox requirement, queue mechanism, idempotency, scheduling model |
 | [ADR-006: REST API with ts-rest and Zod contracts](../../adr/ADR-006-api-style-and-type-safety.md) | API style, contract definition, validation library, versioning approach, error format |
+| [ADR-013: Staged hosting model](../../adr/ADR-013-staged-hosting-model.md) | Which environments exist before launch, where they are hosted, and the trigger that moves hosting to the AWS topology ADR-004 specifies |
+| [ADR-014: The container image is the unit of truth](../../adr/ADR-014-containerized-development.md) | How the application is packaged and run in every environment, and what a contributor must install |
 
 **Precedence.** Where this constitution and an ADR appear to conflict, the ADR wins on *what the
 technology is* and this constitution wins on *what behaviour is required*. If they genuinely
@@ -510,4 +527,4 @@ at each phase boundary of the roadmap, and any principle that is routinely worke
 wrong and MUST be amended, or under-enforced and MUST gain a gate. A principle nobody follows and
 nobody changes is worse than no principle.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-08 | **Last Amended**: 2026-09-08
+**Version**: 1.0.1 | **Ratified**: 2026-09-08 | **Last Amended**: 2026-09-08
