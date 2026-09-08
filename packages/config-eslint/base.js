@@ -7,6 +7,6 @@ export default [
   js.configs.recommended,
   eslintConfigPrettier,
   {
-    ignores: ['dist/**', '.turbo/**', 'node_modules/**', 'coverage/**'],
+    ignores: ['dist/**', '.turbo/**', 'node_modules/**', 'coverage/**', '**/generated/**'],
   },
 ];

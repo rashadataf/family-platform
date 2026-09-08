@@ -28,11 +28,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PNPM_HOME=/pnpm
-ENV PATH="${PNPM_HOME}:${PATH}"
-RUN corepack enable
-
 WORKDIR /app
+
+# NOTE: corepack is deliberately NOT enabled here. `corepack enable` writes
+# pnpm/yarn shims into /usr/local/bin, and `runtime` derives from this stage —
+# so enabling it here would ship a package manager inside the deployable,
+# violating FR-008. It is enabled in `deps` instead, which only the
+# development, migrator and build stages descend from.
 
 # ---------------------------------------------------------------------------
 # deps — the full workspace install.
@@ -43,6 +45,10 @@ WORKDIR /app
 # runs `prisma generate`, which cannot run without it.
 # ---------------------------------------------------------------------------
 FROM base AS deps
+
+ENV PNPM_HOME=/pnpm
+ENV PATH="${PNPM_HOME}:${PATH}"
+RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/api/package.json                 apps/api/
@@ -103,3 +109,56 @@ ENV NODE_ENV=development
 # exits the container instead of leaving `tsx watch` alive with the error
 # buried in the logs — the same guard scripts/dev.ts applies to the host path.
 CMD ["sh", "-c", "pnpm --filter @fp/persistence run build && pnpm --filter @fp/api exec tsx src/config/check-env.ts && pnpm --filter @fp/api run dev"]
+
+# ---------------------------------------------------------------------------
+# build — compile, then prune to a self-contained production tree.
+# ---------------------------------------------------------------------------
+FROM deps AS build
+
+COPY . .
+
+# turbo honours `dependsOn: ["^build"]`, so @fp/persistence is built first.
+RUN pnpm exec turbo run build --filter=@fp/api
+
+# `--legacy` is required. pnpm 10's modern `deploy` needs
+# inject-workspace-packages=true in .npmrc, and setting that would change
+# workspace linking for every package and every developer in order to solve a
+# packaging problem (research.md §2). A plain `COPY node_modules` cannot work
+# here: workspace dependencies are symlinks that escape their own directory,
+# so they would arrive dangling.
+RUN pnpm deploy --filter @fp/api --prod --legacy /app/deploy
+
+# ---------------------------------------------------------------------------
+# runtime — the deployable. TARGET.
+#
+# Derives from `base`, not `deps`: no pnpm store, no dev dependencies, no
+# source, no Prisma CLI. Runs as the unprivileged `node` user (FR-008).
+# ---------------------------------------------------------------------------
+FROM base AS runtime
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY --from=build --chown=node:node /app/deploy ./
+
+# npm and corepack ship with the official node image; nothing here added them.
+# They are removed anyway, because FR-008's "no package manager" exists for
+# attack surface: a package manager in a running production container is the
+# ability to fetch and execute arbitrary code, and this image only ever needs
+# to run `node dist/main.js`.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/lib/node_modules/corepack \
+    /opt/yarn-v* \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
+USER node
+EXPOSE 3000
+
+# Node 24 ships a global fetch, so this needs no curl or wget in the image.
+# Targets liveness, not readiness: a container should not be restarted because
+# its database is briefly unavailable (research.md §7).
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "dist/main.js"]

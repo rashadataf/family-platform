@@ -2,6 +2,9 @@
   "name": "@fp/persistence",
   "version": "0.0.0",
   "private": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,7 +13,7 @@
   },
   "scripts": {
     "db:generate": "prisma generate",
-    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "build": "prisma generate && tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('src/generated','dist/generated',{recursive:true})\"",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json"
   },
