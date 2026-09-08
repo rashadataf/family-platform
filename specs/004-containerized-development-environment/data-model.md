@@ -12,10 +12,10 @@ One file, five stages. Three are addressable targets; two are shared internals t
 
 | Stage | Target? | Derives from | Purpose |
 |---|---|---|---|
-| `base` | no | `node:${NODE_VERSION}-bookworm-slim` | Node runtime, `openssl`, `ca-certificates`, corepack-activated pnpm, non-root `node` user. The single point where the platform is decided. |
+| `base` | no | `node:${NODE_VERSION}-bookworm-slim` | Node runtime, `openssl`, `ca-certificates`. **Corepack is deliberately NOT enabled here** — `corepack enable` writes a pnpm shim into `/usr/local/bin`, and `runtime` derives from this stage, so enabling it here ships a package manager inside the deployable. It is enabled in `deps` instead. |
 | `deps` | no | `base` | Full workspace install from the lockfile. Copies manifests and the lockfile *before* source, so a source edit never re-resolves dependencies. |
 | `development` | **yes** | `deps` | Whole workspace, dev dependencies, file-watch reload. Source arrives by bind mount at runtime, not by `COPY`. |
-| `runtime` | **yes** | `base` | Compiled output plus a pruned production tree from `pnpm deploy --prod --legacy`. No package manager, no source, no dev dependencies, no Prisma CLI. Runs as `node`. |
+| `runtime` | **yes** | `base` | Compiled output plus a pruned production tree from `pnpm deploy --prod --legacy`, with npm/npx/corepack/yarn removed. No package manager, no source, no dev dependencies, no Prisma CLI. Runs as `node`. |
 | `migrator` | **yes** | `deps` | Prisma CLI, `schema.prisma`, `migrations/`. No application source, no HTTP server. |
 
 ### Validation rules
@@ -38,8 +38,8 @@ Three services. Ordering is expressed through Compose's own dependency condition
 | Service | Image / target | Depends on | Lifecycle | Notes |
 |---|---|---|---|---|
 | `postgres` | `postgres:16-alpine` | — | long-running, `unless-stopped` | Existing service, healthcheck unchanged |
-| `migrate` | `migrator` target | `postgres`: `service_healthy` | **one-shot**, exits 0 | `prisma migrate deploy`. Non-zero exit stops the environment coming up. |
-| `api` | `development` target | `migrate`: `service_completed_successfully` | long-running | `init: true`; source bind-mounted; healthcheck on `/health` |
+| `migrate` | `migrator` target | `postgres`: `service_healthy` | **one-shot**, exits 0 | `prisma migrate deploy`. Non-zero exit stops the environment coming up. Bind-mounts `prisma/` so `docker compose up` cannot run a stale baked-in copy. |
+| `api` | `development` target | `migrate`: `service_completed_successfully` | long-running, `on-failure:3` | `init: true`; source bind-mounted; healthcheck on `/health`. Not `unless-stopped`: that turns a config error into an endless crash loop. |
 
 ### State transitions on `docker compose up`
 
@@ -81,7 +81,7 @@ Two categories, with different rules.
 | Every workspace package has a dependency volume | pnpm's symlinks escape their package directory; a bind mount over `/app` shadows any path without one (research §4) |
 | **Adding a workspace package requires adding a volume** | Known maintenance cost, accepted in ADR-014's Negative consequences rather than solved by flattening pnpm's linking |
 | No host path is bind-mounted into any `node_modules` | The host store holds `libquery_engine-darwin-arm64` — a macOS binary that fails inside Linux as an apparent application error |
-| The Prisma client is generated in-container | Same reason; never copied from the host |
+| The Prisma client is generated into `packages/persistence/src/generated/prisma` and copied into `dist` at build | The default `node_modules/.prisma` location is **not** carried by `pnpm deploy --prod`: the pruned tree gets an ungenerated `@prisma/client` and the container dies at import. Generating into the package makes the client part of its build output, so it ships wherever the package ships. |
 
 ---
 

@@ -49,7 +49,7 @@ Addressable via `docker build --target <name> -f apps/api/Dockerfile .` from the
 | Target | Guarantees |
 |---|---|
 | `development` | Full workspace; watch reload; **not** for deployment |
-| `runtime` | No package manager, no dev dependencies, no source, no Prisma CLI; non-root; graceful `SIGTERM`; `HEALTHCHECK` on `/health` |
+| `runtime` | No package manager (pnpm, npm, npx, corepack and yarn are all removed — the last four ship with the node image), no dev dependencies, no source, no Prisma CLI, no TypeScript; runs as `node`; graceful `SIGTERM`; `HEALTHCHECK` on `/health`. **146 MB, verified serving `/health/ready`.** |
 | `migrator` | Prisma CLI + schema + migrations only; runs to completion and exits |
 
 **Build context is the repository root**, not `apps/api` — the workspace lockfile and sibling packages are required. The context is filtered by the root `.dockerignore`, which excludes `.env` and `.env.*` (FR-012).
@@ -62,9 +62,13 @@ Addressable via `docker build --target <name> -f apps/api/Dockerfile .` from the
 |---|---|---|---|---|
 | `postgres` | — | `${POSTGRES_PORT:-5432}:5432` | `unless-stopped` | — |
 | `migrate` | `migrator` | none | `no` (one-shot) | `postgres`: `service_healthy` |
-| `api` | `development` | `${PORT:-3000}:3000` | `unless-stopped` | `migrate`: `service_completed_successfully` |
+| `api` | `development` | `${PORT:-3000}:3000` | `on-failure:3` | `migrate`: `service_completed_successfully` |
 
-`api` sets `init: true` so Docker supplies `tini` as PID 1 — without it a `SIGTERM` reaching an unhandled PID 1 is ignored, and `docker stop` waits its full timeout before `SIGKILL` (research §6).
+`api` sets `init: true` so Docker supplies `tini` as PID 1 — without it a `SIGTERM` reaching an unhandled PID 1 is ignored, and `docker stop` waits its full timeout before `SIGKILL` (research §6). **Verified: `docker stop` completes in 0.23s with the shutdown hook logged.**
+
+`api` uses `restart: on-failure:3`, not `unless-stopped`. Found during implementation: with `unless-stopped`, a configuration error crash-loops forever and buries the one line naming the bad variable. Three attempts rides out a transient blip; a genuinely broken container ends up `Exited (1)` with the reason on screen.
+
+`migrate` bind-mounts `./packages/persistence/prisma`. Also found during implementation: the migrator image bakes migrations at build time, so `docker compose up` without `--build` silently ran a **stale** image — a developer adds a migration, nothing happens, and nothing says why. The image keeps its own copy, which is what a deployed environment uses.
 
 ### Configuration overrides
 

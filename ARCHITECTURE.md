@@ -482,8 +482,12 @@ family-platform/
 ├── docs/                        # explanatory material, runbooks, onboarding
 ├── diagrams/                    # mermaid sources referenced from docs
 │
+├── docker-compose.yml           # the local service set: postgres, migrate, api (ADR-014)
+│
 ├── apps/
 │   ├── api/                     # NestJS HTTP host. Thin. Controllers, guards, DI wiring.
+│   │   └── Dockerfile           #   base -> deps -> {development, runtime, migrator}.
+│   │                            #   The artifact every environment runs from.
 │   ├── worker/                  # NestJS standalone host. Queue consumers, sweeps, relay.
 │   └── mobile/                  # Expo. Screens, navigation, native config.
 │

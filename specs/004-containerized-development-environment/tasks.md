@@ -101,7 +101,7 @@ Repository root is the Docker build context. Application code lives in `apps/api
 - [X] T028 [P] [US2] Run `quickstart.md` scenario 7 locally: build the `runtime` target and confirm all four inspection assertions. Note this builds arm64 on Apple Silicon while CI builds `linux/amd64`; do not attempt to cross-build locally (research.md §8)
 - [X] T029 [P] [US2] Run `quickstart.md` scenario 5: `docker compose stop api` and time it. **Well under 10 seconds means `SIGTERM` was handled; exactly ~10 seconds means it was ignored and Docker fell back to `SIGKILL`** — which would mean T007/T008 or `init: true` is not working (FR-009)
 - [X] T030 [P] [US2] Run `quickstart.md` scenario 8: confirm `pnpm verify:node-version` passes, then temporarily set the Dockerfile's `NODE_VERSION` to `22` and confirm it fails naming both values, then revert (FR-014, SC-007)
-- [ ] T031 [US2] After the `image` job has reported green on a real pull request at least once, add it to `main`'s required status checks alongside `format` and `verify-env`. **This is a live shared repository setting — confirm with the user before running it**, as spec 002's own branch-protection task did
+- [ ] T031 [US2] **OPEN — requires the user.** After the `image` job has reported green on a real pull request at least once, add it to `main`'s required status checks alongside `format` and `verify-env`. **This is a live shared repository setting — confirm with the user before running it**, as spec 002's own branch-protection task did
 
 **Checkpoint**: The deployable artifact is built and proven on every pull request. Spec 003 now has a real image to consume.
 
@@ -115,13 +115,13 @@ Repository root is the Docker build context. Application code lives in `apps/api
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Add the host-based path to the rewritten `docs/local-development.md` as a clearly-labelled **optional optimisation**, stating its prerequisites (Node.js 24, pnpm 10) and its rationale (bind-mount filesystem overhead on macOS). Do not present it as the primary route (FR-017, ADR-014 Decision 3). Touches the same file as T016, so not parallel with it
-- [ ] T033 [US3] Document the port conflict in `docs/local-development.md`: both paths publish the API on the same host port, so running them simultaneously fails with a binding error. This is documented behaviour, not a defect — the alternative would be two divergent database states (contracts/cli-and-compose.md §1)
+- [X] T032 [US3] Add the host-based path to the rewritten `docs/local-development.md` as a clearly-labelled **optional optimisation**, stating its prerequisites (Node.js 24, pnpm 10) and its rationale (bind-mount filesystem overhead on macOS). Do not present it as the primary route (FR-017, ADR-014 Decision 3). Touches the same file as T016, so not parallel with it
+- [X] T033 [US3] Document the port conflict in `docs/local-development.md`: both paths publish the API on the same host port, so running them simultaneously fails with a binding error. This is documented behaviour, not a defect — the alternative would be two divergent database states (contracts/cli-and-compose.md §1)
 
 ### Verification for User Story 3
 
-- [ ] T034 [US3] Run `quickstart.md` scenario 6: `docker compose down`, then `pnpm install && pnpm dev`, and confirm it behaves exactly as spec 001 defined — database up, migrations applied, API running with watch reload (FR-017, SC-008)
-- [ ] T035 [US3] Confirm shared state per `quickstart.md` scenario 6: write a row through the host path (`pnpm dev`), stop it, bring up `docker compose up -d`, and confirm the same row is present with no reset required — both paths use the same `postgres` service and the `postgres_data` volume declared in `docker-compose.yml` (FR-018)
+- [X] T034 [US3] Run `quickstart.md` scenario 6: `docker compose down`, then `pnpm install && pnpm dev`, and confirm it behaves exactly as spec 001 defined — database up, migrations applied, API running with watch reload (FR-017, SC-008)
+- [X] T035 [US3] Confirm shared state per `quickstart.md` scenario 6: write a row through the host path (`pnpm dev`), stop it, bring up `docker compose up -d`, and confirm the same row is present with no reset required — both paths use the same `postgres` service and the `postgres_data` volume declared in `docker-compose.yml` (FR-018)
 
 **Checkpoint**: Both paths work, share state, and are documented at their correct relative priority.
 
@@ -129,11 +129,11 @@ Repository root is the Docker build context. Application code lives in `apps/api
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T036 Run `quickstart.md` scenario 9 — **the only success criterion the author cannot verify** (SC-001). Give the repository to someone who has never onboarded, watch them work from `docs/local-development.md` alone, and **do not answer their questions — write them down**. Every question is a documentation defect; the list is this task's output. Passing means they reach `/health/ready` with zero questions answered
-- [ ] T037 [P] Add a "Running the platform" section to the root `README.md` naming `docker compose up` as the supported path and linking to `docs/local-development.md`
-- [ ] T038 [P] Update the repository tree in `ARCHITECTURE.md` §8 to include `apps/api/Dockerfile`, so the normative structure document does not omit the artifact every environment now runs from
-- [ ] T039 Re-read `apps/api/Dockerfile`, `docker-compose.yml` and `.github/workflows/ci.yml` end to end against `contracts/cli-and-compose.md` and confirm every target name, service name, job name, port and dependency condition matches the contract exactly
-- [ ] T040 Open a follow-up issue or pull request against spec 003: its `plan.md` runs migrations via `docker compose run --rm api … prisma migrate deploy`, which cannot work against a correctly-built `runtime` image. It must invoke the `migrator` target instead (research.md §3). Recorded here rather than changed, because spec 003 is a merged document
+- [ ] T036 **OPEN — requires a real first-time contributor; cannot be self-certified.** Run `quickstart.md` scenario 9 — **the only success criterion the author cannot verify** (SC-001). Give the repository to someone who has never onboarded, watch them work from `docs/local-development.md` alone, and **do not answer their questions — write them down**. Every question is a documentation defect; the list is this task's output. Passing means they reach `/health/ready` with zero questions answered
+- [X] T037 [P] Add a "Running the platform" section to the root `README.md` naming `docker compose up` as the supported path and linking to `docs/local-development.md`
+- [X] T038 [P] Update the repository tree in `ARCHITECTURE.md` §8 to include `apps/api/Dockerfile`, so the normative structure document does not omit the artifact every environment now runs from
+- [X] T039 Re-read `apps/api/Dockerfile`, `docker-compose.yml` and `.github/workflows/ci.yml` end to end against `contracts/cli-and-compose.md` and confirm every target name, service name, job name, port and dependency condition matches the contract exactly
+- [X] T040 Open a follow-up issue or pull request against spec 003: its `plan.md` runs migrations via `docker compose run --rm api … prisma migrate deploy`, which cannot work against a correctly-built `runtime` image. It must invoke the `migrator` target instead (research.md §3). Recorded here rather than changed, because spec 003 is a merged document
 
 ---
 
