@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Scaffolding only. This table exists to prove the migration mechanism
+// builds schema from nothing (see specs/001-monorepo-dev-environment/spec.md
+// FR-005) and to back the API's /health/ready check. It is not product
+// domain schema and MUST be deleted once the first real domain migration
+// lands in a later feature.
+model ScaffoldProbe {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("_scaffold_probe")
+}

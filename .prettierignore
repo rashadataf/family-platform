@@ -1,0 +1,15 @@
+dist/
+.turbo/
+node_modules/
+pnpm-lock.yaml
+
+# Prose/governance documents are out of scope for a code formatter: ADRs are
+# immutable once accepted, the constitution has its own amendment procedure,
+# and spec-kit's own scaffolding predates this feature. Reformatting any of
+# these as a side effect of `pnpm format` would be unreviewed, unrequested
+# churn on documents this feature doesn't own.
+*.md
+.claude/
+.specify/
+adr/
+

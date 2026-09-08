@@ -1,0 +1,38 @@
+{
+  "name": "family-platform",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "pnpm": ">=10.0.0 <11"
+  },
+  "prettier": "@fp/config-prettier",
+  "scripts": {
+    "dev": "dotenv -e .env -- tsx scripts/dev.ts",
+    "dev:down": "docker compose down",
+    "db:reset": "dotenv -e .env -- tsx scripts/db-reset.ts",
+    "db:migrate:create": "pnpm --filter @fp/persistence exec prisma migrate dev",
+    "postinstall": "pnpm --filter @fp/persistence run db:generate",
+    "verify:env": "tsx scripts/verify-env-example.ts",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "turbo build",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm build"
+  },
+  "devDependencies": {
+    "@fp/config-eslint": "workspace:*",
+    "@fp/config-prettier": "workspace:*",
+    "@fp/config-typescript": "workspace:*",
+    "dotenv": "^16.4.7",
+    "dotenv-cli": "^7.4.4",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.19.2",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3",
+    "zod": "^3.24.1"
+  }
+}
