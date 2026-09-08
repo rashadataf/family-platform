@@ -1,0 +1,27 @@
+{
+  "name": "@fp/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "db:generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.3"
+  },
+  "devDependencies": {
+    "@fp/config-eslint": "workspace:*",
+    "@fp/config-typescript": "workspace:*",
+    "eslint": "^9.39.1",
+    "prisma": "^6.16.3",
+    "typescript": "^5.9.3"
+  }
+}

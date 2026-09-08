@@ -1,0 +1,20 @@
+{
+  "name": "@fp/config-eslint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "files": [
+    "base.js",
+    "typescript.js",
+    "index.js"
+  ],
+  "dependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint-config-prettier": "^9.1.2",
+    "typescript-eslint": "^8.70.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.39.1"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "db:generate": {
+      "inputs": ["prisma/schema.prisma"],
+      "outputs": []
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json", "package.json"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["src/**", "tsconfig.json"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["src/**", "eslint.config.js", "package.json"],
+      "outputs": []
+    },
+    "format:check": {
+      "outputs": []
+    }
+  }
+}

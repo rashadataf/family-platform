@@ -1,0 +1,12 @@
+{
+  "extends": "@fp/config-typescript/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "**/*.ts",
+    "../apps/api/src/config/env.schema.ts",
+    "../apps/api/src/config/load-env.ts"
+  ]
+}
