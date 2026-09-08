@@ -22,6 +22,7 @@ export class HealthController {
   liveness(): HealthOk {
     return { status: 'ok' };
   }
+  // cache-verification probe: temporary, reverted in the next commit
 
   @Get('ready')
   @HttpCode(HttpStatus.OK)
