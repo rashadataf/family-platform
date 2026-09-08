@@ -58,9 +58,9 @@ description: "Task list template for feature implementation"
 
 ### Verification for User Story 1
 
-- [ ] T009 [US1] Push `.github/workflows/ci.yml` on a throwaway branch, open a real pull request against `main`, and confirm the checks list shows four independent entries (`typecheck`, `lint`, `test`, `build`), with `test` passing despite zero test files existing (FR-005), per `quickstart.md` scenario 1
-- [ ] T010 [US1] From that same branch, introduce a single deliberate lint violation only (no type or build error), push, and confirm only the `lint` check shows failed while the other three show passed, per `quickstart.md` scenario 2 (SC-005)
-- [ ] T011 [US1] Fix the lint violation, merge the pull request, and confirm on the repository's Actions tab that the push-triggered run for the new `main` commit executed all four jobs, per `quickstart.md` scenario 4 (FR-002)
+- [X] T009 [US1] Push `.github/workflows/ci.yml` on a throwaway branch, open a real pull request against `main`, and confirm the checks list shows four independent entries (`typecheck`, `lint`, `test`, `build`), with `test` passing despite zero test files existing (FR-005), per `quickstart.md` scenario 1
+- [X] T010 [US1] From that same branch, introduce a single deliberate lint violation only (no type or build error), push, and confirm only the `lint` check shows failed while the other three show passed, per `quickstart.md` scenario 2 (SC-005)
+- [X] T011 [US1] Fix the lint violation, merge the pull request, and confirm on the repository's Actions tab that the push-triggered run for the new `main` commit executed all four jobs, per `quickstart.md` scenario 4 (FR-002)
 
 **Checkpoint**: User Story 1 is fully functional and independently verifiable — every check is automatic and individually attributable, with no caching and no merge-blocking yet.
 
@@ -74,12 +74,12 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Apply branch protection to `main` requiring the `typecheck`, `lint`, `test`, `build` status checks, using the exact `gh api` command documented in `specs/002-ci-pipeline/contracts/required-checks.md` — this is a live, shared repository setting; confirm with the user before running it
+- [X] T012 [US2] Apply branch protection to `main` requiring the `typecheck`, `lint`, `test`, `build` status checks, using the exact `gh api` command documented in `specs/002-ci-pipeline/contracts/required-checks.md` — this is a live, shared repository setting; confirm with the user before running it
 
 ### Verification for User Story 2
 
-- [ ] T013 [US2] Open a pull request with a deliberately failing check and confirm the merge control is blocked and states which required check is not passing, per `quickstart.md` scenario 3 (FR-004, SC-003)
-- [ ] T014 [US2] Fix the failure, push, wait for all four checks to pass, and confirm the same pull request becomes mergeable, per `quickstart.md` scenario 3 (SC-004)
+- [X] T013 [US2] Open a pull request with a deliberately failing check and confirm the merge control is blocked and states which required check is not passing, per `quickstart.md` scenario 3 (FR-004, SC-003)
+- [X] T014 [US2] Fix the failure, push, wait for all four checks to pass, and confirm the same pull request becomes mergeable, per `quickstart.md` scenario 3 (SC-004)
 
 **Checkpoint**: User Stories 1 and 2 both work independently — checks run and are individually visible, and a failing check now genuinely blocks merge.
 
@@ -98,8 +98,8 @@ description: "Task list template for feature implementation"
 
 ### Verification for User Story 3
 
-- [ ] T017 [US3] Push a trivial change touching only one workspace package on top of an already-cached branch, and confirm the run completes within 5 minutes with cache-hit output visible in the job logs for every unaffected package, per `quickstart.md` scenario 6 (SC-001, SC-006)
-- [ ] T018 [US3] Confirm a cold run (e.g. after a lockfile change invalidates the cache) still completes correctly within 15 minutes, per `quickstart.md` scenario 6 (SC-002, FR-008)
+- [X] T017 [US3] Push a trivial change touching only one workspace package on top of an already-cached branch, and confirm the run completes within 5 minutes with cache-hit output visible in the job logs for every unaffected package, per `quickstart.md` scenario 6 (SC-001, SC-006)
+- [X] T018 [US3] Confirm a cold run (e.g. after a lockfile change invalidates the cache) still completes correctly within 15 minutes, per `quickstart.md` scenario 6 (SC-002, FR-008)
 
 **Checkpoint**: All three user stories are independently functional — automatic per-step feedback, merge blocking, and cache-accelerated re-runs.
 
@@ -109,7 +109,7 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Validate the edge cases that span all three stories rather than belonging to one, and close out documentation.
 
-- [ ] T019 [P] Run the remaining `quickstart.md` scenarios not yet exercised by story verification — scenario 5 (a superseded run is cancelled and does not block the PR's current status, FR-011) and scenario 8 (a fork pull request runs with read-only token permissions, FR-012)
+- [X] T019 [P] Run the remaining `quickstart.md` scenarios not yet exercised by story verification — scenario 5 (a superseded run is cancelled and does not block the PR's current status, FR-011) and scenario 8 (a fork pull request runs with read-only token permissions, FR-012). Scenario 5 confirmed live: a superseded run was actually cancelled by the `concurrency` group (visible in the run history). Scenario 8 confirmed partially: the effective `GITHUB_TOKEN` permissions on a real run were read exactly as `Contents: read, Metadata: read` from the job log, matching the fork-safe contract — a genuine external fork PR was not tested, since that requires a second GitHub identity.
 - [X] T020 [P] Add a short "Continuous Integration" section to the root `README.md` naming the four required checks and linking to `specs/002-ci-pipeline/contracts/required-checks.md`
 - [X] T021 Re-read `.github/workflows/ci.yml` against `specs/002-ci-pipeline/contracts/required-checks.md` end to end and confirm every job name, trigger, permission, and concurrency setting matches the contract exactly
 
