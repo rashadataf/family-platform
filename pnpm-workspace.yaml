@@ -10,3 +10,21 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - 'esbuild'
   - 'prisma'
+
+# Transitive dependencies forced past a published advisory.
+#
+# Both are pinned by their parents at versions with known HIGH advisories, and
+# in both cases the newest upstream release still pins the vulnerable version
+# (@nestjs/platform-express@12 still requires multer 2.2.0; @prisma/config
+# still requires deepmerge-ts 7.1.5), so waiting for a parent bump is not a
+# plan. Forcing the fixed version here is preferable to an osv-scanner
+# suppression: a suppression accepts the risk, an override removes it.
+#
+# Each entry should be deleted once the parent has caught up.
+overrides:
+  # GHSA-535w-7cp7-47q4, GHSA-qfvm-cv95-jqjf, GHSA-wc9g-mqfw-jrwm (HIGH)
+  multer: '^2.3.0'
+  # GHSA-ggr8-5vv4-36mx (HIGH, CVSS 8.2). A major bump inside Prisma's config
+  # loader, so it is proved by running prisma generate, the build and the
+  # migrator rather than assumed compatible.
+  deepmerge-ts: '^8.0.2'

@@ -51,7 +51,9 @@ Cycle detection (FR-002) is the same tool's `no-circular` rule, and it sees what
 
 **Decision.** Keep GitHub's push protection as the primary control. Add `gitleaks` as a CI job scanning the pull request's changes.
 
-**Rationale.** They fail differently, which is the entire argument for having both. GitHub's scanner matches *partner patterns* — provider-issued token formats it has been taught, with very low false positives. It will not flag `DATABASE_URL=postgresql://postgres:aRealPassword@host/db`, which is not a partner pattern but is exactly the shape of credential this repository handles (ADR-013 puts VPS and database credentials in play). `gitleaks` matches generic high-entropy and assignment patterns and catches that class.
+**Rationale.** They fail differently, which is the entire argument for having both. GitHub's scanner matches *partner patterns* — provider-issued token formats it has been taught, with very low false positives. It will not flag `DATABASE_URL=postgresql://postgres:<password>@host/db`, which is not a partner pattern but is exactly the shape of credential this repository handles (ADR-013 puts VPS and database credentials in play). `gitleaks` matches generic high-entropy and assignment patterns and catches that class.
+
+> **Verified during implementation, and this paragraph was half wrong.** GitHub does not flag it, as stated — but neither did gitleaks' default rule set. Planting one produced a clean scan. The second layer's justification therefore required a rule that did not exist: `database-connection-string-password` in `.gitleaks.toml`, with the placeholder values this repository commits on purpose (`localdev`, `${VAR}`, `<password>`) allowlisted by value rather than by file, so that a real credential landing in `.env.example` later is still caught.
 
 Push protection is also bypassable by the pusher with a documented reason; a CI gate is not.
 
