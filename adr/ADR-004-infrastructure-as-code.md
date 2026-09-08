@@ -1,8 +1,17 @@
 # ADR-004: Infrastructure as Code with Pulumi
 
-- **Status:** Accepted
+- **Status:** Amended by ADR-013
 - **Date:** 2026-09-08
 - **Deciders:** Principal Engineer
+
+> **Scope of the amendment.** [ADR-013](ADR-013-staged-hosting-model.md) replaces the
+> "The MVP infrastructure this provisions" section below, and only that section. Everything
+> else in this ADR — Pulumi with TypeScript, one stack per environment sharing a single
+> program, stack outputs as the source of truth for application configuration, deletion
+> protection on stateful resources, and CI-gated production applies — **remains in full
+> effect and is unamended**. This ADR is deliberately *not* marked `Superseded`, because
+> its decision was not replaced; a reader who saw that status would wrongly conclude that
+> Pulumi is no longer this project's IaC tool.
 
 ## Context
 
