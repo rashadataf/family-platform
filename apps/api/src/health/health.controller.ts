@@ -20,7 +20,6 @@ class ReadinessError extends HttpException {
 export class HealthController {
   @Get()
   liveness(): HealthOk {
-    const debugFlag: any = true;
     return { status: 'ok' };
   }
 
