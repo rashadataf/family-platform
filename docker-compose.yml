@@ -1,12 +1,17 @@
 name: family-platform
 
+# The supported way to run this project (ADR-014): `docker compose up` on a
+# machine whose only prerequisite is Docker. The host-based `pnpm dev` flow
+# still works and is documented in docs/local-development.md as an optional
+# optimisation for contributors who already have Node.js and pnpm.
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: localdev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
       POSTGRES_DB: ${POSTGRES_DB:-family_platform}
     ports:
       - '${POSTGRES_PORT:-5432}:5432'
@@ -19,8 +24,117 @@ services:
       retries: 30
       start_period: 5s
 
+  # One-shot. Applies every committed migration, then exits.
+  #
+  # It exists as its own service, rather than as a step in the API's start-up,
+  # because `service_completed_successfully` below is what makes it
+  # structurally impossible to serve traffic against a partially migrated
+  # schema — Compose refuses to start `api` if this exits non-zero. No
+  # wait-for-it script, no retry loop, no fixed sleep (research.md §5).
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrator
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Host is `postgres`, not `localhost`. The value in .env is correct for
+      # the host-based flow and wrong inside this network; one .env cannot
+      # serve both, and this override is the resolution (data-model.md §4).
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+    volumes:
+      # The schema and migrations are bind-mounted, not just baked into the
+      # image at build time. Without this, `docker compose up` reuses a cached
+      # migrator image and silently runs STALE migrations — a developer adds a
+      # migration, nothing happens, and nothing says why. The image still
+      # carries its own copy, which is what a deployed environment uses.
+      - ./packages/persistence/prisma:/app/packages/persistence/prisma
+      - root_node_modules:/app/node_modules
+      - persistence_node_modules:/app/packages/persistence/node_modules
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: development
+    # Not `unless-stopped`: a configuration error would then crash-loop
+    # forever, burying the one line that says which variable is wrong. Three
+    # attempts is enough to ride out a transient dependency blip, and a
+    # genuinely broken container ends up Exited with the reason on screen.
+    # (Docker still restarts it after a daemon or machine restart.)
+    restart: on-failure:3
+    # Docker supplies tini as PID 1. Without it a SIGTERM reaching an
+    # unhandled PID 1 is ignored, so `docker stop` waits its full timeout and
+    # then SIGKILLs, dropping in-flight requests (research.md §6, FR-009).
+    init: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Required. A missing .env should stop the environment with a clear error
+    # rather than start it with silent defaults (spec.md US1 scenario 4).
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever .env says. The container always listens on 3000;
+      # PORT below only chooses which host port maps to it, so changing PORT
+      # in .env can never desynchronise the two.
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+    ports:
+      - '${PORT:-3000}:3000'
+    volumes:
+      # Source is bind-mounted so edits need no rebuild.
+      - .:/app
+      # ...and every dependency tree is masked by a container-owned volume.
+      # See the note under `volumes:` at the bottom of this file.
+      - root_node_modules:/app/node_modules
+      - api_node_modules:/app/apps/api/node_modules
+      - persistence_node_modules:/app/packages/persistence/node_modules
+      - config_eslint_node_modules:/app/packages/config-eslint/node_modules
+      - config_prettier_node_modules:/app/packages/config-prettier/node_modules
+      - config_typescript_node_modules:/app/packages/config-typescript/node_modules
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 40s
+
 volumes:
-  # No explicit `name:` override: Compose namespaces this per the top-level
-  # `name: family-platform` project name, so it can never collide with an
+  # No explicit `name:` override: Compose namespaces these per the top-level
+  # `name: family-platform` project name, so they can never collide with an
   # unrelated project's identically-keyed volume on a shared machine.
   postgres_data:
+
+  # ---------------------------------------------------------------------------
+  # Dependency volumes — one per workspace package, plus the root.
+  #
+  # ADDING A WORKSPACE PACKAGE REQUIRES ADDING A VOLUME HERE.
+  #
+  # One root volume is not enough. pnpm's node_modules is a symlink farm:
+  # apps/api/node_modules/@fp/persistence points to ../../../../packages/persistence,
+  # escaping its own package directory, and real packages live in the root
+  # .pnpm store. The bind mount of `.` at /app shadows every per-package
+  # node_modules that has no volume of its own, leaving dangling links.
+  #
+  # The one-volume alternative is `node-linker=hoisted` in .npmrc. It is
+  # rejected: ARCHITECTURE.md §8.2 names pnpm's strict, non-hoisted layout as
+  # the STRONGEST of the four boundary-enforcement layers, the one that "is not
+  # a rule that can be disabled with a comment". Flattening it to save six
+  # lines of YAML would delete a Constitution Principle III guarantee.
+  # ---------------------------------------------------------------------------
+  root_node_modules:
+  api_node_modules:
+  persistence_node_modules:
+  config_eslint_node_modules:
+  config_prettier_node_modules:
+  config_typescript_node_modules:
