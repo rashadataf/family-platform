@@ -7,11 +7,14 @@
   "files": [
     "base.js",
     "typescript.js",
+    "boundaries.js",
     "index.js"
   ],
   "dependencies": {
     "@eslint/js": "^9.39.1",
     "eslint-config-prettier": "^9.1.2",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.2.0",
     "typescript-eslint": "^8.70.0"
   },
   "peerDependencies": {

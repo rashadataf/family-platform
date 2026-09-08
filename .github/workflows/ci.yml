@@ -57,6 +57,22 @@ jobs:
           turbo-cache-key: test
       - run: pnpm exec turbo run test test:workspace-root
 
+  # Constitution Principle III: "Architecture Boundaries Are Enforced, Not
+  # Suggested". The principle names dependency-cruiser explicitly and until now
+  # nothing ran it, which left code review — the layer the constitution itself
+  # calls "assumed to fail" — as the only one operating.
+  #
+  # Fail-closed: the rule set is an `allowed` graph with allowedSeverity error,
+  # so a dependency matching no entry is a violation. That matters most for the
+  # rules governing packages/core, which does not exist yet: a fail-open
+  # configuration would let the first bounded context arrive unchecked.
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+      - run: pnpm boundaries
+
   # Principle II requires .env.example to stay in sync with the API's env
   # schema. The check existed as `pnpm verify:env` but nothing ran it.
   # Also runs the Node version drift check (FR-014). Deliberately a step here

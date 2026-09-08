@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@fp/persistence": ["packages/persistence/src/index.ts"],
+      "@fp/config-eslint": ["packages/config-eslint/index.js"]
+    }
+  }
+}
