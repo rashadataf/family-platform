@@ -15,15 +15,17 @@
     "db:migrate:create": "pnpm --filter @fp/persistence exec prisma migrate dev",
     "postinstall": "pnpm --filter @fp/persistence run db:generate",
     "verify:env": "tsx scripts/verify-env-example.ts",
+    "verify:node-version": "tsx scripts/verify-node-version.ts",
     "typecheck": "turbo run typecheck typecheck:workspace-root",
     "typecheck:workspace-root": "tsc -p scripts/tsconfig.json",
     "lint": "turbo run lint lint:workspace-root",
     "lint:workspace-root": "eslint . --max-warnings 0",
-    "test": "turbo test",
+    "test": "turbo run test test:workspace-root",
+    "test:workspace-root": "vitest run --dir scripts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "turbo build",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm format:check && pnpm verify:env && pnpm build"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm format:check && pnpm verify:env && pnpm verify:node-version && pnpm build"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",

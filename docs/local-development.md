@@ -2,9 +2,11 @@
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 24.x (see `.nvmrc`)
-- [pnpm](https://pnpm.io/) 10.x (`corepack enable` will pick up the version pinned in `package.json`)
-- [Docker](https://www.docker.com/) with Docker Compose (used to run local Postgres — nothing else needs to be installed manually)
+**[Docker](https://www.docker.com/) with Docker Compose. That is the whole list.**
+
+You do not need Node.js, pnpm, a version manager, or PostgreSQL installed. The container carries all of them.
+
+> **What this does not cover.** This guarantee is for backend work — `apps/api`, and `apps/worker` when it exists. It will **not** extend to the mobile app. Expo requires host-native simulators and platform SDKs that cannot live in a Linux container, so when `apps/mobile` lands it will have its own prerequisites. Better to know that now than to discover it later. See [ADR-014](../adr/ADR-014-containerized-development.md).
 
 ## From a fresh clone to a running environment
 
@@ -12,33 +14,74 @@
 git clone <repo-url>
 cd family-platform
 cp .env.example .env
+docker compose up
+```
+
+That is the supported path, and it is the one to use if you are new here.
+
+`docker compose up` starts three things, in order, and each waits for the one before it:
+
+1. **`postgres`** — PostgreSQL 16, and waits until it actually accepts connections.
+2. **`migrate`** — applies every committed migration, then exits. If a migration fails, **the API never starts.** That is deliberate: a partially migrated schema must never be served.
+3. **`api`** — the API, watching your source for changes.
+
+Once it is up:
+
+```sh
+curl http://localhost:3000/health        # {"status":"ok"}
+curl http://localhost:3000/health/ready  # {"status":"ok"} — proves the database is migrated and reachable
+```
+
+Edit anything under `apps/api/src/` and the API restarts on its own. No rebuild, no restart.
+
+## Running commands without pnpm installed
+
+Any workspace command runs inside the container:
+
+```sh
+docker compose run --rm api pnpm test
+docker compose run --rm api pnpm lint
+docker compose run --rm api pnpm --filter @fp/persistence exec prisma migrate status
+```
+
+The exit code is passed through, so these work in scripts too.
+
+To author a **new** migration (an interactive workflow — it prompts you for a name):
+
+```sh
+docker compose run --rm api pnpm --filter @fp/persistence exec prisma migrate dev
+```
+
+## Stopping, restarting, and resetting
+
+These are different operations. Don't confuse them:
+
+| Goal | Command | What happens to your data |
+|---|---|---|
+| Stop everything | `docker compose down` | **Kept.** The database volume is untouched. |
+| Stop everything and wipe the database | `docker compose down -v` | **Destroyed.** Next `up` rebuilds from migrations. |
+| Restart just the API | `docker compose restart api` | Kept |
+| Watch the logs | `docker compose logs -f api` | — |
+
+## The host-based path (optional)
+
+If you already have **Node.js 24** and **pnpm 10** installed, `pnpm dev` still works and is faster.
+
+It avoids the container filesystem layer, which on macOS is a real difference in day-to-day feel. This is an optimisation for people who already have the toolchain — not the route to recommend to someone new, and not required for any task.
+
+```sh
+docker compose down   # see the port note below
 pnpm install
 pnpm dev
 ```
 
-`pnpm dev` does everything in one command:
+`pnpm dev` starts Postgres in Docker, applies migrations, and runs the API on your host with watch reload. Its companions are unchanged: `pnpm dev:down`, `pnpm db:reset`, `pnpm db:migrate:create`.
 
-1. Starts a local PostgreSQL 16 container (Docker Compose).
-2. Applies every committed database migration.
-3. Starts the API, watching for source changes and restarting automatically.
+**Both paths share the same database.** Same Postgres service, same volume, same migrations — switch between them freely, no reset needed.
 
-Once it's running, confirm it worked:
+> **`DATABASE_URL` and `PORT` in `.env` do not affect the container path.** Compose overrides both: inside the network the database host is `postgres`, not `localhost`, and the container always listens on 3000 (`PORT` only chooses which host port maps to it). One `.env` cannot describe both paths, so the container's values are set in `docker-compose.yml` instead. Every other variable in `.env` is passed through unchanged.
 
-```sh
-curl http://localhost:3000/health        # {"status":"ok"}
-curl http://localhost:3000/health/ready  # {"status":"ok"} once the database is migrated
-```
-
-Edit anything under `apps/api/src/` while `pnpm dev` is running and the API restarts on its own — no need to stop and re-run the command.
-
-## Stopping, restarting, and resetting
-
-These are three different operations — don't confuse them:
-
-- **Stop the API, keep the database running**: press <kbd>Ctrl+C</kbd> in the terminal running `pnpm dev`. The Postgres container is left running in the background; the next `pnpm dev` reattaches instantly.
-- **Stop everything, keep the data**: `pnpm dev:down`. This stops the Postgres container but never touches its data volume — your local data is still there next time you run `pnpm dev`.
-- **Reset the database to a clean state**: `pnpm db:reset`. This destroys the database's data volume, recreates the container from nothing, and reapplies every committed migration. Use this when your local data has drifted into a state you don't want, or you just want a clean slate. **All local data is lost.**
-- **Author a *new* migration**: `pnpm db:migrate:create`. This is a distinct, interactive workflow (`prisma migrate dev` under the hood) that diffs `packages/persistence/prisma/schema.prisma` against your running database, prompts you for a migration name, and writes + applies the new SQL file. Don't confuse this with what `pnpm dev` does internally (`prisma migrate deploy`, which only *applies* already-committed migrations and never generates new ones).
+> **Port conflict.** Both paths publish the API on the same host port, so **they cannot run at the same time**. Starting the second one fails with a port-binding error. This is intended: the alternative would be two environments quietly diverging. Run `docker compose down` before `pnpm dev`, or stop `pnpm dev` before `docker compose up`.
 
 ## Adding a new package
 
@@ -46,17 +89,27 @@ A new package under `packages/` or `apps/` should extend the three shared config
 
 - **TypeScript**: `"extends": "@fp/config-typescript/base.json"` in `tsconfig.json` (or `@fp/config-typescript/nestjs.json` for a NestJS app).
 - **ESLint**: `import fpConfig from '@fp/config-eslint';` and export it (optionally extended) from `eslint.config.js`.
-- **Prettier**: nothing to add — the root `package.json`'s `"prettier": "@fp/config-prettier"` field and the root `prettier --check .` / `prettier --write .` scripts already cover every package.
+- **Prettier**: nothing to add — the root `package.json`'s `"prettier": "@fp/config-prettier"` field already covers every package.
 
-No package should carry its own copy of strict-mode compiler options, lint rules, or formatting rules.
+**You must also add two things for the container path:**
+
+1. A `COPY` line for its `package.json` in [`apps/api/Dockerfile`](../apps/api/Dockerfile)'s `deps` stage.
+2. A named volume for its `node_modules` in [`docker-compose.yml`](../docker-compose.yml), mounted on the `api` service.
+
+Step 2 is not optional and not decorative. pnpm links workspace packages by symlink, and those symlinks point outside their own directory — so a package without its own volume gets its `node_modules` shadowed by the source bind mount, and its imports break in ways that look like application bugs. The comment block at the bottom of `docker-compose.yml` explains why the simpler one-volume alternative is rejected.
 
 ## Troubleshooting
 
 | Symptom | What's happening | What to do |
 |---|---|---|
-| `pnpm dev` says no `.env` file found | You haven't created your local environment file yet | `cp .env.example .env`, then re-run `pnpm dev` |
-| `pnpm dev` says Docker isn't reachable | Docker isn't installed, or the daemon isn't running | Install/start Docker, then re-run `pnpm dev` |
-| `pnpm dev` says a port is already in use | Something else on your machine is already using the configured Postgres port | Stop the other process, or set a different `POSTGRES_PORT` in `.env` (and update `DATABASE_URL` to match), then re-run |
-| `pnpm dev` recovers from a "stale container" state on its own | The Postgres container was left in a stopped/broken state from a previous run | No action needed — this is automatic. If it keeps happening, `pnpm db:reset` |
-| `pnpm dev` reports a migration failure and stops before starting the API | A migration didn't apply cleanly | Read the Prisma error above the failure message; the API is deliberately never started in this case, since a partially-migrated environment must never be reported as "ready" |
-| `pnpm dev` fails immediately naming a specific environment variable | A required value is missing or invalid in your `.env` | Fix that value; see `apps/api/src/config/env.schema.ts` for what's required |
+| `env file .env not found` | You haven't created your local environment file | `cp .env.example .env`, then re-run |
+| Port already in use | Something else is on that port — often the *other* development path | Stop it, or change `PORT` / `POSTGRES_PORT` in `.env` |
+| The API never starts, `migrate` shows an error | A migration failed | Read the Prisma error in `docker compose logs migrate`. The API is deliberately not started — a partially migrated environment must never be reported ready |
+| Container exits immediately naming a variable | A required value is missing or invalid in `.env` | Fix that value. See `apps/api/src/config/env.schema.ts` for what's required |
+| Source edits don't trigger a restart | File-watch events aren't crossing the bind mount | Restart the container. If it persists, this is a known Docker Desktop issue — raise it, because the fallback (polling) belongs in this document rather than in your head |
+| Imports of `@fp/*` fail after adding a package | You added a workspace package without its `node_modules` volume | See "Adding a new package" above |
+| `pnpm dev` says Docker isn't reachable | Docker isn't running | Start Docker, then re-run |
+
+## Why it works this way
+
+[ADR-014](../adr/ADR-014-containerized-development.md) records the decision and the alternatives that were rejected. The short version: the container image is what runs in every environment, including staging, so it should be what you develop against too — otherwise its defects are only discovered at deploy time, by whoever is least placed to debug them.

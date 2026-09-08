@@ -55,16 +55,21 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: test
-      - run: pnpm exec turbo run test
+      - run: pnpm exec turbo run test test:workspace-root
 
   # Principle II requires .env.example to stay in sync with the API's env
   # schema. The check existed as `pnpm verify:env` but nothing ran it.
+  # Also runs the Node version drift check (FR-014). Deliberately a step here
+  # rather than a job of its own: branch protection on `main` names required
+  # checks by JOB NAME, so renaming or splitting this job would block every
+  # later merge on a check that no longer reports.
   verify-env:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - run: pnpm verify:env
+      - run: pnpm verify:node-version
 
   build:
     runs-on: ubuntu-latest
@@ -74,3 +79,122 @@ jobs:
         with:
           turbo-cache-key: build
       - run: pnpm exec turbo run build
+
+  # Builds the deployable and proves it actually runs (spec 004, US2).
+  #
+  # Build-only would catch Dockerfile syntax and missing files, and none of the
+  # three failure modes that matter: an incomplete production dependency prune,
+  # a Prisma client that resolves locally but not in the pruned tree, and an
+  # image that starts but cannot reach a database. So this job starts the image
+  # against a real Postgres and requires /health/ready to succeed.
+  #
+  # Nothing is pushed. Whether a registry exists is spec 003's open question.
+  image:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: family_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d family_platform"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # linux/amd64 is what the VPS runs, and ubuntu-latest is natively amd64,
+      # so no QEMU emulation is involved (research.md §8).
+      - name: Build runtime target
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: runtime
+          platforms: linux/amd64
+          load: true
+          tags: fp-api:runtime
+          cache-from: type=gha,scope=runtime
+          cache-to: type=gha,mode=max,scope=runtime
+
+      - name: Build migrator target
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: migrator
+          platforms: linux/amd64
+          load: true
+          tags: fp-api:migrator
+          cache-from: type=gha,scope=migrator
+          cache-to: type=gha,mode=max,scope=migrator
+
+      # FR-008 / SC-006: assert by inspection, not by assertion in a document.
+      - name: Assert the runtime image carries nothing it should not
+        run: |
+          set -euo pipefail
+          fail=0
+          for tool in pnpm npm npx corepack yarn prisma tsc; do
+            if docker run --rm --entrypoint sh fp-api:runtime -c "command -v $tool" >/dev/null 2>&1; then
+              echo "::error::runtime image contains '$tool' (FR-008: no package manager, no dev dependencies)"
+              fail=1
+            fi
+          done
+          if docker run --rm --entrypoint sh fp-api:runtime -c 'ls -d src' >/dev/null 2>&1; then
+            echo "::error::runtime image contains application source (FR-008)"
+            fail=1
+          fi
+          user=$(docker run --rm --entrypoint sh fp-api:runtime -c 'whoami')
+          if [ "$user" != "node" ]; then
+            echo "::error::runtime image runs as '$user', expected non-root 'node' (FR-008)"
+            fail=1
+          fi
+          exit $fail
+
+      - name: Apply migrations with the migrator image
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL='postgresql://postgres:localdev@127.0.0.1:5432/family_platform' \
+            fp-api:migrator
+
+      # The step that catches an incomplete prune (FR-016).
+      - name: Start the runtime image and require /health/ready
+        run: |
+          set -euo pipefail
+          docker run -d --name api --network host --init \
+            -e NODE_ENV=production -e PORT=3000 -e LOG_LEVEL=info \
+            -e POSTGRES_PORT=5432 -e POSTGRES_DB=family_platform \
+            -e DATABASE_URL='postgresql://postgres:localdev@127.0.0.1:5432/family_platform' \
+            fp-api:runtime
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 5 http://127.0.0.1:3000/health/ready >/dev/null 2>&1; then
+              echo "runtime image reached /health/ready"
+              curl -fsS http://127.0.0.1:3000/health/ready; echo
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::runtime image never reported ready — the production dependency tree is probably incomplete"
+          docker logs api
+          exit 1
+
+      - name: Require a graceful stop (FR-009)
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          docker stop api >/dev/null
+          elapsed=$(( $(date +%s) - start ))
+          echo "stop took ${elapsed}s"
+          if [ "$elapsed" -ge 9 ]; then
+            echo "::error::SIGTERM was ignored — Docker fell back to SIGKILL after its timeout"
+            exit 1
+          fi
+          docker logs api 2>&1 | grep -q "Database connections released" \
+            || { echo "::error::shutdown hook did not run"; docker logs api; exit 1; }

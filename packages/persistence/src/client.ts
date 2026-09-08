@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/prisma/index.js';
 
 /**
  * The single instantiation point for PrismaClient in this codebase

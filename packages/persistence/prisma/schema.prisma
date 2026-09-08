@@ -1,5 +1,17 @@
 generator client {
   provider = "prisma-client-js"
+  // Generated into this package rather than into node_modules/.prisma.
+  //
+  // The default location is not carried by `pnpm deploy --prod`: the pruned
+  // tree gets a fresh, ungenerated @prisma/client, and the container then dies
+  // at import with "does not provide an export named 'PrismaClient'". Copying
+  // the generated directory across pnpm virtual-store paths in the Dockerfile
+  // would work but is fragile — it hard-codes store layout.
+  //
+  // Generating here makes the client part of @fp/persistence's own build
+  // output, so it ships wherever the package ships. Prisma is also moving to
+  // require an explicit output, so this is the direction of travel anyway.
+  output   = "../src/generated/prisma"
 }
 
 datasource db {

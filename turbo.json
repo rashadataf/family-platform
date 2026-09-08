@@ -40,6 +40,10 @@
     "//#lint:workspace-root": {
       "inputs": ["scripts/**", "eslint.config.js", "package.json"],
       "outputs": []
+    },
+    "//#test:workspace-root": {
+      "inputs": ["scripts/**", "apps/api/Dockerfile", ".nvmrc", "package.json"],
+      "outputs": []
     }
   }
 }

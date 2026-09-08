@@ -12,4 +12,4 @@ pnpm-lock.yaml
 .claude/
 .specify/
 adr/
-
+**/src/generated/
