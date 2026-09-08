@@ -26,7 +26,19 @@
       "inputs": ["src/**", "package.json"],
       "outputs": []
     },
-    "format:check": {
+
+    "//#typecheck:workspace-root": {
+      "inputs": [
+        "scripts/**",
+        "scripts/tsconfig.json",
+        "apps/api/src/config/env.schema.ts",
+        "apps/api/src/config/load-env.ts",
+        "package.json"
+      ],
+      "outputs": []
+    },
+    "//#lint:workspace-root": {
+      "inputs": ["scripts/**", "eslint.config.js", "package.json"],
       "outputs": []
     }
   }

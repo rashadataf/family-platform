@@ -1,4 +1,56 @@
+# Build context hygiene for every image built from this repository.
+#
+# Two jobs, in order of importance:
+#   1. Keep secrets OUT of image layers. A `COPY . .` in any Dockerfile would
+#      otherwise bake a developer's real `.env` into a layer that is pushed,
+#      shipped over SSH, and readable by anyone who can `docker history` the
+#      image (Constitution Principle X: secrets are resolved at runtime, never
+#      passed at build time).
+#   2. Keep the context small, so `docker build` stays fast and layer caching
+#      is not busted by files the build never reads.
+
+# --- Secrets (rule 1). Order matters: the negation must follow the pattern. ---
+.env
+.env.*
+!.env.example
+
+# --- Build output and dependency trees (regenerated inside the image) ---
 node_modules
+**/node_modules
 dist
-.git
+**/dist
+build
+**/build
 .turbo
+**/.turbo
+*.tsbuildinfo
+coverage
+**/coverage
+
+# --- Version control and CI ---
+.git
+.gitignore
+.github
+
+# --- Documentation and process artefacts: never read by a build ---
+adr
+specs
+docs
+diagrams
+.specify
+.claude
+*.md
+!README.md
+
+# --- Local tooling and editor state ---
+.vscode
+.idea
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Docker's own files: changing a compose file must not bust the build cache ---
+docker-compose*.yml
+Dockerfile*
+.dockerignore

@@ -14,74 +14,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Constitution, Development Workflow and Quality Gates: "Typecheck, strict
+  # mode, zero errors". Covers every workspace package AND the root package's
+  # own `scripts/**` via the //#typecheck:workspace-root task — that code
+  # orchestrates every developer's environment and was previously unchecked.
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-typecheck-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-typecheck-${{ runner.os }}-
-      - run: pnpm exec turbo run typecheck
+          turbo-cache-key: typecheck
+      - run: pnpm exec turbo run typecheck typecheck:workspace-root
 
+  # "Lint, zero warnings" — the `--max-warnings 0` the constitution names
+  # lives in each package's own lint script, so it applies locally too.
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-lint-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-lint-${{ runner.os }}-
-      - run: pnpm exec turbo run lint
+          turbo-cache-key: lint
+      - run: pnpm exec turbo run lint lint:workspace-root
+
+  # Formatting is not in the constitution's gate table, but `pnpm verify`
+  # already ran it locally; a check that only exists on developer machines is
+  # not a gate.
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm format:check
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-test-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-test-${{ runner.os }}-
+          turbo-cache-key: test
       - run: pnpm exec turbo run test
+
+  # Principle II requires .env.example to stay in sync with the API's env
+  # schema. The check existed as `pnpm verify:env` but nothing ran it.
+  verify-env:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm verify:env
 
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: turbo-build-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-build-${{ runner.os }}-
+          turbo-cache-key: build
       - run: pnpm exec turbo run build
