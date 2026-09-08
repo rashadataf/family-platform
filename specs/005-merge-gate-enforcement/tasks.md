@@ -20,8 +20,8 @@ description: "Task list for spec 005: Merge Gate Enforcement"
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `dependency-cruiser` and `eslint-plugin-boundaries` as root devDependencies via `pnpm add -D -w`. These are the two tools [Constitution Principle III](../../.specify/memory/constitution.md) names in its own "Enforced by" clause, so this is implementing a decision rather than taking one
-- [ ] T002 Add a `boundaries` script to the root `package.json` (`depcruise --config .dependency-cruiser.cjs .`), append it to the `verify` chain, and declare a `//#boundaries` task in `turbo.json` with inputs covering `apps/**`, `packages/**`, `scripts/**` and the config file
+- [X] T001 Add `dependency-cruiser` and `eslint-plugin-boundaries` as root devDependencies via `pnpm add -D -w`. These are the two tools [Constitution Principle III](../../.specify/memory/constitution.md) names in its own "Enforced by" clause, so this is implementing a decision rather than taking one
+- [X] T002 Add a `boundaries` script to the root `package.json` (`depcruise --config .dependency-cruiser.cjs .`), append it to the `verify` chain, and declare a `//#boundaries` task in `turbo.json` with inputs covering `apps/**`, `packages/**`, `scripts/**` and the config file
 
 ---
 
@@ -31,10 +31,10 @@ description: "Task list for spec 005: Merge Gate Enforcement"
 
 **⚠️ CRITICAL**: T003–T005 touch the same files every later CI task edits. Complete them before Phase 3.
 
-- [ ] T003 Pin every third-party action in `.github/workflows/ci.yml` to a full commit SHA with the human-readable version in a trailing comment (`uses: actions/checkout@11d5960… # v4`). A tag is mutable and repointable by whoever controls that repository, which is a supply-chain path into a pipeline holding write access; the comment exists because a bare 40-character hash is unreviewable (FR-025). Resolve each SHA with `gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha`
-- [ ] T004 Pin the actions inside `.github/actions/setup/action.yml` the same way — it is a composite action and its `uses:` lines are just as mutable
-- [ ] T005 Verify no mutable references remain: `grep -rn "uses:" .github/ | grep -v "@[0-9a-f]\{40\}"` MUST print nothing (quickstart scenario 10)
-- [ ] T006 **Requires the user.** Enable Dependabot alerts, currently disabled: `gh api -X PUT repos/rashadataf/family-platform/vulnerability-alerts`. This is a live repository setting. Alerts answer a question no pull-request gate can — "has something we already shipped become vulnerable since" — because nothing changed on our side for a gate to notice (research §3)
+- [X] T003 Pin every third-party action in `.github/workflows/ci.yml` to a full commit SHA with the human-readable version in a trailing comment (`uses: actions/checkout@11d5960… # v4`). A tag is mutable and repointable by whoever controls that repository, which is a supply-chain path into a pipeline holding write access; the comment exists because a bare 40-character hash is unreviewable (FR-025). Resolve each SHA with `gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha`
+- [X] T004 Pin the actions inside `.github/actions/setup/action.yml` the same way — it is a composite action and its `uses:` lines are just as mutable
+- [X] T005 Verify no mutable references remain. **The command as specified is wrong**: it reports the six `uses: ./.github/actions/setup` lines as violations, and a local composite action resolves from the commit the job already checked out, so it has no external pointer to pin. Replaced with `scripts/verify-action-pins.ts` (+ `.spec.ts`), which skips local references and additionally requires the trailing version comment FR-025 asks for. Wired into the existing `verify-env` job and `pnpm verify` — a check nobody runs is not a gate
+- [X] T006 **Requires the user.** Enable Dependabot alerts, currently disabled: `gh api -X PUT repos/rashadataf/family-platform/vulnerability-alerts`. This is a live repository setting. Alerts answer a question no pull-request gate can — "has something we already shipped become vulnerable since" — because nothing changed on our side for a gate to notice (research §3)
 
 **Checkpoint**: The pipeline's own dependencies are immutable and the out-of-band notifier is on.
 

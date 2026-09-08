@@ -41,6 +41,10 @@
       "inputs": ["scripts/**", "eslint.config.js", "package.json"],
       "outputs": []
     },
+    "//#boundaries": {
+      "inputs": ["apps/**", "packages/**", "scripts/**", ".dependency-cruiser.cjs", "package.json"],
+      "outputs": []
+    },
     "//#test:workspace-root": {
       "inputs": ["scripts/**", "apps/api/Dockerfile", ".nvmrc", "package.json"],
       "outputs": []
