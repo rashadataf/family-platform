@@ -17,10 +17,11 @@
     "verify:env": "tsx scripts/verify-env-example.ts",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
+    "test": "turbo test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "turbo build",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm build"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm format:check && pnpm build"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",

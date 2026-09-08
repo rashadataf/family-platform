@@ -21,6 +21,11 @@
       "inputs": ["src/**", "eslint.config.js", "package.json"],
       "outputs": []
     },
+    "test": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["src/**", "package.json"],
+      "outputs": []
+    },
     "format:check": {
       "outputs": []
     }
