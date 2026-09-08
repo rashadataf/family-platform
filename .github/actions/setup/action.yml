@@ -1,0 +1,38 @@
+name: Set up workspace
+description: >
+  pnpm, Node, a frozen-lockfile install, and the Turborepo cache.
+  Every CI job needs exactly this, so it lives in one place: adding a new
+  gate should cost two lines in ci.yml, not six copied ones.
+
+inputs:
+  turbo-cache-key:
+    description: >
+      Task name used to namespace the Turborepo cache (e.g. "lint"). Jobs that
+      run no Turborepo task can omit this to skip the cache step entirely.
+    required: false
+    default: ''
+
+# A local composite action can only be resolved after the calling job has
+# already checked the repository out, so checkout stays in the job itself.
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Restore Turborepo cache
+      if: inputs.turbo-cache-key != ''
+      uses: actions/cache@v4
+      with:
+        path: .turbo
+        key: turbo-${{ inputs.turbo-cache-key }}-${{ runner.os }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ inputs.turbo-cache-key }}-${{ runner.os }}-
