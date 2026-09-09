@@ -350,3 +350,66 @@ jobs:
             ghcr.io/aquasecurity/trivy@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
             image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
             --no-progress --scanners vuln fp-api:runtime
+
+  # Constitution, Development Workflow and Quality Gates: "Infrastructure
+  # validation and preview" (spec 003). `pulumi preview` never mutates the
+  # shared vps-staging stack — safe to run from any pull request branch
+  # (contracts/cli-and-config.md). `if:` is required, not decoration: this
+  # job's only documented trigger is pull_request, and without the guard it
+  # would also run — pointlessly, and against a stack a push event has no
+  # business previewing — on every push to main.
+  infra-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      # No `command:`/`work-dir:` input: this action's job here is only to put
+      # a `pulumi` binary on PATH, matching contracts/cli-and-config.md's
+      # command table exactly rather than introducing a second, competing way
+      # to invoke it (the action's own `command` input) alongside the `pnpm`
+      # scripts already documented as the real interface.
+      - uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
+      - run: pnpm staging:preview
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+
+  # FR-019: merging to main deploys automatically, only after every existing
+  # blocking check has already passed on the merged commit.
+  #
+  # `needs:` names the full current ten-job blocking set — corrected here
+  # from spec 002's original four (contracts/cli-and-config.md's "Corrected
+  # before implementation" note). `needs:` alone does not stop this job from
+  # also running on a pull_request: every job it names here also runs on
+  # pull_request, so without the `if:` guard this would deploy an unmerged
+  # branch to the shared staging environment the moment its checks went
+  # green — before review, before merge. `if:` and `needs:` are both load
+  # -bearing here, not redundant.
+  #
+  # This list must be kept current — see this job's entry in
+  # contracts/cli-and-config.md and the follow-up issue tracked there.
+  infra-deploy:
+    if: github.event_name == 'push'
+    needs:
+      [
+        typecheck,
+        lint,
+        format,
+        test,
+        test-integration,
+        verify-env,
+        boundaries,
+        security,
+        build,
+        image,
+      ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
+      - run: pnpm staging:deploy
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
