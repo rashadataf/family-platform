@@ -57,11 +57,16 @@ services:
     image: fp-api:staging-runtime
     build: !reset null
     restart: unless-stopped
-    # Replaces, not adds to, the base file's local dev port mapping — the
-    # base and staging port variables are deliberately different names
-    # (PORT vs API_PUBLISHED_PORT) so the two can never be silently summed
-    # into two host bindings for the same container port.
-    ports: !reset
+    # !override, not !reset: this REPLACES the base file's local dev port
+    # mapping with a new one, rather than clearing it to nothing. (An
+    # earlier version of this file used !reset here by mistake — !reset
+    # ignores the value that follows it unconditionally, so no port was
+    # published at all; caught by actually bringing this up locally and
+    # finding the staging URL unreachable.) The base and staging port
+    # variables are deliberately different names (PORT vs API_PUBLISHED_PORT)
+    # so the two can never be silently summed into two host bindings for the
+    # same container port.
+    ports: !override
       - '${API_PUBLISHED_PORT}:3000'
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-family_platform}

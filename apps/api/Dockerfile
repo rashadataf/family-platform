@@ -7,7 +7,8 @@
 # Targets:
 #   development  contributor's machine, via Compose. Source bind-mounted.
 #   runtime      the deployable. No package manager, no source, no Prisma CLI.
-#   migrator     one-shot `prisma migrate deploy`. Nothing else.
+#   migrator     one-shot `prisma migrate deploy` / `prisma db seed` (spec 003).
+#                No apps/api source, no HTTP server.
 #
 # Kept in sync with .nvmrc by `pnpm verify:node-version` (FR-014). Compose
 # cannot read .nvmrc, so this duplication is forced; the check is what keeps
@@ -66,6 +67,18 @@ COPY packages/persistence/prisma/ packages/persistence/prisma/
 # packageManager field, so pnpm's version has one source of truth, not two.
 RUN corepack install
 RUN pnpm install --frozen-lockfile
+
+# @fp/persistence's own source — specifically client.ts, which spec 003's
+# prisma/seed.ts imports directly (it is never exported through the
+# package's public `main`/`exports`, so nothing outside this COPY can reach
+# it). Copied AFTER `pnpm install`, not alongside the manifests above,
+# deliberately: putting it before would invalidate the install layer's cache
+# on every source edit, which is exactly what copying manifests first exists
+# to prevent (SC-004, data-model.md §1 in spec 004). `migrator` is the only
+# target this matters for — `development` and `build` get real source a
+# different way (a bind mount, or their own later `COPY . .`), and `runtime`
+# derives from `base`, never seeing this layer at all.
+COPY packages/persistence/src/ packages/persistence/src/
 
 # ---------------------------------------------------------------------------
 # migrator — one-shot schema migration. TARGET.

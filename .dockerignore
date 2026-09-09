@@ -21,6 +21,14 @@ dist
 **/dist
 build
 **/build
+# The generated Prisma client. Excluded even though it lives under src/, not
+# dist/ (packages/persistence/prisma/schema.prisma's `generator` comment
+# explains why it's generated there instead of node_modules/.prisma) — every
+# stage that needs it runs its own `prisma generate` from postinstall, and
+# without this, spec 003's `COPY packages/persistence/src/` in the deps stage
+# would bake in whatever a contributor's own machine happened to have
+# generated locally, defeating that reproducibility entirely.
+**/src/generated
 .turbo
 **/.turbo
 *.tsbuildinfo
