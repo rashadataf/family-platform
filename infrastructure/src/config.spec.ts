@@ -10,6 +10,22 @@ const WELL_FORMED_PEM = `-----BEGIN PRIVATE KEY-----
 MC4CAQAwBQYDK2VwBCIEIMKN9gLVY833sHBscKsZE+SdwV5sJw5yFgnoRgm4VN5l
 -----END PRIVATE KEY-----`;
 
+/**
+ * A throwaway, locally-generated Ed25519 key in OpenSSH's own private-key
+ * format — `ssh-keygen -t ed25519`'s DEFAULT output, and what the real
+ * vps-staging deploy key turned out to be. Node's `crypto.createPrivateKey`
+ * cannot parse this format at all, which is exactly the gap
+ * `isWellFormedOpenSshPrivateKey` (config.ts) exists to cover.
+ */
+const WELL_FORMED_OPENSSH_KEY = `-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACDqr8NqswYlNe5h+oMWYGv59j3P+rREwPejto4iIBu3+wAAAKhcFBP/XBQT
+/wAAAAtzc2gtZWQyNTUxOQAAACDqr8NqswYlNe5h+oMWYGv59j3P+rREwPejto4iIBu3+w
+AAAECVJy6bhTf5GaCocZGQvDv31IR0+Zp/F54bnk8V24Y3hOqvw2qzBiU17mH6gxZga/n2
+Pc/6tETA96O2jiIgG7f7AAAAH3Rocm93YXdheS10ZXN0LWtleS1uby1yZWFsLWhvc3QBAg
+MEBQY=
+-----END OPENSSH PRIVATE KEY-----`;
+
 const VALID_RAW: RawStackConfig = {
   vpsHost: '203.0.113.10',
   vpsSshUser: 'deploy',
@@ -61,6 +77,12 @@ describe('loadStackConfig', () => {
     expect(() => loadStackConfig({ ...VALID_RAW, vpsSshPrivateKey: 'not a pem key' })).toThrow(
       /vpsSshPrivateKey/,
     );
+  });
+
+  it('accepts an OpenSSH-format vpsSshPrivateKey (ssh-keygen -t ed25519\'s default output)', () => {
+    expect(() =>
+      loadStackConfig({ ...VALID_RAW, vpsSshPrivateKey: WELL_FORMED_OPENSSH_KEY }),
+    ).not.toThrow();
   });
 
   it('rejects an empty postgresPassword', () => {

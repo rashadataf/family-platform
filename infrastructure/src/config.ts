@@ -10,12 +10,46 @@ import { z } from 'zod';
  */
 const DOCKER_RESERVED_NETWORK_NAMES = new Set(['bridge', 'host', 'none']);
 
+/**
+ * OpenSSH's own private-key container format (RFC-less, documented only in
+ * OpenSSH's PROTOCOL.key source file) — the DEFAULT output of `ssh-keygen -t
+ * ed25519` on every current OpenSSH version, standard or PKCS8 PEM never
+ * enters the picture unless the user knows to ask for it. Node's own
+ * `crypto.createPrivateKey` cannot parse this format at all (confirmed:
+ * throws "DECODER routines::unsupported" regardless of Node version), so
+ * `isWellFormedPrivateKey` needs a second path for it or it rejects the
+ * single most common way anyone generates this exact kind of key — as
+ * happened with the real vps-staging deploy key. `remote.Command`'s actual
+ * SSH connection is implemented in `@pulumi/command`'s Go provider (there is
+ * no `ssh2` or other JS SSH library in this dependency tree at all), whose
+ * `golang.org/x/crypto/ssh` parser has always supported this format, so
+ * accepting it here does not risk accepting something the real connection
+ * would then reject.
+ */
+const OPENSSH_PRIVATE_KEY_HEADER =
+  /^-----BEGIN OPENSSH PRIVATE KEY-----\r?\n([\s\S]+?)\r?\n-----END OPENSSH PRIVATE KEY-----$/;
+const OPENSSH_PRIVATE_KEY_MAGIC = 'openssh-key-v1\0';
+
+function isWellFormedOpenSshPrivateKey(pem: string): boolean {
+  const match = OPENSSH_PRIVATE_KEY_HEADER.exec(pem.trim());
+  if (!match?.[1]) {
+    return false;
+  }
+
+  try {
+    const body = Buffer.from(match[1].replace(/\s+/g, ''), 'base64');
+    return body.toString('binary', 0, OPENSSH_PRIVATE_KEY_MAGIC.length) === OPENSSH_PRIVATE_KEY_MAGIC;
+  } catch {
+    return false;
+  }
+}
+
 function isWellFormedPrivateKey(pem: string): boolean {
   try {
     createPrivateKey({ key: pem, format: 'pem' });
     return true;
   } catch {
-    return false;
+    return isWellFormedOpenSshPrivateKey(pem);
   }
 }
 
