@@ -38,7 +38,7 @@ Run-and-verify guide for this feature. Not implementation instructions — see
 
 1. Open a pull request with a trivial change; confirm the `infra-preview` CI job runs and posts a `pulumi preview` result without altering the live environment.
 2. Merge the pull request to `main`.
-3. **Expect**: the `infra-deploy` CI job runs only after `typecheck`, `lint`, `test`, and `build` succeed, and the staging URL serves the merged change afterward with no manual step (SC-008).
+3. **Expect**: the `infra-deploy` CI job runs only after every other blocking check on `main` succeeds — `typecheck`, `lint`, `format`, `test`, `test-integration`, `verify-env`, `boundaries`, `security`, `build`, `image` (contracts/cli-and-config.md, corrected for spec 005) — and the staging URL serves the merged change afterward with no manual step (SC-008).
 4. Confirm no CI job ever invokes `pnpm staging:destroy` or `pnpm staging:deploy:reset` (FR-020) — inspect `.github/workflows/ci.yml` directly.
 
 ## Scenario 4 — Reboot recovery (FR-017, SC-007)

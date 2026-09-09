@@ -28,19 +28,35 @@ validation rules. Contract-relevant points:
 
 ## CI trigger contract
 
-Extends `.github/workflows/ci.yml` (spec 002) with two new jobs:
+Extends `.github/workflows/ci.yml` with two new jobs.
+
+> **Corrected before implementation.** This contract was originally written against spec 002's
+> four-job pipeline (`typecheck`, `lint`, `test`, `build`). [Spec 005](../../005-merge-gate-enforcement/spec.md)
+> merged first and added six more blocking checks — `format`, `test-integration`, `verify-env`,
+> `boundaries`, `security`, `image` — all of which are now required, reporting checks on `main`
+> (see [spec 005's contract](../../005-merge-gate-enforcement/contracts/gates-and-config.md)). An
+> `infra-deploy` job whose `needs:` list names only the original four would deploy to the VPS
+> without waiting for `security` or `boundaries` or `test-integration` to pass — silently
+> reopening exactly the gap spec 005 exists to close. `needs:` below lists the full current set.
 
 | Job | Trigger | Depends on | Secrets required |
 |---|---|---|---|
 | `infra-preview` | `pull_request` → `main` (existing trigger) | none | `PULUMI_ACCESS_TOKEN` |
-| `infra-deploy` | `push` → `main` (existing trigger) | `typecheck`, `lint`, `test`, `build` (existing jobs) | `PULUMI_ACCESS_TOKEN` |
+| `infra-deploy` | `push` → `main` (existing trigger) | `typecheck`, `lint`, `format`, `test`, `test-integration`, `verify-env`, `boundaries`, `security`, `build`, `image` (every existing blocking job) | `PULUMI_ACCESS_TOKEN` |
 
 `infra-preview` runs `pnpm staging:preview` and never mutates the staging environment — safe to
 run against the one shared stack from any pull request branch. `infra-deploy` runs
 `pnpm staging:deploy` only after every existing quality gate has already passed on the merged
-commit, satisfying FR-019 without weakening spec 002's existing gates. Neither job ever runs
-`pnpm staging:destroy` or `pnpm staging:deploy:reset` — those remain founder-invoked only
+commit, satisfying FR-019 without weakening any existing gate — spec 005's included. Neither job
+ever runs `pnpm staging:destroy` or `pnpm staging:deploy:reset` — those remain founder-invoked only
 (FR-020).
+
+**This list must be kept current.** If a future feature adds another blocking CI job, `infra-deploy`'s
+`needs:` list must grow with it, or the same gap reopens silently. There is no mechanism here that
+enforces that automatically; it is a discipline this contract states rather than something the
+repository verifies (unlike spec 005's own `boundaries`/`security` gates, which are self-enforcing).
+A follow-up worth considering, out of scope for this feature: a check asserting `infra-deploy`'s
+`needs:` list is a superset of every other blocking job name in `ci.yml`.
 
 `PULUMI_ACCESS_TOKEN` is the only secret CI needs; every other secret this feature uses (VPS SSH
 key, Postgres password) is resolved by Pulumi Cloud at apply time from the stack's own encrypted
