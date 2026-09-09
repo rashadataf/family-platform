@@ -39,6 +39,21 @@
     "//#boundaries": {
       "inputs": ["apps/**", "packages/**", "scripts/**", ".dependency-cruiser.cjs", "package.json"],
       "outputs": []
+    },
+
+    // infrastructure/'s entrypoint is index.ts, at the package root (Pulumi's
+    // own convention) rather than under src/ like every other package's
+    // default `typecheck`/`lint` inputs assume — without this override,
+    // turbo's cache would not invalidate when index.ts changes.
+    "infrastructure#typecheck": {
+      "dependsOn": [],
+      "inputs": ["index.ts", "src/**", "tsconfig.json"],
+      "outputs": []
+    },
+    "infrastructure#lint": {
+      "dependsOn": [],
+      "inputs": ["index.ts", "src/**", "eslint.config.js", "package.json"],
+      "outputs": []
     }
   }
 }
