@@ -20,9 +20,9 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ## Phase 1: Setup
 
-- [ ] T001 Create the `infrastructure/` workspace package skeleton: `package.json` (name `@fp/infrastructure`; dependencies `@pulumi/pulumi`, `@pulumi/docker-build`, `@pulumi/command`, `zod`; devDependencies `@fp/config-eslint`, `@fp/config-typescript`, `typescript`, `eslint`, `vitest`), `tsconfig.json` (extends `@fp/config-typescript/base.json`), `eslint.config.js` (extends `@fp/config-eslint`) — the same three-file shape every existing workspace package already has
-- [ ] T002 Add `infrastructure` to `pnpm-workspace.yaml`'s package list — a literal path, not a glob, since `apps/*` and `packages/*` do not match it. ARCHITECTURE.md §8 already reserves this location; the workspace glob does not yet include it
-- [ ] T003 `pnpm install`; confirm `infrastructure` resolves as a workspace member and its declared dependencies install cleanly
+- [X] T001 Create the `infrastructure/` workspace package skeleton: `package.json` (name `@fp/infrastructure`; dependencies `@pulumi/pulumi`, `@pulumi/docker-build`, `@pulumi/command`, `zod`; devDependencies `@fp/config-eslint`, `@fp/config-typescript`, `typescript`, `eslint`, `vitest`), `tsconfig.json` (extends `@fp/config-typescript/base.json`), `eslint.config.js` (extends `@fp/config-eslint`) — the same three-file shape every existing workspace package already has
+- [X] T002 Add `infrastructure` to `pnpm-workspace.yaml`'s package list — a literal path, not a glob, since `apps/*` and `packages/*` do not match it. ARCHITECTURE.md §8 already reserves this location; the workspace glob does not yet include it
+- [X] T003 `pnpm install`; confirm `infrastructure` resolves as a workspace member and its declared dependencies install cleanly
 
 ---
 
@@ -30,10 +30,10 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 **Purpose**: Prove the boundary gate catches a new package with no rule (again — this is the second time this exact proof matters, per spec 005 T025), then give the program a config surface that fails before touching anything if it's wrong.
 
-- [ ] T004 Run `pnpm boundaries`; confirm it **FAILS** — `infrastructure` has no `WORKSPACE_GRAPH` entry in `.dependency-cruiser.cjs`, so its own `eslint.config.js` importing `@fp/config-eslint` is `not-in-allowed`. If this passes, the fail-closed configuration T005 of spec 005 built has regressed
-- [ ] T005 Add `'infrastructure': []` to `WORKSPACE_GRAPH` in `.dependency-cruiser.cjs` — its only workspace dependency is `packages/config-*`, already implicit in the existing expansion (matches plan.md's Constitution Check: "does not import `packages/core`, `packages/persistence`'s client, or any application package"). Confirm `pnpm boundaries` passes again
-- [ ] T006 Create `infrastructure/src/config.ts`: `StackConfig`, a Zod schema per [data-model.md](data-model.md) — `vpsHost`, `vpsSshUser`, `vpsSshPort` (default 22), `vpsSshPrivateKey` (secret, MUST parse as a well-formed PEM key), `postgresPassword` (secret), `apiPublishedPort` (default 8080, 1024–65535), `stagingNetworkName` (default `family-platform-staging`), `resetData` (default `false`) — parsed once at program start and MUST fail before any Pulumi resource is constructed on an invalid value (Constitution Principle II), mirroring `apps/api/src/config/env.schema.ts` exactly
-- [ ] T007 [P] Write `infrastructure/src/config.spec.ts`: unit tests for every `StackConfig` validation rule in T006 — empty `vpsHost`/`vpsSshUser` fails, a malformed `vpsSshPrivateKey` fails before any resource construction, `apiPublishedPort` outside 1024–65535 fails. Pure schema tests — no VPS, no Pulumi runtime, unit tier
+- [X] T004 Run `pnpm boundaries`; confirm it **FAILS** — `infrastructure` has no `WORKSPACE_GRAPH` entry in `.dependency-cruiser.cjs`, so its own `eslint.config.js` importing `@fp/config-eslint` is `not-in-allowed`. If this passes, the fail-closed configuration T005 of spec 005 built has regressed
+- [X] T005 Add `'infrastructure': []` to `WORKSPACE_GRAPH` in `.dependency-cruiser.cjs` — its only workspace dependency is `packages/config-*`, already implicit in the existing expansion (matches plan.md's Constitution Check: "does not import `packages/core`, `packages/persistence`'s client, or any application package"). Confirm `pnpm boundaries` passes again
+- [X] T006 Create `infrastructure/src/config.ts`: `StackConfig`, a Zod schema per [data-model.md](data-model.md) — `vpsHost`, `vpsSshUser`, `vpsSshPort` (default 22), `vpsSshPrivateKey` (secret, MUST parse as a well-formed PEM key), `postgresPassword` (secret), `apiPublishedPort` (default 8080, 1024–65535), `stagingNetworkName` (default `family-platform-staging`), `resetData` (default `false`) — parsed once at program start and MUST fail before any Pulumi resource is constructed on an invalid value (Constitution Principle II), mirroring `apps/api/src/config/env.schema.ts` exactly
+- [X] T007 [P] Write `infrastructure/src/config.spec.ts`: unit tests for every `StackConfig` validation rule in T006 — empty `vpsHost`/`vpsSshUser` fails, a malformed `vpsSshPrivateKey` fails before any resource construction, `apiPublishedPort` outside 1024–65535 fails. Pure schema tests — no VPS, no Pulumi runtime, unit tier
 
 **Checkpoint**: A misconfigured stack fails immediately and by name, before anything reaches the VPS.
 
@@ -47,19 +47,19 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Create `docker-compose.staging.yml` per [data-model.md](data-model.md)'s `ComposeServiceSet`: `postgres` override (`restart: unless-stopped`, joins `stagingNetworkName`); `migrate` override (joins `stagingNetworkName`, `DATABASE_URL` from `StackConfig` — **no bind mount** of `packages/persistence/prisma`, unlike the local override; the deployed image's own baked-in migrations are what proves the transferred artifact, not the deploy host's working tree); `api` override (`restart: unless-stopped` FR-017, published port from `apiPublishedPort` FR-004, joins `stagingNetworkName`, environment from `StackConfig`)
-- [ ] T009 [P] [US1] Create `infrastructure/src/image.ts`: a `docker-build.Image` resource building `apps/api/Dockerfile`'s `runtime` target locally, on whichever machine runs `pulumi up` (research.md §1) — the same artifact CI's `image` job already builds and health-checks on every pull request (FR-018); this feature defines no Dockerfile of its own
-- [ ] T010 [P] [US1] Create `infrastructure/src/transfer.ts`: a `command.remote.CopyToRemote` resource transferring the built image tarball plus `docker-compose.yml` and `docker-compose.staging.yml` to the VPS, connecting with `StackConfig`'s `vpsHost`/`vpsSshUser`/`vpsSshPort`/`vpsSshPrivateKey`
-- [ ] T011 [US1] Create `infrastructure/src/deploy.ts`: a `command.remote.Command` sequence implementing research.md §2's corrected ordering — `docker load`, then `docker compose -f docker-compose.yml -f docker-compose.staging.yml run --rm migrate`, then **only on success** `docker compose ... up -d`. A failed migration MUST leave the previous deployment running and MUST NOT reach the `up` step (FR-009) — this is the ordering the whole feature exists to get right
-- [ ] T012 [US1] Create `infrastructure/index.ts`: the program entrypoint, wiring config (T006) → image (T009) → transfer (T010) → deploy (T011); export the staging URL (`http://<vpsHost>:<apiPublishedPort>`) as a stack output
-- [ ] T013 [US1] Add `pnpm staging:preview` / `staging:deploy` / `staging:deploy:reset` / `staging:destroy` scripts to the root `package.json`, exactly matching [contracts/cli-and-config.md](contracts/cli-and-config.md)'s command table (`staging:destroy` runs `pulumi state unprotect --all` before `pulumi destroy`)
-- [ ] T014 [US1] Create `packages/persistence/prisma/seed.ts` (FR-010/FR-011): seeds the fixture data set against the `ScaffoldProbe` table spec 001 already defined, proving the seeding mechanism end to end against today's schema. Contains no real name, address, document, or any field resembling one — and by construction offers **no supported path** for anything else (SC-005). Wire `prisma.seed` into `packages/persistence/package.json` so `prisma db seed` runs it
-- [ ] T015 [US1] Create `docs/staging-environment.md` (FR-015): states explicitly what the staging environment is for (technical validation, demos, the founder's own dogfooding) and its synthetic-data-only constraint, including that it is never authorized to hold real user or family data — written so SC-006 holds without the reader needing to ask anyone
+- [X] T008 [US1] Create `docker-compose.staging.yml` per [data-model.md](data-model.md)'s `ComposeServiceSet`: `postgres` override (`restart: unless-stopped`, joins `stagingNetworkName`); `migrate` override (joins `stagingNetworkName`, `DATABASE_URL` from `StackConfig` — **no bind mount** of `packages/persistence/prisma`, unlike the local override; the deployed image's own baked-in migrations are what proves the transferred artifact, not the deploy host's working tree); `api` override (`restart: unless-stopped` FR-017, published port from `apiPublishedPort` FR-004, joins `stagingNetworkName`, environment from `StackConfig`)
+- [X] T009 [P] [US1] Create `infrastructure/src/image.ts`: a `docker-build.Image` resource building `apps/api/Dockerfile`'s `runtime` target locally, on whichever machine runs `pulumi up` (research.md §1) — the same artifact CI's `image` job already builds and health-checks on every pull request (FR-018); this feature defines no Dockerfile of its own
+- [X] T010 [P] [US1] Create `infrastructure/src/transfer.ts`: a `command.remote.CopyToRemote` resource transferring the built image tarball plus `docker-compose.yml` and `docker-compose.staging.yml` to the VPS, connecting with `StackConfig`'s `vpsHost`/`vpsSshUser`/`vpsSshPort`/`vpsSshPrivateKey`
+- [X] T011 [US1] Create `infrastructure/src/deploy.ts`: a `command.remote.Command` sequence implementing research.md §2's corrected ordering — `docker load`, then `docker compose -f docker-compose.yml -f docker-compose.staging.yml run --rm migrate`, then **only on success** `docker compose ... up -d`. A failed migration MUST leave the previous deployment running and MUST NOT reach the `up` step (FR-009) — this is the ordering the whole feature exists to get right
+- [X] T012 [US1] Create `infrastructure/index.ts`: the program entrypoint, wiring config (T006) → image (T009) → transfer (T010) → deploy (T011); export the staging URL (`http://<vpsHost>:<apiPublishedPort>`) as a stack output
+- [X] T013 [US1] Add `pnpm staging:preview` / `staging:deploy` / `staging:deploy:reset` / `staging:destroy` scripts to the root `package.json`, exactly matching [contracts/cli-and-config.md](contracts/cli-and-config.md)'s command table (`staging:destroy` runs `pulumi state unprotect --all` before `pulumi destroy`)
+- [X] T014 [US1] Create `packages/persistence/prisma/seed.ts` (FR-010/FR-011): seeds the fixture data set against the `ScaffoldProbe` table spec 001 already defined, proving the seeding mechanism end to end against today's schema. Contains no real name, address, document, or any field resembling one — and by construction offers **no supported path** for anything else (SC-005). Wire `prisma.seed` into `packages/persistence/package.json` so `prisma db seed` runs it
+- [X] T015 [US1] Create `docs/staging-environment.md` (FR-015): states explicitly what the staging environment is for (technical validation, demos, the founder's own dogfooding) and its synthetic-data-only constraint, including that it is never authorized to hold real user or family data — written so SC-006 holds without the reader needing to ask anyone
 
 ### Verification for User Story 1 — mine, no VPS needed
 
-- [ ] T016 [US1] `pnpm typecheck && pnpm lint` clean across `infrastructure/` and the amended `packages/persistence`
-- [ ] T017 [US1] Run quickstart Scenario 5 cold: read `docs/staging-environment.md` with no other context and confirm SC-006 holds — the purpose and the data constraint are both restatable unaided
+- [X] T016 [US1] `pnpm typecheck && pnpm lint` clean across `infrastructure/` and the amended `packages/persistence`
+- [X] T017 [US1] Run quickstart Scenario 5 cold: read `docs/staging-environment.md` with no other context and confirm SC-006 holds — the purpose and the data constraint are both restatable unaided
 
 ### Verification for User Story 1 — **Requires the user** (real VPS + Pulumi Cloud)
 
@@ -78,12 +78,12 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] Amend `infrastructure/src/deploy.ts`: add the `resetData`-conditional path (FR-012) — when `true`, wipe and reseed the database fresh from fixtures as part of the same deploy run; when `false` (the default), previously seeded or founder-generated data is left untouched. Same file as T011; sequential, not parallel
-- [ ] T021 [US2] Add `infra-preview` and `infra-deploy` jobs to `.github/workflows/ci.yml`, per the corrected CI trigger contract in [contracts/cli-and-config.md](contracts/cli-and-config.md): `infra-preview` on `pull_request` → `main` (`pnpm staging:preview`, mutates nothing); `infra-deploy` on `push` → `main`, `needs:` the full ten-job blocking set — `typecheck`, `lint`, `format`, `test`, `test-integration`, `verify-env`, `boundaries`, `security`, `build`, `image`. **No existing job renamed** — branch protection names required checks by job name
+- [X] T020 [US2] Amend `infrastructure/src/deploy.ts`: add the `resetData`-conditional path (FR-012) — when `true`, wipe and reseed the database fresh from fixtures as part of the same deploy run; when `false` (the default), previously seeded or founder-generated data is left untouched. Same file as T011; sequential, not parallel
+- [X] T021 [US2] Add `infra-preview` and `infra-deploy` jobs to `.github/workflows/ci.yml`, per the corrected CI trigger contract in [contracts/cli-and-config.md](contracts/cli-and-config.md): `infra-preview` on `pull_request` → `main` (`pnpm staging:preview`, mutates nothing); `infra-deploy` on `push` → `main`, `needs:` the full ten-job blocking set — `typecheck`, `lint`, `format`, `test`, `test-integration`, `verify-env`, `boundaries`, `security`, `build`, `image`. **No existing job renamed** — branch protection names required checks by job name
 
 ### Verification for User Story 2 — mine
 
-- [ ] T022 [US2] Confirm, by reading the workflow file rather than running it, that `infra-preview`'s steps never invoke `pulumi up`, `staging:deploy`, `staging:deploy:reset`, or `staging:destroy` — a preview job that can mutate state is not a preview job
+- [X] T022 [US2] Confirm, by reading the workflow file rather than running it, that `infra-preview`'s steps never invoke `pulumi up`, `staging:deploy`, `staging:deploy:reset`, or `staging:destroy` — a preview job that can mutate state is not a preview job
 
 ### Verification for User Story 2 — **Requires the user**
 
@@ -103,8 +103,8 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Write `infrastructure/deploy.test.ts` using `@pulumi/pulumi/testing`'s mock harness (research.md §5): assert the staging network name/config can never resolve to a value that would collide with the portfolio site's own containers, and that every `command.remote.*` resource's connection host is sourced from the same `StackConfig.vpsHost` value rather than a second, possibly-drifted literal. No VPS, no Pulumi Cloud, no network call — this is the one real assertion behind the constitution's "Unit tests" gate for this package, not an empty stub (research.md §5 rejects that explicitly)
-- [ ] T027 [US3] Confirm `infrastructure`'s `test` script is picked up by the root `test` / `turbo run test` chain and `pnpm test` passes with no database and no VPS reachable — it stays in the fast unit tier (the same SC-007 discipline spec 005 established applies here too)
+- [X] T026 [US3] Write `infrastructure/deploy.test.ts` using `@pulumi/pulumi/testing`'s mock harness (research.md §5): assert the staging network name/config can never resolve to a value that would collide with the portfolio site's own containers, and that every `command.remote.*` resource's connection host is sourced from the same `StackConfig.vpsHost` value rather than a second, possibly-drifted literal. No VPS, no Pulumi Cloud, no network call — this is the one real assertion behind the constitution's "Unit tests" gate for this package, not an empty stub (research.md §5 rejects that explicitly)
+- [X] T027 [US3] Confirm `infrastructure`'s `test` script is picked up by the root `test` / `turbo run test` chain and `pnpm test` passes with no database and no VPS reachable — it stays in the fast unit tier (the same SC-007 discipline spec 005 established applies here too)
 
 ### Verification for User Story 3 — **Requires the user**
 
@@ -117,11 +117,11 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T030 [P] Update `README.md` with a short pointer to `docs/staging-environment.md`, consistent with the Continuous Integration section spec 005 already added there
-- [ ] T031 Re-read `contracts/cli-and-config.md`, `data-model.md`, and `quickstart.md` end to end against what was actually implemented, correcting any further drift — the same discipline that caught the stale four-job `infra-deploy` dependency list before this task list was written
-- [ ] T032 Confirm the constitution's "Infrastructure validation and preview" gate row now maps to a named, reporting check (`infra-preview`) — the same row-by-row reconciliation spec 005's T041 performed for its own three rows
+- [X] T030 [P] Update `README.md` with a short pointer to `docs/staging-environment.md`, consistent with the Continuous Integration section spec 005 already added there
+- [X] T031 Re-read `contracts/cli-and-config.md`, `data-model.md`, and `quickstart.md` end to end against what was actually implemented, correcting any further drift — the same discipline that caught the stale four-job `infra-deploy` dependency list before this task list was written
+- [X] T032 Confirm the constitution's "Infrastructure validation and preview" gate row now maps to a named, reporting check (`infra-preview`) — the same row-by-row reconciliation spec 005's T041 performed for its own three rows
 - [ ] T033 **Requires the user.** Once `infra-preview` has reported green at least once on a real pull request, add it to branch protection's required-check list. **`infra-deploy` cannot be a required PR check** — it triggers on `push` to `main`, after merge, so there is structurally nothing for a pull request to wait on
-- [ ] T034 Open a follow-up issue proposing a check that verifies `infra-deploy`'s `needs:` list is a superset of every other blocking job name in `ci.yml`. Named as a real, live gap during this feature's planning correction (contracts/cli-and-config.md) rather than left as an unenforced comment: a future feature that adds another blocking CI job and forgets to extend `infra-deploy`'s `needs:` list silently reopens the exact gap spec 005 exists to close, and nothing today would catch that but a human re-reading two lists side by side
+- [X] T034 Open a follow-up issue proposing a check that verifies `infra-deploy`'s `needs:` list is a superset of every other blocking job name in `ci.yml`. Named as a real, live gap during this feature's planning correction (contracts/cli-and-config.md) rather than left as an unenforced comment: a future feature that adds another blocking CI job and forgets to extend `infra-deploy`'s `needs:` list silently reopens the exact gap spec 005 exists to close, and nothing today would catch that but a human re-reading two lists side by side. Opened as [#19](https://github.com/rashadataf/family-platform/issues/19)
 
 ---
 
