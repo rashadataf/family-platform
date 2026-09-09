@@ -54,6 +54,16 @@
       "dependsOn": [],
       "inputs": ["index.ts", "src/**", "eslint.config.js", "package.json"],
       "outputs": []
+    },
+
+    // packages/persistence's typecheck also runs a second tsc project for
+    // prisma/seed.ts (T014) — it cannot share tsconfig.json's rootDir:"src",
+    // so it lives in prisma/tsconfig.json instead. Without this override
+    // turbo would not invalidate its cache when the seed script changes.
+    "@fp/persistence#typecheck": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["src/**", "tsconfig.json", "prisma/seed.ts", "prisma/tsconfig.json"],
+      "outputs": []
     }
   }
 }

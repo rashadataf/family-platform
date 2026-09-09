@@ -29,6 +29,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "turbo build",
+    "staging:preview": "pulumi preview --cwd infrastructure --stack vps-staging",
+    "staging:deploy": "pulumi up --cwd infrastructure --stack vps-staging --yes",
+    "staging:deploy:reset": "pulumi up --cwd infrastructure --stack vps-staging --yes --config resetData=true",
+    "staging:destroy": "pulumi state unprotect --cwd infrastructure --stack vps-staging --all --yes && pulumi destroy --cwd infrastructure --stack vps-staging --yes",
     "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm test:integration && pnpm format:check && pnpm verify:env && pnpm verify:node-version && pnpm verify:action-pins && pnpm verify:suppressions && pnpm verify:workspace && pnpm build"
   },
   "devDependencies": {

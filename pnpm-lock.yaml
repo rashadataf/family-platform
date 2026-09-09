@@ -176,12 +176,18 @@ importers:
       '@fp/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
       eslint:
         specifier: ^9.39.1
         version: 9.39.5(jiti@2.7.0)
       prisma:
         specifier: ^6.16.3
         version: 6.19.3(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.13
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
