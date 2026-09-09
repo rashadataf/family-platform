@@ -33,6 +33,10 @@ const WORKSPACE_GRAPH = {
   // ai, or any app.
   'packages/persistence': ['packages/core', 'packages/kernel'],
 
+  // The integration-test harness. It drives a real database through the same
+  // package everything else does, and exports no client of its own.
+  'packages/testing': ['packages/persistence'],
+
   // Shared configuration. Leaves: they depend on npm packages only.
   'packages/config-eslint': [],
   'packages/config-prettier': [],
@@ -85,6 +89,10 @@ module.exports = {
     { from: { path: '^scripts/' }, to: { path: '^scripts/' } },
     { from: { path: '^[^/]+\\.(c|m)?(j|t)s$' }, to: { path: '^packages/config-' } },
 
+    // Test files may use the integration harness. Production modules may not —
+    // `harness-is-test-only` below says so by name.
+    { from: { path: '\\.(spec|test)\\.ts$' }, to: { path: '^packages/testing/' } },
+
     // `scripts/` reads the API's environment schema so that `pnpm verify:env`
     // and `pnpm dev` validate against the one authoritative definition rather
     // than a second copy that drifts (Principle II).
@@ -132,6 +140,15 @@ module.exports = {
         'One app importing another (ARCHITECTURE §6). Apps are composition roots and deployment units; shared code belongs in a package.',
       from: { path: '^apps/([^/]+)/' },
       to: { path: '^apps/', pathNot: '^apps/$1/' },
+    },
+
+    {
+      name: 'harness-is-test-only',
+      severity: 'error',
+      comment:
+        'packages/testing is the integration-test harness. Only a *.spec.ts / *.test.ts file may import it. A production module reaching for a test fixture means the fixture is really domain code and belongs somewhere else.',
+      from: { pathNot: '\\.(spec|test)\\.ts$|^packages/testing/|^vitest\\.config\\.ts$' },
+      to: { path: '^packages/testing/' },
     },
 
     // ---- Rules for the structure that does not exist yet -------------------

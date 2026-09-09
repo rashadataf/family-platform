@@ -18,17 +18,18 @@
     "verify:node-version": "tsx scripts/verify-node-version.ts",
     "verify:action-pins": "tsx scripts/verify-action-pins.ts",
     "verify:suppressions": "tsx scripts/verify-suppressions.ts",
+    "verify:workspace": "tsx scripts/verify-workspace-packages.ts",
     "typecheck": "turbo run typecheck typecheck:workspace-root",
     "typecheck:workspace-root": "tsc -p scripts/tsconfig.json",
     "lint": "turbo run lint lint:workspace-root",
     "lint:workspace-root": "eslint . --max-warnings 0",
     "boundaries": "tsx scripts/boundaries.ts",
-    "test": "turbo run test test:workspace-root",
-    "test:workspace-root": "vitest run --dir scripts",
+    "test": "turbo run build && vitest run --project unit",
+    "test:integration": "turbo run build && vitest run --project integration",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build": "turbo build",
-    "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm format:check && pnpm verify:env && pnpm verify:node-version && pnpm verify:action-pins && pnpm verify:suppressions && pnpm build"
+    "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm test:integration && pnpm format:check && pnpm verify:env && pnpm verify:node-version && pnpm verify:action-pins && pnpm verify:suppressions && pnpm verify:workspace && pnpm build"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",

@@ -96,6 +96,7 @@ services:
       - config_eslint_node_modules:/app/packages/config-eslint/node_modules
       - config_prettier_node_modules:/app/packages/config-prettier/node_modules
       - config_typescript_node_modules:/app/packages/config-typescript/node_modules
+      - testing_node_modules:/app/packages/testing/node_modules
     healthcheck:
       test:
         [
@@ -138,3 +139,4 @@ volumes:
   config_eslint_node_modules:
   config_prettier_node_modules:
   config_typescript_node_modules:
+  testing_node_modules:

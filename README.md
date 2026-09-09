@@ -23,4 +23,19 @@ See [`docs/local-development.md`](docs/local-development.md) for the full guide,
 
 ## Continuous Integration
 
-Every pull request against `main`, and every push to `main`, runs independently-reported checks: `typecheck`, `lint`, `format`, `test`, `verify-env`, `build`, and `image` (which builds the deployable container, asserts its contents, and requires it to start against a real database). See [`specs/002-ci-pipeline/contracts/required-checks.md`](specs/002-ci-pipeline/contracts/required-checks.md) for the exact trigger, permissions, and required-check configuration.
+Every pull request against `main`, and every push to `main`, runs ten independently-reported checks:
+
+| Check | What it blocks on |
+|---|---|
+| `typecheck` | A type error, in strict mode, anywhere including `scripts/` |
+| `lint` | Any lint warning — the threshold is zero |
+| `format` | A file Prettier would reformat |
+| `test` | A failing unit test. No database; the tier stays fast on purpose |
+| `test-integration` | A failing test against a real, migrated PostgreSQL |
+| `boundaries` | A forbidden import or a dependency cycle. **Fails closed** — an import matching no rule is an error |
+| `security` | A secret in the diff, or a HIGH/CRITICAL advisory in the lockfile |
+| `verify-env` | `.env.example` drifting from the API's schema, Node version drift, an unpinned action, an undeclared workspace package |
+| `build` | A build failure in any package |
+| `image` | A deployable image that will not build, carries a package manager or source, runs as root, will not reach `/health/ready` against a real database, ignores SIGTERM, or has a fixable HIGH/CRITICAL CVE |
+
+Every third-party GitHub Action is pinned to a commit SHA, and Dependabot keeps the pins current. See [`specs/002-ci-pipeline/contracts/required-checks.md`](specs/002-ci-pipeline/contracts/required-checks.md) for the trigger and permissions, and [`specs/005-merge-gate-enforcement/contracts/gates-and-config.md`](specs/005-merge-gate-enforcement/contracts/gates-and-config.md) for what each gate owns.

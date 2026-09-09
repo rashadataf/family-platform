@@ -7,6 +7,7 @@
   "include": [
     "**/*.ts",
     "../apps/api/src/config/env.schema.ts",
-    "../apps/api/src/config/load-env.ts"
+    "../apps/api/src/config/load-env.ts",
+    "../vitest.config.ts"
   ]
 }

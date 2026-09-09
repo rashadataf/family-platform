@@ -48,6 +48,12 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm format:check
 
+  # The UNIT tier only, and it must stay that way: no database, under 30
+  # seconds (FR-021, SC-007). The integration tier is `test-integration`.
+  #
+  # The job NAME is unchanged even though the command behind it is not.
+  # Branch protection on `main` names required checks by job name, so renaming
+  # this would block every later merge on a check that no longer reports.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +61,41 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: test
-      - run: pnpm exec turbo run test test:workspace-root
+      - run: pnpm test
+
+  # Separate from `test` because the constitution's gate table lists unit and
+  # integration tests as separate rows, and because folding them together would
+  # make the fast tier as slow as the slow one — at which point people stop
+  # running it locally, which is the whole value of having a fast tier.
+  #
+  # The harness derives `<database>_test` from DATABASE_URL and applies the
+  # committed migrations to it, so this needs no CI-specific flag: the same
+  # `pnpm test:integration` runs here, on the host, and in the dev container
+  # (FR-020).
+  test-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: family_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d family_platform"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:localdev@127.0.0.1:5432/family_platform
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        with:
+          turbo-cache-key: test-integration
+      - run: pnpm test:integration
 
   # Constitution Principle III: "Architecture Boundaries Are Enforced, Not
   # Suggested". The principle names dependency-cruiser explicitly and until now
@@ -87,6 +127,7 @@ jobs:
       - run: pnpm verify:env
       - run: pnpm verify:node-version
       - run: pnpm verify:action-pins
+      - run: pnpm verify:workspace
 
   # Closes TODO(SECURITY_SCAN_TOOLING), open since the constitution was
   # ratified. Two scanners, because they fail differently.

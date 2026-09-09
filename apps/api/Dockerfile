@@ -56,6 +56,7 @@ COPY packages/persistence/package.json     packages/persistence/
 COPY packages/config-eslint/package.json   packages/config-eslint/
 COPY packages/config-prettier/package.json packages/config-prettier/
 COPY packages/config-typescript/package.json packages/config-typescript/
+COPY packages/testing/package.json          packages/testing/
 
 # Prisma schema + migrations: an input to `postinstall`, and the entire payload
 # of the `migrator` target below.
