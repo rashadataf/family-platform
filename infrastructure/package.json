@@ -1,0 +1,24 @@
+{
+  "name": "@fp/infrastructure",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pulumi/command": "^1.2.1",
+    "@pulumi/docker-build": "^0.0.22",
+    "@pulumi/pulumi": "^3.261.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@fp/config-eslint": "workspace:*",
+    "@fp/config-typescript": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
+  }
+}

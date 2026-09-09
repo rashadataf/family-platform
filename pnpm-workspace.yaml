@@ -1,6 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  # A literal path, not a glob: this is the one package ADR-004/ADR-013
+  # place outside apps/* and packages/*, per ARCHITECTURE.md §8.
+  - 'infrastructure'
 
 # pnpm 10 blocks postinstall scripts by default. These need them:
 # Prisma downloads its query engine binaries, esbuild its platform binary.
@@ -10,6 +13,14 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - 'esbuild'
   - 'prisma'
+  # Each downloads its matching Pulumi resource provider plugin binary
+  # (`scripts/install-pulumi-plugin.js`) — without it, `pulumi up`/`preview`
+  # fails at the first resource of that type with "no resource plugin found".
+  - '@pulumi/command'
+  - '@pulumi/docker-build'
+  # Transitive dependency of @pulumi/pulumi's gRPC layer; its postinstall
+  # selects a prebuilt binary for protobuf (de)serialization.
+  - 'protobufjs'
 
 # Transitive dependencies forced past a published advisory.
 #

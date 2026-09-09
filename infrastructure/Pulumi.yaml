@@ -1,0 +1,11 @@
+name: infrastructure
+description: >-
+  ADR-004/ADR-013 Stage 0: the vps-staging stack, deploying the same
+  container images spec 001/004 already produce to the founder's existing
+  VPS over SSH, isolated from its portfolio-site containers (spec 003).
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+    packagemanager: pnpm
+main: index.ts
