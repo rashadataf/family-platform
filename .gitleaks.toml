@@ -53,7 +53,15 @@ keywords = ["postgres", "postgresql", "mysql", "mongodb", "redis", "amqp"]
   description = "Known development placeholders, not credentials"
   regexTarget = "match"
   regexes = [
-    '''(?i):(localdev|postgres|password|changeme|secret|example|test)@''',
+    '''(?i):(localdev|postgres|password|changeme|secret|example|test|arealpassword|realpassword)@''',
+    # `arealpassword` / `realpassword`: this feature's own spec.md and research.md
+    # illustrated a connection-string leak using an illustrative English phrase
+    # rather than a placeholder token, before the prose was corrected to
+    # `<password>`. The two commits that introduced it (20d49c4, 633ecf0) are on
+    # `main` now, so this is enumerated by value rather than fixed by rewriting
+    # published history. It is a specific, known, historical string — not a path
+    # exemption for `specs/**`, which stays unallowlisted on purpose so a real
+    # credential pasted into a spec later is still caught.
     '''\$\{[^}]+\}@''',
     ''':<[^>]+>@''',
   ]
