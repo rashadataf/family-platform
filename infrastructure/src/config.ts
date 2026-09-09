@@ -38,7 +38,9 @@ function isWellFormedOpenSshPrivateKey(pem: string): boolean {
 
   try {
     const body = Buffer.from(match[1].replace(/\s+/g, ''), 'base64');
-    return body.toString('binary', 0, OPENSSH_PRIVATE_KEY_MAGIC.length) === OPENSSH_PRIVATE_KEY_MAGIC;
+    return (
+      body.toString('binary', 0, OPENSSH_PRIVATE_KEY_MAGIC.length) === OPENSSH_PRIVATE_KEY_MAGIC
+    );
   } catch {
     return false;
   }

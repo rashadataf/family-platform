@@ -79,7 +79,7 @@ describe('loadStackConfig', () => {
     );
   });
 
-  it('accepts an OpenSSH-format vpsSshPrivateKey (ssh-keygen -t ed25519\'s default output)', () => {
+  it("accepts an OpenSSH-format vpsSshPrivateKey (ssh-keygen -t ed25519's default output)", () => {
     expect(() =>
       loadStackConfig({ ...VALID_RAW, vpsSshPrivateKey: WELL_FORMED_OPENSSH_KEY }),
     ).not.toThrow();
