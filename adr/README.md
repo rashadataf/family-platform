@@ -14,6 +14,7 @@ An ADR records a decision that is expensive to reverse, together with the altern
 | [006](ADR-006-api-style-and-type-safety.md) | REST API with ts-rest and Zod contracts | Accepted | 2026-09-08 |
 | [013](ADR-013-staged-hosting-model.md) | Staged hosting model: VPS-first pre-launch, AWS at real-user data | Accepted | 2026-09-08 |
 | [014](ADR-014-containerized-development.md) | The container image is the unit of truth, including on a developer's laptop | Accepted | 2026-09-08 |
+| [015](ADR-015-repository-visibility.md) | Repository visibility: public, chosen deliberately | Accepted | 2026-09-09 |
 
 ## Planned
 
