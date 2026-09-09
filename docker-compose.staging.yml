@@ -1,0 +1,80 @@
+# Staging-only overrides for the vps-staging Pulumi stack (spec 003).
+# Combined with the base file, never applied alone:
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml ...
+#
+# Every service here amends or replaces a piece of the base file (spec 001 +
+# spec 004); nothing here defines a service of its own (FR-018 — this
+# feature ships no image).
+#
+# The base file's `api` service requires an `.env` (`env_file: [.env]`) so a
+# missing one fails loudly rather than starting with silent defaults. A
+# staging deploy has no contributor-authored `.env` — `docker-compose.staging.env`
+# is transferred as `.env` alongside these two compose files
+# (infrastructure/src/transfer.ts) to satisfy that requirement with fixed,
+# non-secret staging values only. The one real secret POSTGRES_PASSWORD needs
+# is never written to a file on the VPS (data-model.md); it reaches
+# containers only through the SSH session's process environment and the
+# `${POSTGRES_PASSWORD}` interpolations below.
+#
+# `image:` below must match the tag baked in by
+# infrastructure/src/image.ts's RUNTIME_IMAGE_TAG / MIGRATOR_IMAGE_TAG
+# constants — the two files have no shared source of truth for that string,
+# so a rename in one and not the other fails at `docker compose up` with
+# "image not found", not at review time.
+
+services:
+  postgres:
+    # `restart: unless-stopped` is already set in the base file (FR-017).
+    #
+    # Host port publication is reset to none: nothing outside this Docker
+    # network needs to reach staging's Postgres directly (the clarification
+    # in spec.md settled on SSH + the Docker CLI as sufficient), and not
+    # publishing it removes an entire class of host-port collision with
+    # whatever the portfolio site's own containers already bind on this VPS.
+    ports: !reset []
+    networks:
+      - staging
+
+  # One-shot migration/seed runner (spec 004's migrator target, consumed here
+  # per FR-018 — corrects issue #9, which originally had this feature invoke
+  # `prisma migrate deploy` against the api image directly; that image
+  # carries no Prisma CLI by design).
+  migrate:
+    image: fp-api:staging-migrator
+    build: !reset null
+    # No bind mount of packages/persistence/prisma, unlike the local
+    # override in the base file: a staging deploy migrates what the
+    # TRANSFERRED IMAGE actually contains, baked in at build time — not
+    # whatever happens to be on the deploy host's working tree
+    # (data-model.md's ComposeServiceSet note).
+    volumes: !reset []
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-family_platform}
+    networks:
+      - staging
+
+  api:
+    image: fp-api:staging-runtime
+    build: !reset null
+    restart: unless-stopped
+    # Replaces, not adds to, the base file's local dev port mapping — the
+    # base and staging port variables are deliberately different names
+    # (PORT vs API_PUBLISHED_PORT) so the two can never be silently summed
+    # into two host bindings for the same container port.
+    ports: !reset
+      - '${API_PUBLISHED_PORT}:3000'
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-family_platform}
+    # No source bind mount: the base file's `.:/app` and per-package
+    # node_modules volumes exist for the `development` target's live-edit
+    # workflow, which staging's `runtime` image target does not use at all.
+    volumes: !reset []
+    networks:
+      - staging
+
+# A plain (non-`external`) network: Compose creates a fresh, isolated
+# network on first use, which is what satisfies FR-005 by construction
+# rather than by an additional isolation step (data-model.md).
+networks:
+  staging:
+    name: ${STAGING_NETWORK_NAME:-family-platform-staging}
