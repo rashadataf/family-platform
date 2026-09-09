@@ -42,10 +42,13 @@ Placeholders resolved:
   [LAST_AMENDED_DATE]       -> 2026-09-08
 
 Deferred items / follow-up TODOs:
-  - TODO(SECURITY_SCAN_TOOLING): The merge-gate table in "Development Workflow and Quality Gates"
-    requires a security scan covering dependency vulnerabilities and secret scanning, but names
-    no specific scanner. Resolve when the CI pipeline is specified. This requires no amendment,
-    because this constitution deliberately does not own tool selection.
+  - RESOLVED(SECURITY_SCAN_TOOLING) on 2026-09-09 by spec 005 (merge gate enforcement). The
+    merge-gate table's security row is now implemented by the `security` CI job — gitleaks for
+    secrets and osv-scanner for dependency advisories, blocking on HIGH and CRITICAL — plus a
+    trivy scan of the runtime image in the `image` job and a scheduled full-history secret audit.
+    Selection and rationale live in specs/005-merge-gate-enforcement/research.md, not here: this
+    constitution deliberately does not own tool selection, which is why resolving this needed no
+    amendment and the version is unchanged.
   - Principles VIII, IX and X cite ADR-005, ADR-006 and ADR-004 respectively. Those ADRs are
     Accepted. No placeholder citations remain.
   - Planned ADRs 007-012 (see adr/README.md) are not yet written. Principles that will
