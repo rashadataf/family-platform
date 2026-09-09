@@ -58,9 +58,9 @@ describe('loadStackConfig', () => {
   });
 
   it('rejects a malformed vpsSshPrivateKey before any resource is constructed', () => {
-    expect(() =>
-      loadStackConfig({ ...VALID_RAW, vpsSshPrivateKey: 'not a pem key' }),
-    ).toThrow(/vpsSshPrivateKey/);
+    expect(() => loadStackConfig({ ...VALID_RAW, vpsSshPrivateKey: 'not a pem key' })).toThrow(
+      /vpsSshPrivateKey/,
+    );
   });
 
   it('rejects an empty postgresPassword', () => {
@@ -91,8 +91,8 @@ describe('loadStackConfig', () => {
   );
 
   it('names every invalid field in a single error, not just the first', () => {
-    expect(() =>
-      loadStackConfig({ vpsHost: '', vpsSshUser: '', postgresPassword: '' }),
-    ).toThrow(/vpsHost[\s\S]*vpsSshUser|vpsSshUser[\s\S]*vpsHost/);
+    expect(() => loadStackConfig({ vpsHost: '', vpsSshUser: '', postgresPassword: '' })).toThrow(
+      /vpsHost[\s\S]*vpsSshUser|vpsSshUser[\s\S]*vpsHost/,
+    );
   });
 });

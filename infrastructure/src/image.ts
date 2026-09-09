@@ -48,9 +48,7 @@ export function buildStagingImages(): StagingImages {
   const migrator = new dockerBuild.Image('staging-migrator-image', {
     ...common,
     target: 'migrator',
-    exports: [
-      { docker: { tar: true, dest: MIGRATOR_TARBALL_NAME, names: [MIGRATOR_IMAGE_TAG] } },
-    ],
+    exports: [{ docker: { tar: true, dest: MIGRATOR_TARBALL_NAME, names: [MIGRATOR_IMAGE_TAG] } }],
   });
 
   return { runtime, migrator };
