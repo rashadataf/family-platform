@@ -6,6 +6,7 @@ A UK-first, mobile-first family life management platform. Working placeholder na
 - [`adr/`](adr/) — every foundational technology and structural decision, with alternatives and rationale.
 - This repository is public, deliberately — see [`ADR-015`](adr/ADR-015-repository-visibility.md).
 - [`docs/local-development.md`](docs/local-development.md) — how to get a local environment running.
+- [`docs/staging-environment.md`](docs/staging-environment.md) — what the staging deployment is for, and its synthetic-data-only constraint.
 
 ## Running the platform
 
@@ -40,3 +41,5 @@ Every pull request against `main`, and every push to `main`, runs ten independen
 | `image` | A deployable image that will not build, carries a package manager or source, runs as root, will not reach `/health/ready` against a real database, ignores SIGTERM, or has a fixable HIGH/CRITICAL CVE |
 
 Every third-party GitHub Action is pinned to a commit SHA, and Dependabot keeps the pins current. See [`specs/002-ci-pipeline/contracts/required-checks.md`](specs/002-ci-pipeline/contracts/required-checks.md) for the trigger and permissions, and [`specs/005-merge-gate-enforcement/contracts/gates-and-config.md`](specs/005-merge-gate-enforcement/contracts/gates-and-config.md) for what each gate owns.
+
+Two more jobs run on top of these ten, each on only one of the two events above: `infra-preview` (pull request only — `pulumi preview` against the staging stack, mutates nothing) and `infra-deploy` (push to `main` only, after all ten above have passed — deploys the merged commit to the staging environment). See [`docs/staging-environment.md`](docs/staging-environment.md) and [`specs/003-vps-staging-deployment/contracts/cli-and-config.md`](specs/003-vps-staging-deployment/contracts/cli-and-config.md).
