@@ -75,6 +75,7 @@ file plus a staging-only override file, combined at deploy time
 | Service | Base file (`docker-compose.yml`, spec 001 + spec 004) | Staging override (`docker-compose.staging.yml`, new) |
 |---|---|---|
 | `postgres` | Image, healthcheck, named volume (unchanged) | `restart: unless-stopped` (already present), joins `stagingNetworkName` |
+| `migrate` | One-shot service delivered by spec 004: builds the `migrator` target, gates `api` behind `service_completed_successfully` (consumed here per FR-018, corrects issue #9) | Joins `stagingNetworkName`, `DATABASE_URL` sourced from `StackConfig` — the local override bind-mounts `packages/persistence/prisma`, which a staging deploy MUST NOT do: the deployed image's own baked-in migrations are what proves the transferred artifact, not the deploy host's working tree |
 | `api` | Service entry delivered by spec 004 (consumed here per FR-018): build context, depends on `postgres` healthcheck | `restart: unless-stopped` (FR-017), published port from `apiPublishedPort` (FR-004), joins `stagingNetworkName`, environment sourced from `StackConfig` |
 
 Declaring `stagingNetworkName` as a plain (non-`external`) Compose network means Compose creates a

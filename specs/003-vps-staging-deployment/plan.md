@@ -48,7 +48,7 @@ each a direct, deliberate consequence of the five `/speckit-clarify` decisions t
 | I. Type Safety Is a Contract | PASS. `infrastructure/tsconfig.json` extends `@fp/config-typescript/base.json` with strict mode, matching every other package; no `any` in stack config or resource definitions — `StackConfig` (data-model.md) is a Zod-parsed, fully typed shape. |
 | II. Validate at Every Boundary | PASS. Stack configuration is "environment variables and runtime configuration, at process start" in this feature's context — `infrastructure/src/config.ts` parses it with Zod before any resource is constructed, and MUST fail before touching the VPS on an invalid value (data-model.md's `StackConfig` validation rules), mirroring `apps/api/src/config/env.schema.ts` exactly. |
 | III. Architecture Boundaries Are Enforced, Not Suggested | PASS / mostly N/A. `infrastructure/` is not a bounded context and does not import `packages/core`, `packages/persistence`'s client, or any application package — its only workspace dependencies are the shared `config-*` packages. This is a stronger constraint than ADR-004's own "depends only on `packages/kernel`" note, since `packages/kernel` does not exist yet in this repository; `infrastructure/` depends on nothing app-specific at all. |
-| IV. Persistence Goes Through the Data-Access Layer | N/A for `infrastructure/` itself — it invokes the Prisma CLI remotely (`docker compose run --rm api ... prisma migrate deploy`) via the same mechanism local dev already uses (FR-008); it does not query the database or add a second data-access path. |
+| IV. Persistence Goes Through the Data-Access Layer | N/A for `infrastructure/` itself — it invokes the Prisma CLI remotely via the `migrate` service (spec 004's `migrator` build target, ADR-014), the same one-shot mechanism local dev already uses and the same one `docker-compose.yml` already gates `api` behind via `service_completed_successfully` (FR-008; corrects issue #9 — the `api` runtime image deliberately carries no Prisma CLI per spec 004 FR-008, so a migration cannot run from it). It does not query the database or add a second data-access path. |
 | V. Object-Level Authorization | N/A. No resource identifiers, no multi-tenant access — a single operator, a single shared environment. |
 | VI. Children and Family Data Are Sensitive by Default (NON-NEGOTIABLE) | PASS by construction. FR-010 forbids any supported path for loading real data; the fixture-only seed mechanism (data-model.md's `FixtureDataSet`) is the only data source. See spec.md's Data Handling and Compliance section, added during this planning pass to close a Principle XI gap (below). |
 | VII. AI Proposes, the Domain Decides | N/A. No AI involvement. |
@@ -98,7 +98,7 @@ infrastructure/                          # new: @fp/infrastructure workspace pac
 │   ├── config.ts                        # StackConfig, Zod-parsed (data-model.md)
 │   ├── image.ts                         # docker-build.Image: local build (research.md §1)
 │   ├── transfer.ts                      # command.remote.CopyToRemote: image tarball + compose files -> VPS
-│   ├── deploy.ts                        # command.remote.Command sequence: load, migrate-before-swap (research.md §2), up
+│   ├── deploy.ts                        # command.remote.Command sequence: load, `compose run --rm migrate` (research.md §2), up
 │   └── deploy.test.ts                   # Pulumi mock test (research.md §5)
 └── docker-compose.staging.yml           # staging-only Compose override (data-model.md's ComposeServiceSet)
 
