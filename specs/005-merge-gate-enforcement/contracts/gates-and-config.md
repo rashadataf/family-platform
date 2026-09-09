@@ -15,8 +15,8 @@ No product API. This feature's interface is the set of CI checks, the commands a
 | `typecheck` | `turbo run typecheck typecheck:workspace-root` | none |
 | `lint` | `turbo run lint lint:workspace-root` | none |
 | `format` | `prettier --check .` | none |
-| `test` | `turbo run test test:workspace-root` | **unit tier only** — must stay database-free and under 30s |
-| `verify-env` | `verify:env`, `verify:node-version` | none |
+| `test` | `pnpm test` → `vitest run --project unit` | **unit tier only** — database-free, 0.72s measured |
+| `verify-env` | `verify:env`, `verify:node-version`, `verify:action-pins`, `verify:workspace` | **+2 steps** (job name unchanged) |
 | `build` | `turbo run build` | none |
 | `image` | builds/asserts/smoke-tests the runtime image | **+ one step**: `trivy` scan |
 
@@ -32,8 +32,8 @@ No product API. This feature's interface is the set of CI checks, the commands a
 
 ### Required-check list
 
-**Current (4 of 7 reporting):** `typecheck`, `lint`, `test`, `build`
-**Target on completion (10):** the seven above plus `boundaries`, `security`, `test-integration`
+**Current (4 of 10 reporting):** `typecheck`, `lint`, `test`, `build`
+**Target (10):** the seven above plus `boundaries`, `security`, `test-integration`
 
 Each new job joins the list **only after reporting green at least once** (FR-029). Reconciling this is part of the feature (SC-010), and it is repository configuration rather than a file in this repository — see §4.
 
@@ -68,10 +68,10 @@ pnpm test:integration
 |---|---|---|
 | `.dependency-cruiser.cjs` | The allowed-edge graph | `allowed` + `allowedSeverity: error` = default deny. **No per-line suppression** (FR-007) |
 | `packages/config-eslint/boundaries.js` | Editor-time import zones | Latency, not coverage — `dependency-cruiser` remains authoritative |
-| `osv-scanner.toml` | Vulnerability suppressions | Every entry carries an **expiry** |
-| `.gitleaks.toml` | Secret-scan allowlist | Path allowlist for `.env.example`, whose values are deliberately fake |
-| `.github/dependabot.yml` | Update policy | `npm` + `github-actions` ecosystems, grouped |
-| `vitest.config.ts` | Test tier split | `projects`: `unit`, `integration` |
+| `osv-scanner.toml` | Vulnerability suppressions | Every entry carries an **expiry** (`ignoreUntil`), enforced by `verify:suppressions` — osv-scanner treats it as optional |
+| `.gitleaks.toml` | Secret-scan rules and allowlist | Adds `database-connection-string-password`, which the default rule set lacks. Placeholders allowlisted **by value**, not by file |
+| `.github/dependabot.yml` | Update policy | `npm`, `github-actions` and `docker` ecosystems, grouped. Does **not** cover the scanner image digests in `run:` steps |
+| `vitest.config.ts` | Test tier split | `projects`: `unit`, `integration`. Integration uses `globalSetup`, not `setupFiles` — the Prisma client is built at import time |
 
 **Changing an architectural boundary is an edit to `.dependency-cruiser.cjs`** — a reviewable diff in one file, never a comment silencing one line.
 
@@ -101,6 +101,35 @@ gh api repos/rashadataf/family-platform/branches/main/protection/required_status
 **The invariant (SC-010):** every reporting blocking check is required, and every required check reports. A required check that never reports blocks all merges forever; a blocking check that is not required blocks nothing — which is the state three checks are in today.
 
 ---
+
+## 4a. Reconciliation against the constitution's gate table (SC-009)
+
+Read row by row, not assumed. Seven of nine rows now map to a named check.
+
+| Constitution gate row | Check | Before this feature |
+|---|---|---|
+| Typecheck, strict mode, zero errors | `typecheck` | existed |
+| Lint, zero warnings | `lint` | existed |
+| Boundary and cycle validation | `boundaries` | **nothing** |
+| Unit tests | `test` | existed |
+| Integration tests against a real database | `test-integration` | **nothing** |
+| Contract and API tests, incl. cross-family authorization | **none** | nothing |
+| Security scan: dependency vulnerabilities and secret scanning | `security`, plus `trivy` in `image` | **nothing** |
+| Infrastructure validation and preview | **none** | nothing |
+| Build of all applications | `build` | existed |
+
+**Two rows still have no check, and this is stated rather than ticked.**
+
+- *Contract and API tests, including cross-family authorization assertions.* There is no product API, no `packages/contracts` and no authorization to assert against. A check here would be an empty suite reporting green, which is worse than an acknowledged gap: it would make the table look complete. This row closes with the first bounded context, and Principle V's assertions are the reason the harness this feature just built exists.
+- *Infrastructure validation and preview.* No infrastructure-as-code exists yet. Spec 003 (VPS staging) is parked, and ADR-004 was amended by ADR-013. This row closes when spec 003 resumes.
+
+So SC-009 is met for every row whose subject exists, and the two that remain are blocked on features rather than on this one. That is the honest reading; claiming nine of nine would require two vacuous checks.
+
+## 4b. SC-010 is not yet met
+
+Four checks are required; ten report. `format`, `verify-env`, `image`, `boundaries`, `security` and `test-integration` can all block and none of them does.
+
+This closes with the §4 command, **after** the six new and newly-reporting checks have each reported green at least once. Adding a check to the required list before it has ever reported blocks every merge forever on a check that never arrives — which is the ordering constraint, not caution for its own sake.
 
 ## 5. Out of scope
 
