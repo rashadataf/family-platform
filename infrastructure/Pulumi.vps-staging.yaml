@@ -1,0 +1,9 @@
+config:
+  infrastructure:vpsHost:
+    secure: AAABALtbbu9n6IFzsPzX3b1oTs2Xd9YiuUnPvr34DAIZQGTrXHWY7w7PrCU8
+  infrastructure:vpsSshUser:
+    secure: AAABACdriz59iLXee6KAiP+ajkIVWZ+txEmwe/16umCn6px78uI=
+  infrastructure:vpsSshPrivateKey:
+    secure: AAABACPW2GjDCJ+jQRUuv+ZicNqlaUUydWwzMRKP/0w=
+  infrastructure:postgresPassword:
+    secure: AAABAPXy45x7R1WGkt7FIPdnBq6Ny9KFpkviwcveh/49Opfe2jAZCsm2MHCVR9fDI4sc/XdVs2tQ1b0qAVNiQagR5FLHqSDRp/q3KQ==
