@@ -1,0 +1,67 @@
+version: 2
+
+# FR-024, FR-026, FR-027.
+#
+# Dependabot rather than Renovate, and the reason is constitutional rather
+# than technical: Renovate is the better tool, but its practical form is the
+# Mend-hosted GitHub App, and installing it grants a third-party service read
+# and write access to this repository. The constitution requires an ADR and a
+# privacy review before adding an external service that receives our data.
+# Dependabot is GitHub's own, inside a platform that already holds the source.
+#
+# The `github-actions` ecosystem is the half that makes SHA pinning safe rather
+# than merely stale. A pin nobody updates is a component that has silently
+# stopped receiving security patches, which is worse than a floating tag.
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    # Ungrouped updates bury the one that matters under nine that do not.
+    # Production dependencies are separated from development ones because they
+    # carry different risk and deserve different attention.
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types: ['minor', 'patch']
+      development-dependencies:
+        dependency-type: development
+        update-types: ['minor', 'patch']
+    # A major is a decision, not a routine update. Left ungrouped so it arrives
+    # as its own pull request with its own changelog to read.
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/London
+    groups:
+      github-actions:
+        patterns: ['*']
+    commit-message:
+      prefix: 'chore(ci)'
+
+  # The Node base image in apps/api/Dockerfile, which is what ADR-013 ships to
+  # a VPS and what the `image` job's trivy scan reports on. Note the gap this
+  # does NOT close: the scanner images in ci.yml and secret-audit.yml are
+  # referenced by digest inside `run:` steps, and no ecosystem sees those.
+  # They are bumped by hand.
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/London
+    commit-message:
+      prefix: 'chore(docker)'

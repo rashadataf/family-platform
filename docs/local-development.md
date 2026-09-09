@@ -46,6 +46,39 @@ docker compose run --rm api pnpm --filter @fp/persistence exec prisma migrate st
 
 The exit code is passed through, so these work in scripts too.
 
+## Tests come in two tiers
+
+| Command | Runs | Needs a database |
+|---|---|---|
+| `pnpm test` | The unit tier — everything under `apps/`, `packages/` and `scripts/` except `*.integration.spec.ts` | **no** |
+| `pnpm test:integration` | Only `*.integration.spec.ts`, against a real, migrated PostgreSQL | **yes** |
+| `pnpm boundaries` | The architecture's allowed-edge graph, and cycle detection | no |
+
+Both test commands work identically on both paths, with no path-specific flags:
+
+```sh
+docker compose run --rm api pnpm test:integration   # containerized
+pnpm test:integration                               # host
+```
+
+**`pnpm test` must stay runnable with no database at all.** That is the whole point of the split: the tier you run every few minutes has to be fast, and it stops being fast the moment it needs a service to be up. If you find yourself reaching for a database in a `*.spec.ts`, the test belongs in a `*.integration.spec.ts` instead.
+
+The integration harness derives its database by suffixing the one in `DATABASE_URL` — `family_platform` becomes `family_platform_test` — creates it if absent, and applies every committed migration to it. **It never touches your development database.** A suite that empties the database you were just working in is one people learn not to run.
+
+Each test runs inside a transaction that is rolled back afterwards, so tests start clean and cannot see each other's writes.
+
+## Checking the architecture boundaries
+
+```sh
+pnpm boundaries
+```
+
+This validates every import in the repository against the allowed-edge graph in [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs), and detects dependency cycles. It **fails closed**: an import matching no rule is an error, so a new package is a violation until the graph knows about it.
+
+Your editor will also flag a forbidden import as you type it, via `eslint-plugin-boundaries`. That is for speed, not authority — a per-file linter cannot see a cycle that spans packages, and a lint rule can be silenced with a comment. `pnpm boundaries` cannot. If the two ever disagree, it is right.
+
+To change a boundary, edit the rule set. That is a reviewable diff in one file, which is the point.
+
 To author a **new** migration (an interactive workflow — it prompts you for a name):
 
 ```sh
@@ -91,10 +124,15 @@ A new package under `packages/` or `apps/` should extend the three shared config
 - **ESLint**: `import fpConfig from '@fp/config-eslint';` and export it (optionally extended) from `eslint.config.js`.
 - **Prettier**: nothing to add — the root `package.json`'s `"prettier": "@fp/config-prettier"` field already covers every package.
 
-**You must also add two things for the container path:**
+**You must also declare it in three places.** `pnpm verify:workspace` checks all three and runs in CI, so you will be told rather than left to discover it:
 
 1. A `COPY` line for its `package.json` in [`apps/api/Dockerfile`](../apps/api/Dockerfile)'s `deps` stage.
 2. A named volume for its `node_modules` in [`docker-compose.yml`](../docker-compose.yml), mounted on the `api` service.
+3. An entry in `WORKSPACE_GRAPH` in [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs), saying which packages it may import.
+
+Step 3 is the boundary gate's fail-closed behaviour: until the graph knows about the package, every import into or out of it is an error. That is deliberate — a boundary system that silently ignores what it has not been told about guarantees nothing.
+
+Step 1 is the one that is easy to miss and expensive to diagnose. Without it the image installs no dependencies for the package, and the containerized path dies with `Cannot find package '@fp/…'` — which reads like a broken install rather than a missing line in a Dockerfile, and which a contributor working on the host path never sees at all.
 
 Step 2 is not optional and not decorative. pnpm links workspace packages by symlink, and those symlinks point outside their own directory — so a package without its own volume gets its `node_modules` shadowed by the source bind mount, and its imports break in ways that look like application bugs. The comment block at the bottom of `docker-compose.yml` explains why the simpler one-volume alternative is rejected.
 

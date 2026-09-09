@@ -1,0 +1,59 @@
+# Secret-scanning configuration.
+#
+# This is the SECOND layer. GitHub secret scanning with push protection is
+# already enabled on this repository (free, because it is public) and is the
+# stronger control: it rejects the push, so a detected credential never enters
+# history at all. gitleaks exists because the two fail differently. GitHub
+# matches provider-issued token formats it has been taught; it will not flag
+# `DATABASE_URL=postgresql://postgres:aRealPassword@host/db`, which is not a
+# partner pattern but is exactly the shape of credential this project handles
+# (ADR-013 puts VPS and database credentials in play).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+.env.example is the committed template (spec 001 FR-006). Its values are
+deliberately fake and its entire purpose is to be copied to .env and edited.
+
+This is a PERMANENT statement about a file whose job is to hold placeholder
+values — unlike a vulnerability suppression, it carries no expiry, because
+there is no risk here that could later become real. A scanner that fails on
+its own repository's fixtures is switched off within a week, and then it
+protects nothing (FR-014).
+"""
+paths = ['''(^|/)\.env\.example$''']
+
+# ---------------------------------------------------------------------------
+# The rule the default set does not have.
+#
+# research.md §2 justified adding gitleaks with this exact example:
+# `DATABASE_URL=postgresql://postgres:aRealPassword@host/db`, "not a partner
+# pattern, but exactly the shape of credential this repository handles". That
+# turned out to be half right — GitHub does not flag it, and neither did
+# gitleaks' default rules. Verified by planting one and getting a clean scan.
+#
+# Without this rule the second layer's whole justification is unmet, so it is
+# written here rather than assumed.
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "database-connection-string-password"
+description = "Password embedded in a database or broker connection string"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp)://[^\s:@/]+:([^\s:@/"']{6,})@'''
+secretGroup = 1
+keywords = ["postgres", "postgresql", "mysql", "mongodb", "redis", "amqp"]
+
+  # The placeholder passwords this repository commits on purpose: .env.example,
+  # docker-compose.yml and the CI service containers all use `localdev` against
+  # a throwaway local database. Listing them by value keeps the rule usable;
+  # allowlisting the files instead would blind it to a real credential landing
+  # in one of them later.
+  [[rules.allowlists]]
+  description = "Known development placeholders, not credentials"
+  regexTarget = "match"
+  regexes = [
+    '''(?i):(localdev|postgres|password|changeme|secret|example|test)@''',
+    '''\$\{[^}]+\}@''',
+    ''':<[^>]+>@''',
+  ]

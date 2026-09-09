@@ -1,0 +1,29 @@
+# Vulnerability suppressions.
+#
+# EVERY ENTRY MUST CARRY AN EXPIRY. There are no exceptions, and this is not a
+# style rule: the project constitution states that an exception without an
+# expiry MUST NOT be granted. Without one this file becomes a graveyard nobody
+# re-reads, and the gate above it quietly stops meaning anything.
+#
+# osv-scanner does NOT enforce this — `ignoreUntil` is optional as far as the
+# tool is concerned, and an entry without it suppresses the finding forever.
+# `pnpm verify:suppressions` (scripts/verify-suppressions.ts) enforces it
+# instead, and runs in the `security` job.
+#
+# An entry is a TEMPORARY acceptance of real risk — typically "no fix has been
+# published upstream yet". When the date passes the finding fails the build
+# again, which is the point: it forces the question to be asked a second time.
+#
+#   [[IgnoredVulns]]
+#   id = "GHSA-xxxx-xxxx-xxxx"
+#   ignoreUntil = 2026-12-01
+#   reason = "No fix published upstream; reachable only from the CLI path."
+#
+# There are no entries, and that is the correct state.
+#
+# It is also not the state this repository was in when the gate was first run:
+# osv-scanner found five advisories, four of them HIGH, in `multer` and
+# `deepmerge-ts`. Neither was suppressed. Both were pinned past the advisory
+# with pnpm `overrides` in pnpm-workspace.yaml, because the newest upstream
+# release of each parent still required the vulnerable version — a suppression
+# accepts risk, an override removes it, and the override was available.

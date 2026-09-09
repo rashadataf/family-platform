@@ -21,7 +21,7 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: typecheck
@@ -32,7 +32,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: lint
@@ -44,18 +44,74 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
       - run: pnpm format:check
 
+  # The UNIT tier only, and it must stay that way: no database, under 30
+  # seconds (FR-021, SC-007). The integration tier is `test-integration`.
+  #
+  # The job NAME is unchanged even though the command behind it is not.
+  # Branch protection on `main` names required checks by job name, so renaming
+  # this would block every later merge on a check that no longer reports.
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: test
-      - run: pnpm exec turbo run test test:workspace-root
+      - run: pnpm test
+
+  # Separate from `test` because the constitution's gate table lists unit and
+  # integration tests as separate rows, and because folding them together would
+  # make the fast tier as slow as the slow one — at which point people stop
+  # running it locally, which is the whole value of having a fast tier.
+  #
+  # The harness derives `<database>_test` from DATABASE_URL and applies the
+  # committed migrations to it, so this needs no CI-specific flag: the same
+  # `pnpm test:integration` runs here, on the host, and in the dev container
+  # (FR-020).
+  test-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: family_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d family_platform"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://postgres:localdev@127.0.0.1:5432/family_platform
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+        with:
+          turbo-cache-key: test-integration
+      - run: pnpm test:integration
+
+  # Constitution Principle III: "Architecture Boundaries Are Enforced, Not
+  # Suggested". The principle names dependency-cruiser explicitly and until now
+  # nothing ran it, which left code review — the layer the constitution itself
+  # calls "assumed to fail" — as the only one operating.
+  #
+  # Fail-closed: the rule set is an `allowed` graph with allowedSeverity error,
+  # so a dependency matching no entry is a violation. That matters most for the
+  # rules governing packages/core, which does not exist yet: a fail-open
+  # configuration would let the first bounded context arrive unchecked.
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: ./.github/actions/setup
+      - run: pnpm boundaries
 
   # Principle II requires .env.example to stay in sync with the API's env
   # schema. The check existed as `pnpm verify:env` but nothing ran it.
@@ -66,15 +122,91 @@ jobs:
   verify-env:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
       - run: pnpm verify:env
       - run: pnpm verify:node-version
+      - run: pnpm verify:action-pins
+      - run: pnpm verify:workspace
+
+  # Closes TODO(SECURITY_SCAN_TOOLING), open since the constitution was
+  # ratified. Two scanners, because they fail differently.
+  #
+  # The scanners run as their own pinned container images rather than as
+  # wrapper Actions. gitleaks-action v2 is licensed separately from gitleaks
+  # itself and requires a key for organization-owned repositories; this
+  # repository is a personal account today, so it would work today, and would
+  # break the moment the project moves to a company org. FR-032 says no paid
+  # or subscription service of any kind, and a dependency that is free only
+  # while a condition holds is not the same as one that is free. The tools
+  # themselves are MIT and Apache-2.0.
+  #
+  # Digests are index digests, not platform digests, and are bumped by hand —
+  # Dependabot's github-actions ecosystem does not see them. Named here so
+  # nobody has to rediscover it.
+  security:
+    runs-on: ubuntu-latest
+    env:
+      # gitleaks v8.30.1
+      GITLEAKS: ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+      # osv-scanner v2.5.1
+      OSV_SCANNER: ghcr.io/google/osv-scanner@sha256:8108ae94eadea5a02c9bec6e646909d5b790b44bd62d7f5b7f0b1d6d0ffc7734
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # gitleaks scans a commit range, which needs the commits.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      # FR-009/FR-010. GitHub push protection is the first layer and is already
+      # enabled; it rejects the push, so a credential it recognises never
+      # enters history. This catches what its partner-pattern list does not —
+      # in particular a password inside a database connection string, which
+      # neither GitHub nor gitleaks' own default rules flag, and which
+      # .gitleaks.toml adds a rule for.
+      #
+      # --redact is not optional. This repository is public: a scanner that
+      # prints what it found into a build log has moved the secret somewhere
+      # more accessible than where it started.
+      - name: Scan the proposed change for secrets
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${BASE_SHA:-}" ]; then
+            echo "Scanning ${BASE_SHA}..${HEAD_SHA}"
+            docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS" \
+              git /repo --config /repo/.gitleaks.toml --redact --no-banner \
+              --log-opts="--no-merges ${BASE_SHA}..${HEAD_SHA}"
+          else
+            # A push to main, where there is no base to diff against. The
+            # working tree is what merged, so that is what gets scanned.
+            echo "Scanning the working tree"
+            docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS" \
+              dir /repo --config /repo/.gitleaks.toml --redact --no-banner
+          fi
+
+      # FR-013: a suppression that never expires is permanent silence. The tool
+      # treats `ignoreUntil` as optional, so this is enforced here instead.
+      - run: pnpm verify:suppressions
+
+      # FR-011/FR-012. osv-scanner exits non-zero for anything it finds,
+      # including LOW; the HIGH/CRITICAL threshold and the "name the package,
+      # the advisory and the fix" output live in the script, which has tests.
+      - name: Scan the lockfile for known advisories
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/repo" -w /repo "$OSV_SCANNER" \
+            scan source --lockfile=/repo/pnpm-lock.yaml --config=/repo/osv-scanner.toml \
+            --format json > osv-report.json || true
+          pnpm exec tsx scripts/filter-advisories.ts osv-report.json
 
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: build
@@ -106,14 +238,14 @@ jobs:
           --health-timeout 3s
           --health-retries 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # linux/amd64 is what the VPS runs, and ubuntu-latest is natively amd64,
       # so no QEMU emulation is involved (research.md §8).
       - name: Build runtime target
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: apps/api/Dockerfile
@@ -125,7 +257,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=runtime
 
       - name: Build migrator target
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: apps/api/Dockerfile
@@ -198,3 +330,23 @@ jobs:
           fi
           docker logs api 2>&1 | grep -q "Database connections released" \
             || { echo "::error::shutdown hook did not run"; docker logs api; exit 1; }
+
+      # FR-016. osv-scanner reads the lockfile and therefore sees application
+      # dependencies only. It cannot see the Debian packages in the base layer,
+      # which are on a completely different update cadence and are what ADR-013
+      # ships to a VPS. A step in this job rather than a job of its own,
+      # because the artifact is already built here.
+      #
+      # --ignore-unfixed is deliberate. A base-image CVE with no released fix
+      # cannot be actioned by anyone here, and a gate that is permanently red
+      # for reasons nobody can address is one that gets switched off — which
+      # would cost more than the findings it reports. Fixable HIGH and CRITICAL
+      # findings block; the rest are surfaced by the scheduled audit.
+      - name: Scan the runtime image for OS and library CVEs
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${HOME}/.cache/trivy:/root/.cache/trivy" \
+            ghcr.io/aquasecurity/trivy@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            --no-progress --scanners vuln fp-api:runtime

@@ -21,11 +21,6 @@
       "inputs": ["src/**", "eslint.config.js", "package.json"],
       "outputs": []
     },
-    "test": {
-      "dependsOn": ["^build", "db:generate"],
-      "inputs": ["src/**", "package.json"],
-      "outputs": []
-    },
 
     "//#typecheck:workspace-root": {
       "inputs": [
@@ -41,8 +36,8 @@
       "inputs": ["scripts/**", "eslint.config.js", "package.json"],
       "outputs": []
     },
-    "//#test:workspace-root": {
-      "inputs": ["scripts/**", "apps/api/Dockerfile", ".nvmrc", "package.json"],
+    "//#boundaries": {
+      "inputs": ["apps/**", "packages/**", "scripts/**", ".dependency-cruiser.cjs", "package.json"],
       "outputs": []
     }
   }
