@@ -58,7 +58,7 @@ MC4CAQAwBQYDK2VwBCIEIMKN9gLVY833sHBscKsZE+SdwV5sJw5yFgnoRgm4VN5l
 
 describe('infrastructure resource wiring', () => {
   let stackConfig: import('./config.js').StackConfig;
-  let transfer: import('@pulumi/command').remote.CopyToRemote;
+  let transfers: import('@pulumi/command').remote.CopyToRemote[];
   let deploy: import('@pulumi/command').remote.Command;
 
   beforeAll(async () => {
@@ -71,23 +71,24 @@ describe('infrastructure resource wiring', () => {
 
     stackConfig = loadStackConfig(VALID_RAW);
     const images = buildStagingImages();
-    transfer = createTransfer(stackConfig, images, [images.runtime, images.migrator]);
-    deploy = createDeployCommand(stackConfig, images, [transfer]);
+    transfers = createTransfer(stackConfig, images, [images.runtimeSaved, images.migratorSaved]);
+    deploy = createDeployCommand(stackConfig, images, transfers);
   });
 
   /**
    * Every `command.remote.*` resource's connection host must be sourced from
    * the same `StackConfig.vpsHost` value, never a second, possibly-drifted
    * literal — the concrete form "the staging environment must never share a
-   * host with something else" takes for two SSH-connected resources.
+   * host with something else" takes for several SSH-connected resources.
    */
   it('sources every remote connection from the same StackConfig.vpsHost', async () => {
-    const [transferHost, deployHost] = await Promise.all([
-      resolveOutput(transfer.connection.host),
-      resolveOutput(deploy.connection.host),
-    ]);
+    const transferHosts = await Promise.all(transfers.map((t) => resolveOutput(t.connection.host)));
+    const deployHost = await resolveOutput(deploy.connection.host);
 
-    expect(transferHost).toBe(stackConfig.vpsHost);
+    expect(transferHosts.length).toBeGreaterThan(0);
+    for (const host of transferHosts) {
+      expect(host).toBe(stackConfig.vpsHost);
+    }
     expect(deployHost).toBe(stackConfig.vpsHost);
   });
 

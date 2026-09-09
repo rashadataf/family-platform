@@ -21,40 +21,45 @@ export function connectionFor(stackConfig: StackConfig): types.input.remote.Conn
 }
 
 /**
- * One `CopyToRemote`, one archive: the two built image tarballs, the two
- * compose files, and the fixed non-secret `.env` template `docker-compose.staging.yml`
- * requires (docker-compose.staging.env, landing as `.env` — see that file's
- * own comment for why POSTGRES_PASSWORD is never here). An Archive source is
- * extracted into `remotePath` as a directory tree, not copied as a single
- * compressed file (confirmed against pulumi-command's own CopyToRemote
- * example), so `deploy.ts` finds these five files directly under REMOTE_DIR.
- *
- * `triggers` are the two images' content digests plus `resetData`: without
- * an explicit trigger, an unchanged build could be treated as no-op and
- * skip re-transferring, which is fine when nothing changed but wrong the
- * moment resetData flips with an otherwise-identical image.
+ * Five separate `CopyToRemote` resources — one per file — rather than one
+ * `AssetArchive` bundling all five. An `AssetArchive` combining the two
+ * large (100-300MB) image tarballs with small text files was tried first
+ * and failed at apply time with "archive must be a path to a file or
+ * directory" / a nil archive value, for reasons that didn't repay further
+ * digging once the simpler, one-asset-per-resource shape (documented as its
+ * own supported case in pulumi-command's own CopyToRemote example) turned
+ * out to just work. Each `CopyToRemote` here copies a single `FileAsset` to
+ * an explicit destination path — for an Asset (as opposed to an Archive)
+ * source, `remotePath` is the exact destination file, not a directory.
  */
 export function createTransfer(
   stackConfig: StackConfig,
   images: StagingImages,
   dependsOn: pulumi.Resource[],
-): remote.CopyToRemote {
-  const bundle = new pulumi.asset.AssetArchive({
-    [RUNTIME_TARBALL_NAME]: new pulumi.asset.FileAsset(RUNTIME_TARBALL_NAME),
-    [MIGRATOR_TARBALL_NAME]: new pulumi.asset.FileAsset(MIGRATOR_TARBALL_NAME),
-    'docker-compose.yml': new pulumi.asset.FileAsset('../docker-compose.yml'),
-    'docker-compose.staging.yml': new pulumi.asset.FileAsset('../docker-compose.staging.yml'),
-    '.env': new pulumi.asset.FileAsset('../docker-compose.staging.env'),
-  });
+): remote.CopyToRemote[] {
+  const connection = connectionFor(stackConfig);
 
-  return new remote.CopyToRemote(
-    'staging-bundle-transfer',
-    {
-      connection: connectionFor(stackConfig),
-      source: bundle,
-      remotePath: REMOTE_DIR,
-      triggers: [images.runtime.digest, images.migrator.digest, stackConfig.resetData],
-    },
-    { dependsOn },
-  );
+  const files: Record<string, { local: string; digestDep?: pulumi.Output<string> }> = {
+    [RUNTIME_TARBALL_NAME]: { local: RUNTIME_TARBALL_NAME, digestDep: images.runtime.digest },
+    [MIGRATOR_TARBALL_NAME]: { local: MIGRATOR_TARBALL_NAME, digestDep: images.migrator.digest },
+    'docker-compose.yml': { local: '../docker-compose.yml' },
+    'docker-compose.staging.yml': { local: '../docker-compose.staging.yml' },
+    '.env': { local: '../docker-compose.staging.env' },
+  };
+
+  return Object.entries(files).map(([remoteName, { local, digestDep }]) => {
+    const triggers: pulumi.Input<unknown>[] = [stackConfig.resetData];
+    if (digestDep) triggers.push(digestDep);
+
+    return new remote.CopyToRemote(
+      `staging-transfer-${remoteName}`,
+      {
+        connection,
+        source: new pulumi.asset.FileAsset(local),
+        remotePath: `${REMOTE_DIR}/${remoteName}`,
+        triggers,
+      },
+      { dependsOn },
+    );
+  });
 }
