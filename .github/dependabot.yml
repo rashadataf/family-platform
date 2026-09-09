@@ -37,6 +37,17 @@ updates:
     commit-message:
       prefix: 'chore(deps)'
       prefix-development: 'chore(deps-dev)'
+    # Prisma 7 removed `datasource { url = env(...) }` from the schema
+    # format, requiring a prisma.config.ts and a driver-adapter-based
+    # PrismaClient — a breaking migration across client.ts, the Docker
+    # migrator stage and the integration test harness (spec 005), not a
+    # routine bump. See PR #15 (closed) and issue tracking the migration.
+    # Remove this once that migration is deliberately scheduled and done.
+    ignore:
+      - dependency-name: 'prisma'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@prisma/client'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
