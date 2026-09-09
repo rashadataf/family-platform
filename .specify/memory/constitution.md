@@ -54,6 +54,14 @@ Deferred items / follow-up TODOs:
   - Planned ADRs 007-012 (see adr/README.md) are not yet written. Principles that will
     eventually cite them state the behavioural requirement without a citation and are marked
     accordingly.
+  - The merge-gate table's "Infrastructure validation and preview" row is now implemented on
+    2026-09-09 by spec 003 (VPS staging deployment)'s `infra-preview` CI job (`pulumi preview`
+    against the `vps-staging` stack on every pull request; mutates nothing). As with the security
+    row above, tool selection and rationale live in specs/003-vps-staging-deployment/research.md,
+    not here — resolving this needed no amendment and the version is unchanged. One merge-gate
+    row remains open: "Contract and API tests, including cross-family authorization assertions"
+    has no product API to test against yet and closes with the first bounded context (spec 005's
+    own reconciliation already stated this).
 -->
 
 # Family Platform Constitution

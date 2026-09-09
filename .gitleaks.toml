@@ -25,6 +25,41 @@ protects nothing (FR-014).
 """
 paths = ['''(^|/)\.env\.example$''']
 
+[[allowlists]]
+description = """
+A throwaway Ed25519 private key (`openssl genpkey -algorithm ed25519`),
+generated solely as a test fixture for infrastructure/src/config.spec.ts and
+deploy.spec.ts (spec 003), proving `loadStackConfig`'s well-formed-PEM check
+accepts a real key and that every command.remote.* resource's connection is
+sourced correctly. It has never signed anything and connects to nothing —
+but it is still a syntactically valid PEM private key, exactly the shape
+gitleaks' own default `private-key` rule exists to catch.
+
+Allowlisted by its exact value, not by path or file: `*.spec.ts` and
+`infrastructure/**` stay unallowlisted on purpose, the same reasoning
+already applied to the database-connection-string-password rule below — a
+real private key pasted into either later must still be caught.
+"""
+regexTarget = "match"
+regexes = [
+  '''-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIMKN9gLVY833sHBscKsZE\+SdwV5sJw5yFgnoRgm4VN5l\n-----END PRIVATE KEY-----''',
+]
+
+[[allowlists]]
+description = """
+A second throwaway Ed25519 private key, this one in OpenSSH's own container
+format (`ssh-keygen -t ed25519`'s default output, comment
+"throwaway-test-key-no-real-host"), added to config.spec.ts to prove
+`isWellFormedPrivateKey` accepts the format `ssh-keygen` actually produces by
+default — Node's `crypto.createPrivateKey` cannot parse this format at all,
+which the PKCS8 PEM fixture above could never exercise. Same discipline as
+above: allowlisted by exact value, not by path.
+"""
+regexTarget = "match"
+regexes = [
+  '''-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACDqr8NqswYlNe5h\+oMWYGv59j3P\+rREwPejto4iIBu3\+wAAAKhcFBP/XBQT\n/wAAAAtzc2gtZWQyNTUxOQAAACDqr8NqswYlNe5h\+oMWYGv59j3P\+rREwPejto4iIBu3\+w\nAAAECVJy6bhTf5GaCocZGQvDv31IR0\+Zp/F54bnk8V24Y3hOqvw2qzBiU17mH6gxZga/n2\nPc/6tETA96O2jiIgG7f7AAAAH3Rocm93YXdheS10ZXN0LWtleS1uby1yZWFsLWhvc3QBAg\nMEBQY=\n-----END OPENSSH PRIVATE KEY-----''',
+]
+
 # ---------------------------------------------------------------------------
 # The rule the default set does not have.
 #

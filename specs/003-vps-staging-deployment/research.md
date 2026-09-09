@@ -25,11 +25,20 @@ there is exactly one place service topology is described, not two.
 
 ## 2. Migration ordering relative to container replacement
 
-**Decision**: Migrate before swap. On every deploy: (1) load the new image on the VPS without
-touching running containers, (2) run `prisma migrate deploy` as a one-off container from the *new*
-image against the still-running Postgres (`docker compose run --rm api ...`), (3) only if that
-succeeds, recreate the `api` service with the new image (`docker compose up -d`). Postgres itself
-is untouched by an ordinary deploy.
+**Decision**: Migrate before swap. On every deploy: (1) load the new images on the VPS without
+touching running containers, (2) run `docker compose run --rm migrate` — the one-shot service spec
+004 already built from the `migrator` target, carrying the Prisma CLI, schema and migrations and
+nothing else (ADR-014) — against the still-running Postgres, (3) only if that succeeds, recreate
+the `api` service with the new `runtime` image (`docker compose up -d`). Postgres itself is
+untouched by an ordinary deploy.
+
+> **Correction (issue #9), found during spec 004's implementation.** This section originally read
+> `docker compose run --rm api ... prisma migrate deploy`. That cannot work: spec 004 FR-008
+> requires the `api` runtime image to carry no dev dependencies, and `prisma` (the CLI, as opposed
+> to `@prisma/client`) is one — verified empirically, the runtime image does not contain it. The
+> `migrator` target and its one-shot `migrate` Compose service exist for exactly this reason and
+> already implement the ordering this section describes; this feature invokes that service rather
+> than inventing a second migration path.
 
 **Rationale**: This is the only ordering that satisfies FR-009 (a failed migration must leave the
 previous known-good deployment running, not present a broken deploy as ready) when there is no

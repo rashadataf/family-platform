@@ -16,7 +16,7 @@
     "db:generate": "prisma generate",
     "build": "prisma generate && tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('src/generated','dist/generated',{recursive:true})\"",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p prisma/tsconfig.json"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3"
@@ -24,8 +24,13 @@
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
     "@fp/config-typescript": "workspace:*",
+    "@types/node": "^24.0.0",
     "eslint": "^9.39.1",
     "prisma": "^6.16.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

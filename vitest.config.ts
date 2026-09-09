@@ -20,7 +20,7 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
-          include: ['{apps,packages,scripts}/**/*.spec.ts'],
+          include: ['{apps,packages,scripts,infrastructure}/**/*.spec.ts'],
           exclude: [...IGNORED, '**/*.integration.spec.ts'],
         },
       },

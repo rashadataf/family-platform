@@ -41,6 +41,12 @@ const WORKSPACE_GRAPH = {
   'packages/config-eslint': [],
   'packages/config-prettier': [],
   'packages/config-typescript': [],
+
+  // The vps-staging Pulumi stack (spec 003, ADR-004/ADR-013). Deploy
+  // tooling, not application code — it never imports packages/persistence's
+  // client or any application package, only its own config schema and npm's
+  // Pulumi providers.
+  infrastructure: [],
 };
 
 /**

@@ -75,8 +75,32 @@ file plus a staging-only override file, combined at deploy time
 | Service | Base file (`docker-compose.yml`, spec 001 + spec 004) | Staging override (`docker-compose.staging.yml`, new) |
 |---|---|---|
 | `postgres` | Image, healthcheck, named volume (unchanged) | `restart: unless-stopped` (already present), joins `stagingNetworkName` |
+| `migrate` | One-shot service delivered by spec 004: builds the `migrator` target, gates `api` behind `service_completed_successfully` (consumed here per FR-018, corrects issue #9) | Joins `stagingNetworkName`, `DATABASE_URL` sourced from `StackConfig` — the local override bind-mounts `packages/persistence/prisma`, which a staging deploy MUST NOT do: the deployed image's own baked-in migrations are what proves the transferred artifact, not the deploy host's working tree |
 | `api` | Service entry delivered by spec 004 (consumed here per FR-018): build context, depends on `postgres` healthcheck | `restart: unless-stopped` (FR-017), published port from `apiPublishedPort` (FR-004), joins `stagingNetworkName`, environment sourced from `StackConfig` |
 
 Declaring `stagingNetworkName` as a plain (non-`external`) Compose network means Compose creates a
 fresh, isolated network on first use — satisfying FR-005 by construction rather than by an
 additional isolation step.
+
+**Two corrections found during implementation, not anticipated when this document was first
+written:**
+
+1. **`docker-compose.staging.env`, transferred as `.env`.** The base file's `api` service requires
+   `env_file: [.env]` and treats a missing one as a hard failure by design (local dev's own
+   contributor-`.env` discipline). A staging deploy has no such file, so
+   `infrastructure/src/transfer.ts` bundles a small, fixed, non-secret template alongside the two
+   compose files. `postgresPassword` is deliberately never in it — it reaches containers only
+   through the deploy SSH session's process environment and Compose's `${POSTGRES_PASSWORD}`
+   interpolation, never through a file on the VPS.
+2. **`migrate`'s image gained `packages/persistence/src/`.** `prisma db seed` needs
+   `packages/persistence/src/client.ts` (imported directly by `prisma/seed.ts`), which the
+   `migrator` target — by design, per spec 004 — did not carry; it shipped only the Prisma CLI,
+   schema, and migrations. `apps/api/Dockerfile`'s `deps` stage now also copies
+   `packages/persistence/src/`, added *after* `pnpm install --frozen-lockfile` specifically so
+   editing persistence source still cannot bust spec 004's install-layer cache (its own SC-004).
+   `packages/*/src/generated` is excluded from the build context (`.dockerignore`) so this copy
+   cannot bake in a contributor's own locally-generated, gitignored Prisma client instead of the
+   image's own freshly-generated one.
+
+Both were found by actually running the full sequence — build, transfer-equivalent, migrate, seed,
+swap — against locally-built images before this feature ever touched a VPS, not by inspection.

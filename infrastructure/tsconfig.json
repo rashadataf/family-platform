@@ -1,0 +1,4 @@
+{
+  "extends": "@fp/config-typescript/base.json",
+  "include": ["index.ts", "src/**/*.ts"]
+}
