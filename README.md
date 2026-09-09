@@ -4,6 +4,7 @@ A UK-first, mobile-first family life management platform. Working placeholder na
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — bounded contexts, module boundaries, layering, repository structure.
 - [`adr/`](adr/) — every foundational technology and structural decision, with alternatives and rationale.
+- This repository is public, deliberately — see [`ADR-015`](adr/ADR-015-repository-visibility.md).
 - [`docs/local-development.md`](docs/local-development.md) — how to get a local environment running.
 
 ## Running the platform
