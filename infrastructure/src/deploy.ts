@@ -40,6 +40,25 @@ $COMPOSE run --rm migrate pnpm --filter @fp/persistence exec prisma db seed`;
   return `set -euo pipefail
 IFS= read -r POSTGRES_PASSWORD
 export POSTGRES_PASSWORD
+# docker-compose.staging.yml's DATABASE_URL needs the password safe to sit
+# inside a postgresql:// URL. A real, randomly-generated password can
+# contain characters ('@', ':', '/', '%', ...) that are meaningful in URL
+# syntax; substituted in raw, they silently corrupt the connection string
+# instead of failing loudly (hit for real: Prisma's own "P1013 invalid port
+# number", from a password containing a character that shifted where it
+# thought the host:port segment started). Postgres's own POSTGRES_PASSWORD
+# (set from the unencoded value above, via docker-compose.yml) takes it as a
+# literal string, not a URL component, so only the URL-consuming variable
+# needs encoding.
+POSTGRES_PASSWORD_URLENCODED=''
+for ((i = 0; i < \${#POSTGRES_PASSWORD}; i++)); do
+  c="\${POSTGRES_PASSWORD:i:1}"
+  case "$c" in
+    [a-zA-Z0-9.~_-]) POSTGRES_PASSWORD_URLENCODED+="$c" ;;
+    *) printf -v hex '%%%02X' "'$c"; POSTGRES_PASSWORD_URLENCODED+="$hex" ;;
+  esac
+done
+export POSTGRES_PASSWORD_URLENCODED
 export API_PUBLISHED_PORT='${String(stackConfig.apiPublishedPort)}'
 export STAGING_NETWORK_NAME='${stackConfig.stagingNetworkName}'
 cd '${REMOTE_DIR}'

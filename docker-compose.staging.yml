@@ -13,8 +13,20 @@
 # (infrastructure/src/transfer.ts) to satisfy that requirement with fixed,
 # non-secret staging values only. The one real secret POSTGRES_PASSWORD needs
 # is never written to a file on the VPS (data-model.md); it reaches
-# containers only through the SSH session's process environment and the
-# `${POSTGRES_PASSWORD}` interpolations below.
+# containers only through the SSH session's process environment.
+#
+# `DATABASE_URL` below reads `${POSTGRES_PASSWORD_URLENCODED}`, not
+# `${POSTGRES_PASSWORD}` directly — a real, randomly-generated secret can
+# contain characters (`@`, `:`, `/`, `%`, ...) that are meaningful in URL
+# syntax; substituted in raw, they silently corrupt the connection string
+# instead of failing loudly (hit for real: Prisma's own `P1013 invalid port
+# number` error, from a password containing a character that shifted where
+# it thought the host:port segment started). `postgres`'s own
+# `POSTGRES_PASSWORD` (base docker-compose.yml, inherited here) stays
+# unencoded on purpose — Postgres takes it as a literal string, not a URL
+# component, so encoding it there would set the wrong actual password.
+# `infrastructure/src/deploy.ts`'s script computes and exports the
+# URL-encoded variant right after reading the plain one from stdin.
 #
 # `image:` below must match the tag baked in by
 # infrastructure/src/image.ts's RUNTIME_IMAGE_TAG / MIGRATOR_IMAGE_TAG
@@ -49,7 +61,7 @@ services:
     # (data-model.md's ComposeServiceSet note).
     volumes: !reset []
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
     networks:
       - staging
 
@@ -69,7 +81,7 @@ services:
     ports: !override
       - '${API_PUBLISHED_PORT}:3000'
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
     # No source bind mount: the base file's `.:/app` and per-package
     # node_modules volumes exist for the `development` target's live-edit
     # workflow, which staging's `runtime` image target does not use at all.
