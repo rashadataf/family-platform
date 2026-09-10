@@ -71,6 +71,32 @@ function loadAndSave(
  * SSH, where `deploy.ts` loads it with `docker load`.
  */
 export function buildStagingImages(): StagingImages {
+  /**
+   * Forces a real rebuild on every single deploy, verified against the
+   * provider's own Diff (`docker-build.Image.Diff`, pulumi-docker-build's Go
+   * source): `labels` is one of the properties it compares with
+   * `reflect.DeepEqual`, and any difference routes through `Update`, which
+   * just calls `Create` again — a genuine `docker buildx build --load`.
+   *
+   * Necessary because every other declared property here (context location,
+   * dockerfile path, tags, platform) is IDENTICAL on every deploy unless the
+   * Dockerfile itself changes, so without this the provider reports
+   * "unchanged" and skips the build entirely — which is fatal here because
+   * each deploy runs on a fresh, disposable GitHub Actions VM (or a
+   * developer's laptop after some other local state was cleared): "unchanged
+   * inputs" does NOT mean "the image and tarball this run still needs are
+   * still sitting on this machine." Reproduced for real: a deploy that
+   * failed partway through (an unrelated permission error further down the
+   * resource graph) was retried on a fresh VM where nothing had ever been
+   * built, and the provider still reported "5 unchanged" and skipped
+   * straight to `CopyToRemote`, which then failed with "no such file or
+   * directory" — the tarball from the previous VM's build never existed on
+   * this one. Confirmed the fix locally with a throwaway Pulumi stack before
+   * shipping it: same "image removed, unchanged label → skipped rebuild"
+   * failure reproduced, then resolved by varying just this label.
+   */
+  const cacheBust = Date.now().toString();
+
   const common = {
     // Resolved relative to the Pulumi program's CWD (`--cwd infrastructure`,
     // contracts/cli-and-config.md) — one level up is the repository root,
@@ -81,6 +107,7 @@ export function buildStagingImages(): StagingImages {
     platforms: [dockerBuild.Platform.Linux_amd64],
     push: false,
     load: true,
+    labels: { 'com.family-platform.build-epoch': cacheBust },
     // infra-preview's whole job is proving the program still evaluates and
     // shows a plan without mutating anything (contracts/cli-and-config.md) —
     // it never needed to actually build a multi-hundred-MB image on every
