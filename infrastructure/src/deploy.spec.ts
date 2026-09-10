@@ -99,13 +99,30 @@ describe('infrastructure resource wiring', () => {
    * deploy.ts that could drift from it and silently defeat FR-005's
    * isolation from the portfolio site's containers.
    */
-  it('propagates the validated stagingNetworkName into the deploy environment', async () => {
-    const environment = await resolveOutput(deploy.environment);
-    expect(environment?.STAGING_NETWORK_NAME).toBe(stackConfig.stagingNetworkName);
+  it('propagates the validated stagingNetworkName into the deploy script', async () => {
+    const script = await resolveOutput(deploy.create);
+    expect(script).toContain(`STAGING_NETWORK_NAME='${stackConfig.stagingNetworkName}'`);
   });
 
   it('never puts the postgres password in the deploy script text itself', async () => {
     const script = await resolveOutput(deploy.create);
     expect(script).not.toContain(stackConfig.postgresPassword);
+  });
+
+  /**
+   * `remote.Command`'s `environment` option is unusable against the real
+   * VPS (deploy.ts's comment on `createDeployCommand`: OpenSSH rejects
+   * client-supplied environment variables by default, and fails the whole
+   * command — not just the rejected key). `stdin` is the replacement path
+   * for the one value that must not appear in the script text itself.
+   */
+  it('delivers the postgres password to the remote shell via stdin, not environment', async () => {
+    const stdin = await resolveOutput(deploy.stdin);
+    expect(stdin).toContain(stackConfig.postgresPassword);
+  });
+
+  it('sets no SSH-level environment variables (unsupported by the real VPS sshd)', async () => {
+    const environment = await resolveOutput(deploy.environment);
+    expect(environment).toBeUndefined();
   });
 });
