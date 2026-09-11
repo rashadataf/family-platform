@@ -40,33 +40,33 @@ export async function renewSession(
   deps: RenewSessionDeps,
 ): Promise<Result<RenewedSession, DomainError>> {
   const tokenHash = deps.tokenGenerator.hash(input.token);
-  const match = await deps.sessionRepository.findByCurrentOrPreviousTokenHash(tokenHash);
+  const context = await deps.sessionRepository.findAuthContextByTokenHash(tokenHash);
 
-  if (!match) {
+  if (!context) {
     return err({ kind: 'SessionInvalid' });
   }
 
   const now = deps.clock.now();
 
-  if (match.matchedPrevious) {
-    match.session.revoke('replay_detected', now);
-    await deps.sessionRepository.save(match.session);
-    return err({ kind: 'SessionReplayDetected', sessionId: match.session.id });
+  if (context.matchedPrevious) {
+    context.session.revoke('replay_detected', now);
+    await deps.sessionRepository.save(context.session);
+    return err({ kind: 'SessionReplayDetected', sessionId: context.session.id });
   }
 
   const rawToken = deps.tokenGenerator.generate();
   const newTokenHash = deps.tokenGenerator.hash(rawToken);
-  const rotateResult = match.session.rotate(newTokenHash, now);
+  const rotateResult = context.session.rotate(newTokenHash, now);
   if (!rotateResult.ok) {
     return rotateResult;
   }
 
-  await deps.sessionRepository.save(match.session);
+  await deps.sessionRepository.save(context.session);
 
   return ok({
-    sessionId: match.session.id,
+    sessionId: context.session.id,
     token: rawToken,
-    issuedAt: match.session.issuedAt,
-    absoluteExpiresAt: match.session.absoluteExpiresAt,
+    issuedAt: context.session.issuedAt,
+    absoluteExpiresAt: context.session.absoluteExpiresAt,
   });
 }

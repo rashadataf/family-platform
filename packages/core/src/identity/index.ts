@@ -29,7 +29,6 @@ export type {
 export type {
   ExportedSessionSummary,
   SessionAuthContext,
-  SessionMatch,
   SessionRepository,
   SessionSummary,
 } from './application/ports/session.repository.js';

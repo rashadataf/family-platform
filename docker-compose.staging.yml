@@ -89,6 +89,23 @@ services:
     networks:
       - staging
 
+  # Spec 006's mail sink (research.md §4). It joins `staging` for the same
+  # reason `postgres`, `migrate` and `api` above do: a service left off an
+  # explicit `networks:` override here stays on Compose's implicit default
+  # network instead, where `api` (which actually sends verification mail)
+  # could never resolve or reach it — this was caught by rendering the
+  # merged config (`docker compose ... config`) and confirming `mailpit`
+  # landed on `staging` before deploying it for real.
+  mailpit:
+    # No public host port publication, matching `postgres` above: an
+    # unauthenticated mail-viewing UI and an open SMTP relay have no
+    # business facing the internet. An operator who needs to see a staging
+    # verification email uses an SSH tunnel instead
+    # (`ssh -L 8025:localhost:8025 <staging-host>`).
+    ports: !reset []
+    networks:
+      - staging
+
 # A plain (non-`external`) network: Compose creates a fresh, isolated
 # network on first use, which is what satisfies FR-005 by construction
 # rather than by an additional isolation step (data-model.md).

@@ -370,10 +370,10 @@ dead; separately, revoke one of two active sessions and confirm only that one st
 - [X] T066 [US3] Extend the `Session` aggregate with `rotate()`, `revoke(reason)`, and replay
       detection against `previous_token_hash`, in `session.aggregate.ts`.
       **Deviation.** No `isReplay()` method was added to the aggregate: replay detection needs to
-      compare the *presented* hash against the stored one, and `SessionRepository.findByCurrentOrPreviousTokenHash`
-      (T069) already establishes that fact as part of its one lookup — adding a second method that
+      compare the *presented* hash against the stored one, and `SessionRepository.findAuthContextByTokenHash`
+      already establishes that fact as part of its one lookup — adding a second method that
       re-derives the same boolean from inside the aggregate would be a duplicate source of truth for
-      no benefit, so `RenewSession` (T067) uses the repository's answer directly.
+      no benefit, so both callers (see T069, T071) use the repository's answer directly.
 - [X] T067 [US3] Implement `RenewSession` (FR-010, FR-013's absolute-lifetime check) in
       `packages/core/identity/application/commands/renew-session.command.ts`.
       **Deviation — internal-only error kind.** Added `DomainError`'s `SessionReplayDetected {
@@ -381,8 +381,8 @@ dead; separately, revoke one of two active sessions and confirm only that one st
       identical to any other invalid session (`identity/session_invalid` — contracts/identity-api.md
       is explicit that a replay must not be disclosed as such), but the composition root still needs
       to know a replay specifically occurred in order to log/alert on it distinctly (T073). This kind
-      exists for that internal signal only; the controller collapses it to the same HTTP response as
-      every other rejection.
+      exists for that internal signal only; the controller/guard collapse it to the same HTTP
+      response as every other rejection.
 - [X] T068 [US3] Implement `RevokeSession` (FR-012, ownership check returns not-found rather than
       forbidden) in `packages/core/identity/application/commands/revoke-session.command.ts`.
 - [X] T069 [US3] Extend `session.repository.ts` with the lookups and atomic updates rotation and
@@ -391,8 +391,17 @@ dead; separately, revoke one of two active sessions and confirm only that one st
       invariant (rotation never creates a new `SessionId`, so there is exactly one row per session)
       means revoking that single row *is* revoking every past and future rotated credential under it
       — the existing `save()` upsert already covers it, so no separate bulk-update method was added.
-      The new lookup is `findByCurrentOrPreviousTokenHash`, one query (`OR` on `tokenHash` /
-      `previousTokenHash`) that also reports which side matched.
+      **Corrected during T088.** The first version of this task added a second lookup method,
+      `findByCurrentOrPreviousTokenHash`, used only by `RenewSession`, on the theory that an ordinary
+      authenticated request never needs to know about a superseded hash. Running quickstart.md's
+      Scenario 3 against a real `docker compose up` stack (T088) proved that theory wrong: presenting
+      a superseded credential to an *ordinary* route (`GET /v1/identity/sessions`), not renewal, is
+      exactly what the scenario tests, and it did not trigger replay detection at all under that
+      design — FR-011 says a superseded credential is a possible compromise regardless of which
+      route it turns up on. Fixed by merging the two lookups into one: `findAuthContextByTokenHash`
+      now returns `{session, userStatus, matchedPrevious}` from a single `OR` query, and both
+      `authenticateSession` (T052/T055's guard) and `RenewSession` use it identically. The separate
+      method and its `SessionMatch` type were removed rather than left as dead code.
 - [X] T070 [US3] Register `POST /v1/identity/sessions/current/renewal` and
       `DELETE /v1/identity/sessions/{sessionId}` in `identity.contract.ts` — no idempotency key on
       renewal, per contracts/identity-api.md — sharing `identity/session_invalid`.
@@ -403,13 +412,13 @@ dead; separately, revoke one of two active sessions and confirm only that one st
 - [X] T071 [US3] Implement the two route handlers in `identity.controller.ts`, applying
       `session.guard.ts` to the `DELETE` route.
       **Deviation — renewal does NOT use `SessionGuard`.** contracts/identity-api.md lists renewal
-      under "Unauthenticated" because it authenticates the presented credential itself; the concrete
-      reason is that `SessionGuard`/`authenticateSession` (US2) only ever look up a session by its
-      *current* token hash; a superseded credential simply isn't found by that path, so replay could
-      never be detected if the shared guard ran first. `renewSession`'s controller method instead
-      takes an `@Req()` parameter purely to read the raw `Authorization` header (the same structural
-      `RequestWithIdentityContext` type `SessionGuard` uses), then calls `identity.renewSession`
-      directly.
+      under "Unauthenticated" because it authenticates the presented credential itself. `renewSession`'s
+      controller method takes an `@Req()` parameter purely to read the raw `Authorization` header
+      (the same structural `RequestWithIdentityContext` type `SessionGuard` uses), then calls
+      `identity.renewSession` directly — this stays true after T069's fix (below), since renewal
+      still needs to *rotate* on an ordinary match, which an authorization guard has no reason to do.
+      `SessionGuard` itself gained a matching `Logger.warn` for `SessionReplayDetected`, alongside
+      `renewSession`'s own, once T069's fix meant replay could now surface through either path.
 - [X] T072 [US3] Wire T026's rate limiter on renewal, per session.
       **Deviation — the number chosen.** `PerSessionThrottlerGuard` at 30/60s: "Moderate" per
       contracts/identity-api.md's table, well above what any real client's rotation cadence needs,
@@ -511,20 +520,98 @@ use with no grace window, and that a data export was available before deletion c
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T088 [P] Run quickstart.md's seven scenarios end to end against `docker compose up` (SC-001,
+- [X] T088 [P] Run quickstart.md's seven scenarios end to end against `docker compose up` (SC-001,
       SC-002) and record results in the pull request description.
-- [ ] T089 Confirm `pnpm lint`, `pnpm typecheck`, `pnpm boundaries`, `pnpm test`, and
+      **Recorded here instead — no pull request exists yet on this branch.**
+
+      Ran against a real `docker compose up` stack (postgres, migrate, api, worker, mailpit), driving
+      every request over real HTTP with `curl` and reading verification emails from Mailpit's real
+      API — no test harness, no in-process shortcuts.
+
+      - **Scenario 1** (register/verify/authenticate): PASS. `ADA@example.com` (different casing)
+        authenticated against the account registered as `ada@example.com` (FR-022). Authenticating
+        before verifying returned `identity/not_verified` (FR-003).
+      - **Scenario 2** (resend, old link dies): PASS. Two messages appeared in Mailpit; the older
+        token returned `identity/verification_invalid` after the newer one verified successfully.
+      - **Scenario 3** (rotation, then replay detection): **initially FAILED, then fixed.** Presenting
+        the pre-rotation credential to `GET /v1/identity/sessions` (an ordinary route, not renewal)
+        did not revoke the session — only presenting a superseded credential *to the renewal route
+        itself* did. This is the real bug T069's note above documents fixing. Re-run after the fix:
+        PASS — old credential rejected, new credential also dead, `revoked_reason = replay_detected`
+        confirmed directly in Postgres, and the `SECURITY: replayed session credential presented...`
+        WARN log confirmed in `docker compose logs api`.
+      - **Scenario 4** (log out one device, others survive): PASS, including the specific failure
+        mode the scenario calls out — revoked session B died immediately, session A survived, and
+        revoking session A by its original id *after three rotations* still worked (SessionId is
+        stable across rotation).
+      - **Scenario 5** (deletion revokes instantly): PASS. The same token failed on its very next use
+        with no gap, and re-registering the same email immediately after returned
+        `identity/email_unavailable`.
+      - **Scenario 6** (non-disclosure): PASS. Identical status (401), identical body
+        (`identity/invalid_credentials`) for an unknown email and a wrong password; both requests
+        completed in comparable time (~20-30ms), consistent with the dummy-hash timing-parity design
+        rather than one skipping the argon2id verify.
+      - **Scenario 7** (retention sweeps): PASS, **after also fixing quickstart.md's own documented
+        command** — `docker compose run --rm worker pnpm sweep:retention --as-of ...` fails with
+        "Command sweep:retention not found," because the container's working directory is the
+        workspace root and pnpm does not proxy a bare script name into a single package's
+        `package.json` from there (every other cross-package invocation in this codebase is written
+        fully-qualified, e.g. `apps/api/Dockerfile`'s `pnpm --filter @fp/api run dev` — this one
+        example in quickstart.md just wasn't). Corrected to
+        `pnpm --filter @fp/worker run sweep:retention -- --as-of ...` directly in quickstart.md. With
+        the corrected command: the unverified registration and the deleted account were both gone,
+        their `outbox_event` rows were both still present, and a re-run was a clean no-op.
+
+      Two real defects were found and fixed by actually running this, not merely by unit-testing
+      each piece in isolation — the reason T088 exists as a task distinct from T089.
+- [X] T089 Confirm `pnpm lint`, `pnpm typecheck`, `pnpm boundaries`, `pnpm test`, and
       `pnpm test:integration` all pass repository-wide with every new package included.
 - [ ] T090 [P] Measure argon2id parameters against the Stage 0 VPS (research.md §8: auth p95 <300ms,
       session-guard lookup <5ms) and record the chosen parameters and measurement in
       `packages/platform/src/argon2-password-hasher.ts`.
-- [ ] T091 [P] Add the Mailpit service to the `vps-staging` Pulumi stack in `infrastructure/`
+      **Not completed — no access to the Stage 0 VPS from this environment.** research.md §8 is
+      explicit that this cannot be faked: "Measuring on the machine that will run it is the only way
+      to choose honestly, because memory-hard cost does not transfer between machines." A laptop or
+      CI-runner measurement would be dishonest by the spec's own stated reasoning, not merely
+      imprecise, so none was substituted. `PARAMETERS` keeps its current values (`memoryCost: 19456,
+      timeCost: 2, parallelism: 1` — OWASP's own baseline argon2id configuration, not an arbitrary
+      guess) and the comment's "T090 replaces this comment with the measured values" is left
+      unresolved rather than papered over. Completing this requires SSH access to the actual
+      deployed Stage 0 VPS (spec 003), which this session does not have.
+- [X] T091 [P] Add the Mailpit service to the `vps-staging` Pulumi stack in `infrastructure/`
       (research.md §4), reusing the same container image `docker-compose.yml` already runs.
-- [ ] T092 [P] Add a regression test asserting no plaintext password, session token, or verification
+      **Implementation note.** No Pulumi/TypeScript change was needed: `infrastructure/`'s deploy
+      script transfers `docker-compose.yml` wholesale to the VPS and runs it there, and `mailpit`'s
+      base-file definition has no `build:` (it pulls `axllent/mailpit:latest` directly), so it
+      already ships to staging as-is. What it was missing was a `docker-compose.staging.yml`
+      override, added here: `ports: !reset []` (matching `postgres`'s existing reasoning — an
+      unauthenticated mail UI and an open SMTP relay have no business facing the internet; an
+      operator uses an SSH tunnel instead) and `networks: [staging]`. That second part was not
+      cosmetic — without it, `mailpit` would stay on Compose's implicit default network while `api`
+      (which actually sends mail) joins the explicit `staging` network, and the two would never be
+      able to reach each other. Verified with
+      `docker compose -f docker-compose.yml -f docker-compose.staging.yml config`, confirming the
+      merged service has no published ports and is on `staging`. Real deployment behavior still
+      cannot be verified from this environment (no Stage 0 VPS access — see T090's note).
+- [X] T092 [P] Add a regression test asserting no plaintext password, session token, or verification
       token ever appears in a log line or an export response, across `apps/api/src/identity/**` and
       `packages/core/identity/**` (SC-005).
-- [ ] T093 [P] Add a regression test asserting `packages/core/identity` contains no family, role, or
+      **Implementation note.** `apps/api/src/identity/no-secrets-in-logs.integration.spec.ts`
+      exercises the full flow (register → verify → login → list → renew → export → delete) with a
+      capturing `LoggerService` installed via `app.useLogger()` (the officially supported
+      interception point — a `bootstrapTestApp()` param addition, in
+      `test-support/bootstrap-test-app.ts`) and asserts the raw password, verification token, and
+      both session tokens never appear in any captured message. The export response itself is
+      already asserted secret-free in `export.integration.spec.ts` (T076); this task's export half
+      is that existing coverage, not duplicated here.
+- [X] T093 [P] Add a regression test asserting `packages/core/identity` contains no family, role, or
       capability reference anywhere in its domain or application layers (FR-018).
+      **Implementation note.** `packages/core/src/identity/no-family-references.spec.ts` walks the
+      TypeScript AST of every non-test file under `domain/` and `application/`, flagging any
+      *identifier* (never a comment or string literal) containing "family," "role," or "capability."
+      A substring search over raw text was rejected: several files here — this one included, and
+      `user.aggregate.ts`'s own doc comment — legitimately mention these words while explaining
+      their absence, and a naive search would flag its own explanatory prose.
 
 ---
 

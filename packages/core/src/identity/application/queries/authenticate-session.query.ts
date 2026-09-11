@@ -28,8 +28,13 @@ export interface SessionContext {
 /**
  * FR-023's per-request check: revocation and the owning account's status are
  * re-verified on every use, not only at issuance. One repository call
- * (`findAuthContextByTokenHash`) supplies both the session and its owner's
- * current status, keeping this within research.md §8's <5ms budget.
+ * (`findAuthContextByTokenHash`) supplies the session, its owner's current
+ * status, and whether the presented hash matched a *superseded* credential.
+ *
+ * FR-011 applies here too, not only in `renewSession`: a credential that was
+ * rotated away is a possible compromise regardless of which route it turns
+ * up on. Presenting it to an ordinary authenticated route revokes the whole
+ * session on the spot, the same as presenting it to renewal would.
  */
 export async function authenticateSession(
   input: AuthenticateSessionInput,
@@ -43,6 +48,13 @@ export async function authenticateSession(
   }
 
   const now = deps.clock.now();
+
+  if (context.matchedPrevious) {
+    context.session.revoke('replay_detected', now);
+    await deps.sessionRepository.save(context.session);
+    return err({ kind: 'SessionReplayDetected', sessionId: context.session.id });
+  }
+
   if (!context.session.isUsable(now) || context.userStatus !== 'active') {
     return err({ kind: 'SessionInvalid' });
   }

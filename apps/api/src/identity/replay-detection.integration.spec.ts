@@ -71,4 +71,36 @@ describe('replay detection on POST /v1/identity/sessions/current/renewal', () =>
       .set('Authorization', `Bearer ${renewed.token}`);
     expect(withLatestToken.status).toBe(401);
   });
+
+  it('detects a superseded credential on an ordinary authenticated route too, not only renewal (FR-011, quickstart Scenario 3)', async () => {
+    const original = await registerVerifyAndLogin(
+      `lovelace-${randomUUID()}@example.com`,
+      'correct horse battery staple',
+    );
+
+    const renewal = await request(server)
+      .post('/v1/identity/sessions/current/renewal')
+      .set('Authorization', `Bearer ${original.token}`)
+      .send({});
+    const renewed = renewal.body as SessionCredentialBody;
+
+    // Present the now-superseded credential to an ORDINARY route, not renewal.
+    const replay = await request(server)
+      .get('/v1/identity/sessions')
+      .set('Authorization', `Bearer ${original.token}`);
+
+    expect(replay.status).toBe(401);
+    expect(replay.body).toEqual({ type: 'identity/session_invalid' });
+
+    const sessionRepository = createSessionRepository();
+    const stored = await sessionRepository.findById(asSessionId(original.sessionId));
+    expect(stored?.revokedReason).toBe('replay_detected');
+
+    // The credential issued by that same rotation is also dead — the whole
+    // lineage, not just the replayed token.
+    const withLatestToken = await request(server)
+      .get('/v1/identity/sessions')
+      .set('Authorization', `Bearer ${renewed.token}`);
+    expect(withLatestToken.status).toBe(401);
+  });
 });

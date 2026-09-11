@@ -1,5 +1,5 @@
 import type { Server } from 'node:http';
-import type { INestApplication } from '@nestjs/common';
+import type { INestApplication, LoggerService } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { buildAppModule } from '../../app.module.js';
 import type { AppEnv } from '../../config/env.schema.js';
@@ -15,8 +15,14 @@ import { FakeMailer } from './fake-mailer.js';
  * Returns `server` (typed) alongside `app`, so callers pass it to `supertest`
  * directly — `app.getHttpServer()` itself returns `any`, and Nest's
  * Express-platform server is a real `http.Server` at runtime.
+ *
+ * An optional `logger` is installed via `app.useLogger()` before `app.init()`
+ * — the officially supported override point, and the only one guaranteed to
+ * intercept every call Nest's own `Logger` class makes regardless of how
+ * console/stdout happens to be wired in a given test runner (used by
+ * `no-secrets-in-logs.integration.spec.ts`, SC-005).
  */
-export async function bootstrapTestApp(): Promise<{
+export async function bootstrapTestApp(logger?: LoggerService): Promise<{
   app: INestApplication;
   server: Server;
   mailer: FakeMailer;
@@ -45,6 +51,9 @@ export async function bootstrapTestApp(): Promise<{
     .compile();
 
   const app = moduleRef.createNestApplication();
+  if (logger) {
+    app.useLogger(logger);
+  }
   await app.init();
   const server: unknown = app.getHttpServer();
 

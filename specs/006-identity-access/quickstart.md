@@ -150,8 +150,14 @@ The sweeps run in `apps/worker`. Rather than waiting 30 days, run them against a
 forward — the domain takes `Clock` as an injected port precisely so this is testable:
 
 ```sh
-docker compose run --rm worker pnpm sweep:retention --as-of "$(date -u -v+31d +%Y-%m-%dT%H:%M:%SZ)"
+docker compose run --rm worker pnpm --filter @fp/worker run sweep:retention -- \
+  --as-of "$(date -u -v+31d +%Y-%m-%dT%H:%M:%SZ)"
 ```
+
+(`--filter @fp/worker` is required — the container's working directory is the workspace root, and
+plain `pnpm sweep:retention` only resolves a script defined at the root, not one scoped to a single
+package. Every other cross-package invocation in this codebase is written the same fully-qualified
+way, e.g. `apps/api/Dockerfile`'s own `pnpm --filter @fp/api run dev`.)
 
 **Expect** the unverified registration from Scenario 2 gone, the deleted account from Scenario 5
 gone, and the `outbox_event` rows for both **still present** — they carry identifiers only and must

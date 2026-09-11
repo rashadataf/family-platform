@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
   type CanActivate,
   type ExecutionContext,
@@ -41,6 +42,8 @@ export function extractBearerToken(header: string | undefined): string | null {
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
+  private readonly logger = new Logger(SessionGuard.name);
+
   constructor(
     @Inject(SESSION_REPOSITORY) private readonly sessionRepository: identity.SessionRepository,
     @Inject(TOKEN_GENERATOR) private readonly tokenGenerator: TokenGeneratorPort,
@@ -65,6 +68,14 @@ export class SessionGuard implements CanActivate {
     );
 
     if (!result.ok) {
+      // T073: the alert distinct from an ordinary revocation, same as
+      // `renewSession`'s controller handler — a superseded credential can
+      // surface here too (FR-011 is not only checked on the renewal route).
+      if (result.error.kind === 'SessionReplayDetected') {
+        this.logger.warn(
+          `SECURITY: replayed session credential presented, session ${result.error.sessionId} revoked`,
+        );
+      }
       throw new UnauthorizedException({ type: 'identity/session_invalid' });
     }
 
