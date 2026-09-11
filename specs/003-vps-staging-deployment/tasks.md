@@ -63,8 +63,8 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ### Verification for User Story 1 — **Requires the user** (real VPS + Pulumi Cloud)
 
-- [ ] T018 [US1] **Requires the user.** `pulumi login`; create the `vps-staging` stack; `pulumi config set` for `vpsHost`/`vpsSshUser`/`apiPublishedPort` (and `stagingNetworkName` only if overriding the default); `pulumi config set --secret` for `vpsSshPrivateKey` and `postgresPassword`
-- [ ] T019 [US1] **Requires the user.** Run quickstart Scenario 1 for real: from a clean state, `pnpm staging:deploy`; confirm the staging URL responds within 30 minutes (SC-001) and, via SSH, that the running containers share no network, volume, or name with the portfolio site's containers (User Story 3 acceptance scenario 2 — checked here since access is already at hand)
+- [X] T018 [US1] **Requires the user.** `pulumi login`; create the `vps-staging` stack; `pulumi config set` for `vpsHost`/`vpsSshUser`/`apiPublishedPort` (and `stagingNetworkName` only if overriding the default); `pulumi config set --secret` for `vpsSshPrivateKey` and `postgresPassword`
+- [X] T019 [US1] **Requires the user.** Run quickstart Scenario 1 for real: from a clean state, `pnpm staging:deploy`; confirm the staging URL responds within 30 minutes (SC-001) and, via SSH, that the running containers share no network, volume, or name with the portfolio site's containers (User Story 3 acceptance scenario 2 — checked here since access is already at hand)
 
 **Checkpoint**: A working, reachable staging deployment exists. This is the MVP — stop and validate here before automating iteration.
 
@@ -87,9 +87,9 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ### Verification for User Story 2 — **Requires the user**
 
-- [ ] T023 [US2] **Requires the user.** Add `PULUMI_ACCESS_TOKEN` as a GitHub Actions encrypted secret — the one secret CI needs (research.md §4); everything else resolves from Pulumi Cloud's encrypted stack config at apply time
+- [X] T023 [US2] **Requires the user.** Add `PULUMI_ACCESS_TOKEN` as a GitHub Actions encrypted secret — the one secret CI needs (research.md §4); everything else resolves from Pulumi Cloud's encrypted stack config at apply time
 - [X] T024 [US2] **Requires the user.** Run quickstart Scenario 2 for real: redeploy with no changes (data preserved, SC-002); add a trivial non-domain migration and redeploy (applies automatically, no manual database command, SC-003); run `pnpm staging:deploy:reset` (database wiped and reseeded fresh, SC-002's reset-path guarantee); run `pnpm staging:destroy` (every staging resource removed; portfolio site containers still running afterward, SC-004)
-- [ ] T025 [US2] **Requires the user.** Run quickstart Scenario 3 for real: open a pull request with a trivial change, confirm `infra-preview` posts a preview result without altering the live environment; merge to `main`, confirm `infra-deploy` waits for every other blocking check and then the staging URL serves the merged change with no manual step (SC-008); confirm directly in `.github/workflows/ci.yml` that no CI job ever invokes `staging:destroy` or `staging:deploy:reset` (FR-020)
+- [X] T025 [US2] **Requires the user.** Run quickstart Scenario 3 for real: open a pull request with a trivial change, confirm `infra-preview` posts a preview result without altering the live environment; merge to `main`, confirm `infra-deploy` waits for every other blocking check and then the staging URL serves the merged change with no manual step (SC-008); confirm directly in `.github/workflows/ci.yml` that no CI job ever invokes `staging:destroy` or `staging:deploy:reset` (FR-020)
 
 **Checkpoint**: Staging is a living environment, not a one-off demo, and merges reach it without a manual step.
 
@@ -108,7 +108,7 @@ description: "Task list for spec 003: VPS Staging Deployment"
 
 ### Verification for User Story 3 — **Requires the user**
 
-- [ ] T028 [US3] **Requires the user.** Run [quickstart.md](quickstart.md) Scenario 3 for real: with the portfolio site's containers already running, `pnpm staging:deploy` and confirm the portfolio site remains reachable and unaffected throughout (acceptance scenario 1); `pnpm staging:destroy` and confirm the portfolio site is still running, with its own data intact (acceptance scenario 3)
+- [X] T028 [US3] **Requires the user.** Run [quickstart.md](quickstart.md) Scenario 3 for real: with the portfolio site's containers already running, `pnpm staging:deploy` and confirm the portfolio site remains reachable and unaffected throughout (acceptance scenario 1); `pnpm staging:destroy` and confirm the portfolio site is still running, with its own data intact (acceptance scenario 3)
 - [X] T029 [US3] **Requires the user.** Run quickstart Scenario 4: reboot the VPS (or restart just the Docker daemon if a full reboot is too disruptive to rehearse against the shared portfolio site); confirm `postgres` and `api` come back up on their own within a few minutes via `restart: unless-stopped`, with no `pnpm staging:deploy` invocation (FR-017, SC-007)
 
 **Checkpoint**: All three user stories are independently functional. Only the founder's own VPS can prove any of them end to end — that is a property of what this feature is, not a gap in how it was built.
@@ -120,7 +120,7 @@ description: "Task list for spec 003: VPS Staging Deployment"
 - [X] T030 [P] Update `README.md` with a short pointer to `docs/staging-environment.md`, consistent with the Continuous Integration section spec 005 already added there
 - [X] T031 Re-read `contracts/cli-and-config.md`, `data-model.md`, and `quickstart.md` end to end against what was actually implemented, correcting any further drift — the same discipline that caught the stale four-job `infra-deploy` dependency list before this task list was written
 - [X] T032 Confirm the constitution's "Infrastructure validation and preview" gate row now maps to a named, reporting check (`infra-preview`) — the same row-by-row reconciliation spec 005's T041 performed for its own three rows
-- [ ] T033 **Requires the user.** Once `infra-preview` has reported green at least once on a real pull request, add it to branch protection's required-check list. **`infra-deploy` cannot be a required PR check** — it triggers on `push` to `main`, after merge, so there is structurally nothing for a pull request to wait on
+- [X] T033 **Requires the user.** Once `infra-preview` has reported green at least once on a real pull request, add it to branch protection's required-check list. **`infra-deploy` cannot be a required PR check** — it triggers on `push` to `main`, after merge, so there is structurally nothing for a pull request to wait on
 - [X] T034 Open a follow-up issue proposing a check that verifies `infra-deploy`'s `needs:` list is a superset of every other blocking job name in `ci.yml`. Named as a real, live gap during this feature's planning correction (contracts/cli-and-config.md) rather than left as an unenforced comment: a future feature that adds another blocking CI job and forgets to extend `infra-deploy`'s `needs:` list silently reopens the exact gap spec 005 exists to close, and nothing today would catch that but a human re-reading two lists side by side. Opened as [#19](https://github.com/rashadataf/family-platform/issues/19)
 
 ---
