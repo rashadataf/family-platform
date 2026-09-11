@@ -28,6 +28,25 @@ const WORKSPACE_GRAPH = {
   // Composition roots. "apps/* may import everything except other apps"
   // (ARCHITECTURE §6) — the exception is enforced by `no-cross-app` below.
   'apps/api': ['packages'],
+  'apps/worker': ['packages'],
+
+  // Pure, dependency-free primitives every context and every layer may use
+  // (ARCHITECTURE §6). Depends on nothing but npm packages and Node built-ins,
+  // which the blanket rules above already allow.
+  'packages/kernel': [],
+
+  // Every bounded context lives here. `domain-is-pure` and
+  // `no-cross-context-internals` below do the fine-grained enforcement within
+  // this package; at the workspace-edge level it may only reach the kernel.
+  'packages/core': ['packages/kernel'],
+
+  // The wire boundary (ADR-006). Standalone by design — see
+  // `contracts-are-standalone` below.
+  'packages/contracts': [],
+
+  // Infrastructure adapters. May reach the kernel only —
+  // `platform-has-no-domain` below forbids it reaching a bounded context.
+  'packages/platform': ['packages/kernel'],
 
   // Infrastructure. May reach core and the kernel; must not reach contracts,
   // ai, or any app.

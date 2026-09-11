@@ -1,0 +1,29 @@
+{
+  "name": "@fp/core",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fp/kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@fp/config-eslint": "workspace:*",
+    "@fp/config-typescript": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3"
+  }
+}

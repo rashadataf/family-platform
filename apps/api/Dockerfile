@@ -53,7 +53,12 @@ RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/api/package.json                 apps/api/
+COPY apps/worker/package.json              apps/worker/
 COPY packages/persistence/package.json     packages/persistence/
+COPY packages/kernel/package.json          packages/kernel/
+COPY packages/core/package.json            packages/core/
+COPY packages/contracts/package.json       packages/contracts/
+COPY packages/platform/package.json        packages/platform/
 COPY packages/config-eslint/package.json   packages/config-eslint/
 COPY packages/config-prettier/package.json packages/config-prettier/
 COPY packages/config-typescript/package.json packages/config-typescript/

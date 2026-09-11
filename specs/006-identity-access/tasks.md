@@ -50,40 +50,40 @@ written, and register them everywhere `scripts/verify-workspace-packages.ts` req
 Compose, `.dependency-cruiser.cjs`) — ADR-014's own rule that a required duplication must be guarded
 by a check, not a comment.
 
-- [ ] T001 [P] Create `packages/kernel` (`package.json` name `@fp/kernel`, `tsconfig.json`,
+- [X] T001 [P] Create `packages/kernel` (`package.json` name `@fp/kernel`, `tsconfig.json`,
       `tsconfig.build.json`, `eslint.config.js`), mirroring `packages/persistence`'s non-Prisma parts.
       No runtime dependencies — pure and dependency-free per research.md §6.
-- [ ] T002 [P] Create `packages/core` (`package.json` name `@fp/core`, depending on `@fp/kernel` via
+- [X] T002 [P] Create `packages/core` (`package.json` name `@fp/core`, depending on `@fp/kernel` via
       `workspace:*`, `tsconfig.json`, `eslint.config.js`). This single package will hold every
       bounded context, `identity` first, per `ARCHITECTURE.md` §8.
-- [ ] T003 [P] Create `packages/contracts` (`package.json` name `@fp/contracts`, dependencies `zod`
+- [X] T003 [P] Create `packages/contracts` (`package.json` name `@fp/contracts`, dependencies `zod`
       and `@ts-rest/core`, `tsconfig.json`, `eslint.config.js`).
-- [ ] T004 [P] Create `packages/platform` (`package.json` name `@fp/platform`, dependencies
+- [X] T004 [P] Create `packages/platform` (`package.json` name `@fp/platform`, dependencies
       `@node-rs/argon2` and an SMTP client, depending on `@fp/kernel` via `workspace:*`,
       `tsconfig.json`, `eslint.config.js`).
-- [ ] T005 [P] Create `apps/worker` (`package.json` name `@fp/worker`, `@nestjs/common` +
+- [X] T005 [P] Create `apps/worker` (`package.json` name `@fp/worker`, `@nestjs/common` +
       `@nestjs/core` matching `apps/api`'s versions, workspace dependencies on `@fp/persistence`,
       `@fp/core`, `@fp/kernel`, `@fp/platform`; `tsconfig.json`, `eslint.config.js`) with a minimal
       `apps/worker/src/main.ts` bootstrapping a standalone NestJS application context (no HTTP
       listener — ADR-002 scopes this host to queue consumers and scheduled sweeps).
-- [ ] T006 Register `packages/kernel`, `packages/core`, `packages/contracts`, `packages/platform`,
+- [X] T006 Register `packages/kernel`, `packages/core`, `packages/contracts`, `packages/platform`,
       and `apps/worker` in `.dependency-cruiser.cjs`'s `WORKSPACE_GRAPH`, per `ARCHITECTURE.md` §6's
       layer rules: `kernel: []`; `core: ['packages/kernel']`; `contracts: []` (contracts doc: "imports
       nothing from domain/ or application/"); `platform: ['packages/kernel']`; `apps/worker:
       ['packages']` (a composition root, like `apps/api`).
-- [ ] T007 Add a `COPY <pkg>/package.json` line for each of the five new packages to
+- [X] T007 Add a `COPY <pkg>/package.json` line for each of the five new packages to
       `apps/api/Dockerfile`'s `deps` stage, alongside the existing five.
-- [ ] T008 Add a named `node_modules` volume for each new package to `docker-compose.yml`'s
+- [X] T008 Add a named `node_modules` volume for each new package to `docker-compose.yml`'s
       `volumes:` block, mount them on a new `worker` service (`build.dockerfile:
       apps/worker/Dockerfile`, `target: development`, bind-mounted source, `depends_on.migrate:
       condition: service_completed_successfully`), matching the `api` service's pattern.
-- [ ] T009 Create `apps/worker/Dockerfile`, mirroring `apps/api/Dockerfile`'s `base` → `deps` →
+- [X] T009 Create `apps/worker/Dockerfile`, mirroring `apps/api/Dockerfile`'s `base` → `deps` →
       `development` → `build` → `runtime` stages (no `migrator` target — `apps/api`'s already owns
       migrations).
-- [ ] T010 Add a `mailpit` service to `docker-compose.yml` (image `axllent/mailpit`, SMTP on `1025`,
+- [X] T010 Add a `mailpit` service to `docker-compose.yml` (image `axllent/mailpit`, SMTP on `1025`,
       web UI on `8025`), the Stage 0 mail sink per research.md §4. No environment variables yet —
       those are wired in T021 alongside the adapter that actually uses them.
-- [ ] T011 Run `pnpm install` to lock the five new workspace packages, then run
+- [X] T011 Run `pnpm install` to lock the five new workspace packages, then run
       `pnpm verify:workspace` and confirm it passes.
 
 **Checkpoint**: Five empty-but-wired packages exist, pass the workspace-declaration check, and build

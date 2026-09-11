@@ -5,6 +5,10 @@
       "@fp/persistence": ["packages/persistence/src/index.ts"],
       "@fp/persistence/testing": ["packages/persistence/src/testing.ts"],
       "@fp/testing": ["packages/testing/src/index.ts"],
+      "@fp/kernel": ["packages/kernel/src/index.ts"],
+      "@fp/core": ["packages/core/src/index.ts"],
+      "@fp/contracts": ["packages/contracts/src/index.ts"],
+      "@fp/platform": ["packages/platform/src/index.ts"],
       "@fp/config-eslint": ["packages/config-eslint/index.js"]
     }
   }
