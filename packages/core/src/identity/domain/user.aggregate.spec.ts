@@ -52,4 +52,31 @@ describe('User', () => {
     // The first, successful verification is not undone by the rejected second call.
     expect(user.status).toBe('active');
   });
+
+  it('locks the account once recordFailedAttempt reaches the threshold (FR-008)', () => {
+    const user = register();
+    const params = { maxAttempts: 3, lockoutMs: 15 * 60 * 1000 };
+
+    user.recordFailedAttempt(new Date(NOW.getTime() + 1000), params);
+    user.recordFailedAttempt(new Date(NOW.getTime() + 2000), params);
+    expect(user.throttledUntil).toBeNull();
+
+    const thirdAttemptAt = new Date(NOW.getTime() + 3000);
+    user.recordFailedAttempt(thirdAttemptAt, params);
+
+    expect(user.failedAttemptCount).toBe(3);
+    expect(user.throttledUntil).toEqual(new Date(thirdAttemptAt.getTime() + params.lockoutMs));
+  });
+
+  it('clearFailedAttempts resets the count and lifts any lock', () => {
+    const user = register();
+    const params = { maxAttempts: 1, lockoutMs: 15 * 60 * 1000 };
+    user.recordFailedAttempt(new Date(NOW.getTime() + 1000), params);
+    expect(user.throttledUntil).not.toBeNull();
+
+    user.clearFailedAttempts(new Date(NOW.getTime() + 2000));
+
+    expect(user.failedAttemptCount).toBe(0);
+    expect(user.throttledUntil).toBeNull();
+  });
 });

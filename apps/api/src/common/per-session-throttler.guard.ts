@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { RateLimitGuard } from './rate-limit.guard.js';
 
 /**
  * Tracks by the presented bearer credential rather than by source IP — for
@@ -7,7 +7,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
  * renewal route), as distinct from a per-account or per-source basis.
  */
 @Injectable()
-export class PerSessionThrottlerGuard extends ThrottlerGuard {
+export class PerSessionThrottlerGuard extends RateLimitGuard {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see PerAccountThrottlerGuard's identical note.
   protected override getTracker(req: Record<string, any>): Promise<string> {
     const headers: unknown = req.headers;

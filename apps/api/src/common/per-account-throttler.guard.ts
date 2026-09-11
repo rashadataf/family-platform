@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { emailSchema } from '@fp/contracts';
+import { RateLimitGuard } from './rate-limit.guard.js';
 
 /**
  * Tracks by the normalised email in the request body rather than by source
@@ -9,7 +9,7 @@ import { emailSchema } from '@fp/contracts';
  * default per-source guard protecting the endpoint from a broad attack.
  */
 @Injectable()
-export class PerAccountThrottlerGuard extends ThrottlerGuard {
+export class PerAccountThrottlerGuard extends RateLimitGuard {
   // `req` is typed `Record<string, any>` by the base class we are overriding
   // (@nestjs/throttler ships no narrower type for an Express request body).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- narrowed immediately below via a schema parse.

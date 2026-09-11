@@ -1,7 +1,9 @@
 import { identity } from '@fp/core';
 import type { PrismaClient } from '../../generated/prisma/index.js';
 import { PrismaOutboxRepository } from '../outbox.repository.js';
+import { PrismaDeviceRepository } from './device.repository.js';
 import { PrismaEmailVerificationRepository } from './email-verification.repository.js';
+import { PrismaSessionRepository } from './session.repository.js';
 import { PrismaUserRepository } from './user.repository.js';
 
 /**
@@ -18,6 +20,8 @@ export class PrismaIdentityUnitOfWork implements identity.IdentityUnitOfWorkPort
       work({
         users: new PrismaUserRepository(tx),
         emailVerifications: new PrismaEmailVerificationRepository(tx),
+        sessions: new PrismaSessionRepository(tx),
+        devices: new PrismaDeviceRepository(tx),
         outbox: new PrismaOutboxRepository(tx),
       }),
     );

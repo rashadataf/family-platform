@@ -103,4 +103,27 @@ export class User {
     this.props = { ...this.props, status: 'active', emailVerifiedAt: now, updatedAt: now };
     return ok(undefined);
   }
+
+  /**
+   * FR-008: called on every failed authentication attempt against this
+   * account. Locking on the count crossing the threshold, rather than on
+   * every attempt once locked, means the lockout window keeps resetting for
+   * as long as the attacker keeps trying — the intended behaviour, not a bug.
+   */
+  recordFailedAttempt(now: Date, params: { maxAttempts: number; lockoutMs: number }): void {
+    const failedAttemptCount = this.props.failedAttemptCount + 1;
+    const throttledUntil =
+      failedAttemptCount >= params.maxAttempts
+        ? new Date(now.getTime() + params.lockoutMs)
+        : this.props.throttledUntil;
+    this.props = { ...this.props, failedAttemptCount, throttledUntil, updatedAt: now };
+  }
+
+  /** A successful authentication clears any accumulated failure history. */
+  clearFailedAttempts(now: Date): void {
+    if (this.props.failedAttemptCount === 0 && this.props.throttledUntil === null) {
+      return;
+    }
+    this.props = { ...this.props, failedAttemptCount: 0, throttledUntil: null, updatedAt: now };
+  }
 }

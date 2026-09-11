@@ -13,3 +13,9 @@ export const PASSWORD_HASHER = Symbol('PASSWORD_HASHER');
 export const TOKEN_GENERATOR = Symbol('TOKEN_GENERATOR');
 export const MAILER = Symbol('MAILER');
 export const IDENTITY_UNIT_OF_WORK = Symbol('IDENTITY_UNIT_OF_WORK');
+/**
+ * A standalone, non-transactional session repository for `SessionGuard`
+ * (FR-023 runs on every authenticated request; it only ever reads, so it
+ * does not go through `IDENTITY_UNIT_OF_WORK`'s per-call transaction).
+ */
+export const SESSION_REPOSITORY = Symbol('SESSION_REPOSITORY');

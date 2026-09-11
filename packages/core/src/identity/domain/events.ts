@@ -1,4 +1,4 @@
-import type { OutboxEventToAppend, UserId } from '@fp/kernel';
+import type { OutboxEventToAppend, SessionId, UserId } from '@fp/kernel';
 
 /**
  * ADR-005's event catalogue convention: past tense, context-prefixed,
@@ -25,6 +25,20 @@ export function userRegisteredEvent(params: {
     aggregateType: 'User',
     aggregateId: params.userId,
     payload: { userId: params.userId },
+    correlationId: params.correlationId,
+  };
+}
+
+export function userAuthenticatedEvent(params: {
+  userId: UserId;
+  sessionId: SessionId;
+  correlationId: string;
+}): OutboxEventToAppend {
+  return {
+    eventType: IDENTITY_EVENT_TYPES.UserAuthenticated,
+    aggregateType: 'User',
+    aggregateId: params.userId,
+    payload: { userId: params.userId, sessionId: params.sessionId },
     correlationId: params.correlationId,
   };
 }

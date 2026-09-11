@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Controller, Inject, Logger, UseGuards } from '@nestjs/common';
+import { Controller, Inject, Logger, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { AppRoute, ServerInferResponses } from '@ts-rest/core';
 import { TsRestHandler, tsRestHandler, type TsRestRequestShape } from '@ts-rest/nest';
@@ -12,8 +12,10 @@ import {
   IDENTITY_UNIT_OF_WORK,
   MAILER,
   PASSWORD_HASHER,
+  SESSION_REPOSITORY,
   TOKEN_GENERATOR,
 } from './identity.tokens.js';
+import { SessionGuard, type RequestWithIdentityContext } from './session.guard.js';
 
 /**
  * `tsRestHandler`'s own return type (`NestHandlerImplementation`) is not
@@ -48,6 +50,7 @@ export class IdentityController {
     @Inject(TOKEN_GENERATOR) private readonly tokenGenerator: TokenGeneratorPort,
     @Inject(MAILER) private readonly mailer: MailerPort,
     @Inject(IDENTITY_UNIT_OF_WORK) private readonly unitOfWork: identity.IdentityUnitOfWorkPort,
+    @Inject(SESSION_REPOSITORY) private readonly sessionRepository: identity.SessionRepository,
   ) {}
 
   // Per-source (the default guard's IP tracking): strict, since this limits
@@ -131,6 +134,105 @@ export class IdentityController {
       // account existed would just move the leak from the response to the log.
       this.logger.log('Verification resend requested');
       return { status: 200 as const, body: {} };
+    });
+  }
+
+  // Per-account, on top of the default per-source guard — the strictest pair
+  // of trackers in contracts/identity-api.md's rate-limiting table, layered
+  // on top of (not instead of) FR-008's own per-account lock. The two limits
+  // serve different purposes and are deliberately not the same number: this
+  // route-level limit is a coarse backstop against high-volume automated
+  // abuse (many requests, possibly across many accounts or a rotating
+  // source), while FR-008's domain-level lock (five failed attempts) is the
+  // control that actually engages during a focused attack on one account —
+  // this limit is set well above that threshold so FR-008 is the layer a
+  // real attack meets first.
+  @UseGuards(PerAccountThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @TsRestHandler(identityContract.login)
+  login(): RouteHandler<typeof identityContract.login> {
+    return tsRestHandler(identityContract.login, async ({ body }) => {
+      const correlationId = randomUUID();
+      const result = await identity.authenticateUser(
+        {
+          email: body.email,
+          password: body.password,
+          deviceLabel: body.deviceLabel ?? null,
+          correlationId,
+        },
+        {
+          unitOfWork: this.unitOfWork,
+          passwordHasher: this.passwordHasher,
+          tokenGenerator: this.tokenGenerator,
+          clock: this.clock,
+        },
+      );
+
+      if (result.ok) {
+        // UserId and correlation id only — never the email (Principle VI).
+        this.logger.log(
+          `Authenticated session ${result.value.sessionId} [correlationId=${correlationId}]`,
+        );
+        return {
+          status: 201 as const,
+          body: {
+            sessionId: result.value.sessionId,
+            token: result.value.token,
+            issuedAt: result.value.issuedAt.toISOString(),
+            absoluteExpiresAt: result.value.absoluteExpiresAt.toISOString(),
+          },
+        };
+      }
+
+      this.logger.log(
+        `Authentication rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+      );
+      switch (result.error.kind) {
+        case 'AccountNotVerified':
+          return { status: 403 as const, body: { type: 'identity/not_verified' as const } };
+        case 'Throttled':
+          return {
+            status: 429 as const,
+            body: {
+              type: 'identity/throttled' as const,
+              retryAfterSeconds: result.error.retryAfterSeconds,
+            },
+          };
+        default:
+          return { status: 401 as const, body: { type: 'identity/invalid_credentials' as const } };
+      }
+    });
+  }
+
+  @UseGuards(SessionGuard)
+  @TsRestHandler(identityContract.listSessions)
+  listSessions(
+    @Req() req: RequestWithIdentityContext,
+  ): RouteHandler<typeof identityContract.listSessions> {
+    return tsRestHandler(identityContract.listSessions, async () => {
+      // Set by SessionGuard, which already ran and rejected an invalid
+      // session before this handler is ever reached.
+      if (!req.identityContext) {
+        throw new Error('SessionGuard did not populate identityContext.');
+      }
+      const { userId, sessionId } = req.identityContext;
+      const sessions = await identity.listSessions(
+        { userId, currentSessionId: sessionId },
+        { sessionRepository: this.sessionRepository },
+      );
+      return {
+        status: 200 as const,
+        body: {
+          sessions: sessions.map((session) => ({
+            sessionId: session.sessionId,
+            deviceLabel: session.deviceLabel,
+            issuedAt: session.issuedAt.toISOString(),
+            rotatedAt: session.rotatedAt?.toISOString() ?? null,
+            absoluteExpiresAt: session.absoluteExpiresAt.toISOString(),
+            isCurrent: session.isCurrent,
+          })),
+        },
+      };
     });
   }
 }

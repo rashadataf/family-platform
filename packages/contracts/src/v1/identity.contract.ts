@@ -56,6 +56,48 @@ export const verificationInvalidSchema = z.object({
   type: z.literal('identity/verification_invalid'),
 });
 
+/** FR-007, SC-003: unknown email and wrong password are deliberately indistinguishable. */
+export const invalidCredentialsSchema = z.object({
+  type: z.literal('identity/invalid_credentials'),
+});
+
+/** FR-003: correct credentials, but the account has not completed email verification yet. */
+export const notVerifiedSchema = z.object({
+  type: z.literal('identity/not_verified'),
+});
+
+/** FR-008: returned even when the password on this very attempt would have been correct. */
+export const throttledSchema = z.object({
+  type: z.literal('identity/throttled'),
+  retryAfterSeconds: z.number(),
+});
+
+/**
+ * A route-level limit exceeded (contracts/identity-api.md's rate-limiting
+ * table) — distinct from `identity/throttled` above, which is FR-008's
+ * per-account domain lock rather than a per-route request-rate limit.
+ */
+export const rateLimitedSchema = z.object({ type: z.literal('identity/rate_limited') });
+
+/**
+ * FR-023: one type for unknown, revoked, expired, superseded, or
+ * deleted-account credentials, on purpose — see contracts/identity-api.md's
+ * "why replay returns identity/session_invalid rather than its own type."
+ */
+export const sessionInvalidSchema = z.object({
+  type: z.literal('identity/session_invalid'),
+});
+
+/** What `GET /v1/identity/sessions` renders per session — never a token or its hash. */
+export const sessionSummarySchema = z.object({
+  sessionId: z.string(),
+  deviceLabel: z.string(),
+  issuedAt: z.string(),
+  rotatedAt: z.string().nullable(),
+  absoluteExpiresAt: z.string(),
+  isCurrent: z.boolean(),
+});
+
 const c = initContract();
 
 export const identityContract = c.router(
@@ -85,6 +127,42 @@ export const identityContract = c.router(
       body: z.object({ email: emailSchema }),
       responses: {
         200: z.object({}),
+      },
+    },
+    login: {
+      method: 'POST',
+      path: '/sessions',
+      body: z.object({
+        email: emailSchema,
+        password: passwordSchema,
+        // FR-009: best-effort and optional — issuance proceeds without it.
+        deviceLabel: z.string().trim().min(1).optional(),
+      }),
+      responses: {
+        201: z.object({
+          sessionId: z.string(),
+          token: z.string(),
+          issuedAt: z.string(),
+          absoluteExpiresAt: z.string(),
+        }),
+        401: invalidCredentialsSchema,
+        403: notVerifiedSchema,
+        // FR-008's per-account lock and the per-route rate limit are both
+        // reachable here and are deliberately distinct types (see each
+        // schema's comment) — a client-side consumer discriminates on `type`.
+        429: z.discriminatedUnion('type', [throttledSchema, rateLimitedSchema]),
+      },
+    },
+    // Credential travels as `Authorization: Bearer <token>` (contracts/identity-api.md);
+    // not modelled as a contract `headers` schema so a missing/invalid header can return
+    // the specific `identity/session_invalid` type instead of ts-rest's generic 400 — the
+    // same reasoning as `passwordSchema`'s comment above.
+    listSessions: {
+      method: 'GET',
+      path: '/sessions',
+      responses: {
+        200: z.object({ sessions: z.array(sessionSummarySchema) }),
+        401: sessionInvalidSchema,
       },
     },
     // Remaining routes populated story by story — see the file-level comment above.

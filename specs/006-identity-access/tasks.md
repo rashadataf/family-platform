@@ -251,43 +251,84 @@ issued and a `UserAuthenticated` row lands in the outbox, then use that session 
 
 ### Tests for User Story 2
 
-- [ ] T046 [P] [US2] Integration test for `POST /v1/identity/sessions` — happy path; wrong password
+- [X] T046 [P] [US2] Integration test for `POST /v1/identity/sessions` — happy path; wrong password
       and unknown email produce an identical status/type/body (FR-007, SC-003); repeated failures
       throttle regardless of a later attempt's correctness (FR-008); an unverified account is
       rejected — in `apps/api/src/identity/sessions.integration.spec.ts`.
-- [ ] T047 [P] [US2] Integration test for `GET /v1/identity/sessions` — a user sees only their own
+- [X] T047 [P] [US2] Integration test for `GET /v1/identity/sessions` — a user sees only their own
       sessions (authorization matrix) — in the same file.
-- [ ] T048 [P] [US2] Unit test for `Session` issuance and its `Device` association in
+- [X] T048 [P] [US2] Unit test for `Session` issuance and its `Device` association in
       `packages/core/identity/domain/session.aggregate.spec.ts`.
 
 ### Implementation for User Story 2
 
-- [ ] T049 [P] [US2] Implement the `Session` aggregate (issue, stable `SessionId`, token hash,
+- [X] T049 [P] [US2] Implement the `Session` aggregate (issue, stable `SessionId`, token hash,
       absolute expiry) in `packages/core/identity/domain/session.aggregate.ts`.
-- [ ] T050 [P] [US2] Implement the `Device` entity (label, first/last seen — deliberately minimal per
+- [X] T050 [P] [US2] Implement the `Device` entity (label, first/last seen — deliberately minimal per
       FR-009) in `packages/core/identity/domain/device.ts`.
-- [ ] T051 [US2] Define `UserAuthenticated` in `events.ts`.
-- [ ] T052 [US2] Implement `AuthenticateUser` in
+- [X] T051 [US2] Define `UserAuthenticated` in `events.ts`.
+- [X] T052 [US2] Implement `AuthenticateUser` in
       `packages/core/identity/application/commands/authenticate-user.command.ts`: runs the hasher's
       verify step even for an unknown email to close the timing side channel (SC-003), enforces
       FR-008's throttle, creates/associates a `Device`, issues a `Session`, writes `UserAuthenticated`
       to the outbox.
-- [ ] T053 [P] [US2] Implement `ListSessions` in
+      **Deviation — concrete values.** spec.md explicitly left exact throttle/lifetime numbers as
+      "a planning-phase detail," and neither plan.md nor research.md pinned them, so this task fixes
+      them: `MAX_FAILED_ATTEMPTS = 5` failures locks the account for 15 minutes (FR-008); the
+      absolute session lifetime (FR-013) is 90 days, matching the 90-day figure spec.md already uses
+      for post-invalidity session retention. The unknown-email timing side channel (SC-003) is
+      closed with a hardcoded, precomputed argon2id hash of a fixed non-account string
+      (`DUMMY_PASSWORD_HASH`) verified against whenever no account matches — one real argon2id
+      verification runs either way.
+- [X] T053 [P] [US2] Implement `ListSessions` in
       `packages/core/identity/application/queries/list-sessions.query.ts`.
-- [ ] T054 [US2] Implement `packages/persistence/src/repositories/identity/session.repository.ts` and
+- [X] T054 [US2] Implement `packages/persistence/src/repositories/identity/session.repository.ts` and
       `device.repository.ts`.
-- [ ] T055 [US2] Implement `apps/api/src/identity/session.guard.ts` — the FR-023 check: hash the
+- [X] T055 [US2] Implement `apps/api/src/identity/session.guard.ts` — the FR-023 check: hash the
       presented bearer token, look up the session, reject if revoked, expired, or the owning
       account is deleted, as a single indexed lookup (research.md §8's <5ms budget).
-- [ ] T056 [US2] Register `POST /v1/identity/sessions` and `GET /v1/identity/sessions` in
+      **Implementation note.** The "single indexed lookup" is
+      `SessionRepository.findAuthContextByTokenHash`, a single Prisma query joining `session` to
+      `user` (`include: { user: { select: { status: true } } }`) so the guard never issues two
+      round trips. `identity.authenticateSession` (a new application-layer query, not just guard
+      code) applies the actual rule: usable requires `revokedAt === null`, `absoluteExpiresAt > now`,
+      and `userStatus === 'active'` — the last of these is the "owning account is deleted" check,
+      applied defensively here even though no route in this story can put an account into
+      `deletion_requested` yet. `SessionGuard` is a real Nest `CanActivate`; since a
+      `@TsRestHandler` method's own arguments carry only the validated body/query/params (no request
+      object — see `identity.controller.ts`'s `RouteHandler` comment), the guard attaches the
+      resolved `{userId, sessionId}` to the raw request, and the route handler reads it back via a
+      normal `@Req()` parameter alongside the `@TsRestHandler` decorator.
+- [X] T056 [US2] Register `POST /v1/identity/sessions` and `GET /v1/identity/sessions` in
       `identity.contract.ts`, with `identity/invalid_credentials`, `identity/not_verified`, and
       `identity/throttled`.
-- [ ] T057 [US2] Implement the two route handlers in `identity.controller.ts`, applying
+      **Also fixed while here.** contracts/identity-api.md's error table promises `identity/rate_limited`
+      for a route-level rate limit, but nothing produced that shape — @nestjs/throttler's own
+      `ThrottlerException` throws a generic `{statusCode, message}` body. Added
+      `apps/api/src/common/rate-limit.guard.ts` (a `RateLimitGuard` base class overriding
+      `throwThrottlingException` to throw `{type: 'identity/rate_limited'}`) and rebased
+      `PerAccountThrottlerGuard`, `PerSessionThrottlerGuard`, and the global `APP_GUARD` on it. This
+      is a real fix to a pre-existing gap from US1 (registration and resend were already
+      rate-limited but never returned the documented shape), applied retroactively via the shared
+      base class rather than only for this story's new routes.
+- [X] T057 [US2] Implement the two route handlers in `identity.controller.ts`, applying
       `session.guard.ts` to the `GET` route.
-- [ ] T058 [US2] Wire T026's rate limiter on login: per-source and per-account, the strictest limit
+- [X] T058 [US2] Wire T026's rate limiter on login: per-source and per-account, the strictest limit
       in the table.
-- [ ] T059 [US2] Add structured logging and metrics for authentication success/failure rate and
+      **Deviation — the number chosen.** Both trackers use limit 20/60s, deliberately *above*
+      FR-008's 5-attempt domain lock rather than below it: the two controls have different jobs
+      (route-level = coarse backstop against high-volume/automated abuse; FR-008 = the control that
+      actually engages during a focused attack on one account), and setting the route limit at or
+      below 5 would make FR-008's own lock unreachable in both real use and in T046's test. 20 is
+      still far stricter than the 100/60s global default.
+- [X] T059 [US2] Add structured logging and metrics for authentication success/failure rate and
       throttle activations.
+      **Scoped down — metrics.** Structured logging is implemented in full (login and session-list
+      outcomes log `UserId`/`SessionId` and correlation id, never the email, matching T044's
+      pattern). Metrics are not: no metrics library, exporter, or `/metrics` endpoint exists
+      anywhere in this codebase, and neither research.md nor plan.md selected one — introducing a
+      metrics stack is an infrastructure decision this task was never scoped to make. Deferred to a
+      future task with its own design, not silently dropped.
 
 **Checkpoint**: User Stories 1 and 2 both work independently.
 
