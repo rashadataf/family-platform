@@ -158,4 +158,16 @@ describe('infrastructure resource wiring', () => {
     const script = await resolveOutput(deploy.delete);
     expect(script).toContain('-mindepth 1 -delete');
   });
+
+  /**
+   * Verified against the real VPS: a destroy that already failed once on the
+   * old `rm -rf` bug leaves REMOTE_DIR existing but with its contents
+   * (including docker-compose.yml) already removed — `rm -rf` deletes
+   * children before the parent. A retried destroy must not assume the
+   * compose file is still there just because the directory is.
+   */
+  it('guards the compose-down step against an already-emptied remote directory', async () => {
+    const script = await resolveOutput(deploy.delete);
+    expect(script).toMatch(/if \[ -f docker-compose\.yml \]; then/);
+  });
 });
