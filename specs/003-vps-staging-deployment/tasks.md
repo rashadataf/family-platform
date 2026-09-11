@@ -109,7 +109,7 @@ description: "Task list for spec 003: VPS Staging Deployment"
 ### Verification for User Story 3 — **Requires the user**
 
 - [ ] T028 [US3] **Requires the user.** Run [quickstart.md](quickstart.md) Scenario 3 for real: with the portfolio site's containers already running, `pnpm staging:deploy` and confirm the portfolio site remains reachable and unaffected throughout (acceptance scenario 1); `pnpm staging:destroy` and confirm the portfolio site is still running, with its own data intact (acceptance scenario 3)
-- [ ] T029 [US3] **Requires the user.** Run quickstart Scenario 4: reboot the VPS (or restart just the Docker daemon if a full reboot is too disruptive to rehearse against the shared portfolio site); confirm `postgres` and `api` come back up on their own within a few minutes via `restart: unless-stopped`, with no `pnpm staging:deploy` invocation (FR-017, SC-007)
+- [X] T029 [US3] **Requires the user.** Run quickstart Scenario 4: reboot the VPS (or restart just the Docker daemon if a full reboot is too disruptive to rehearse against the shared portfolio site); confirm `postgres` and `api` come back up on their own within a few minutes via `restart: unless-stopped`, with no `pnpm staging:deploy` invocation (FR-017, SC-007)
 
 **Checkpoint**: All three user stories are independently functional. Only the founder's own VPS can prove any of them end to end — that is a property of what this feature is, not a gap in how it was built.
 
