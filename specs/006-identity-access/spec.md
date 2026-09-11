@@ -8,6 +8,15 @@
 
 **Input**: User description: "Implement the Identity and Access bounded context (ARCHITECTURE.md section 5.1) as the platform's first real domain feature: user registration with credentials, credential-based login, session issuance/refresh/rotation, and account deletion. Aggregates are User, Session, and Device, exactly as named in the architecture doc. A User must have no reference to a Family or any family-scoped concept at all - that relationship belongs entirely to the future Family and Membership context (section 5.2), so this feature must not model roles, capabilities, or anything about what a user may see or do, only who they are ('authentication answers who, never what may they touch' per the architecture doc). Publish UserRegistered, UserAuthenticated, and UserDeletionRequested domain events per the architecture doc's contract, even though no other bounded context exists yet to consume them - the publishing side is this context's own responsibility regardless of current subscribers. The architecture doc explicitly calls this context 'the strongest candidate for a managed provider' (Cognito, Auth0, Clerk, WorkOS), since a managed provider can only ever hold UserId, an email, and authentication factors, never family data - this feature must decide, and record as an ADR, whether to build credential storage and session handling in-house or adopt a managed identity provider, with the trade-offs made explicit rather than defaulted into. MFA and device registration are named in the architecture doc's responsibility list; include them only if a reasonable v1 can ship without disproportionate complexity, otherwise scope them out explicitly with a stated reason rather than silently dropping them. Out of scope: the Family and Membership context and everything downstream of it, any notion of roles or capabilities, every other bounded context in the architecture doc, and any UI beyond what is needed to exercise and verify the API."
 
+## Clarifications
+
+### Session 2026-09-11
+
+- Q: When a session is revoked (e.g. "log out this device") or an account is deleted, how quickly must that credential actually stop working? → A: Effectively instant — every request must be checked against current revocation status, so a revoked/deleted credential stops working on its very next use.
+- Q: Does "a session" mean a stable identity that survives its own renewals, or does each renewal create a logically distinct session? → A: Stable lineage — a session keeps one identity across every renewal; revoking it revokes that whole chain, past and future, in one action.
+- Q: If a verification email never arrives or its link expires, can the person ask for it to be sent again? → A: Resendable, expiring link — the verification link expires after a set window, and the user can request a new one as many times as needed before it does.
+- Q: If someone deletes their account and immediately tries to register again with the same email while it's still inside its retention window, does that succeed? → A: Blocked until erasure completes — the email stays unavailable for the full retention window, same as FR-002's non-disclosure behavior for any other existing account.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create an account (Priority: P1)
@@ -80,30 +89,33 @@ A user who no longer wants an account can request its deletion, so that their cr
 ### Edge Cases
 
 - What happens when someone registers, never verifies their email, and never returns? (See retention answer below — unverified registrations are not kept indefinitely.)
+- What happens when a verification link expires before it's used, or the email never arrives? The person can request a new verification message as many times as needed; each request issues a fresh link and the previous one stops working.
 - What happens when a password reset is needed? Out of scope for this feature (see Out of Scope) — an account with a forgotten password cannot currently recover access within this feature's boundary.
 - What happens when the same person tries to authenticate from two devices at once? Both succeed independently; each gets its own session and its own device association. There is no platform-wide single-session-per-user constraint.
 - What happens when a session's device association can't be determined (e.g. an unusual or missing client identifier)? The session is still issued; the device record is created with whatever minimal identifying information is available rather than blocking authentication on it.
 - What happens if the same email is used with different letter casing (`User@Example.com` vs `user@example.com`)? They MUST resolve to the same account — email comparison is case-insensitive.
+- What happens if someone deletes their account and immediately tries to register again with the same email? Registration is rejected until the prior account's retention window (FR-019) has fully elapsed and erasure has completed — the email does not free up the moment deletion is requested.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: The system MUST allow a person to register an account with an email address and a password.
-- **FR-002**: The system MUST reject registration against an email address that already has an account, without disclosing whether the existing account is verified, unverified, or deleted-but-within-its-retention-window.
+- **FR-002**: The system MUST reject registration against an email address that already has an account, including one whose deletion was requested but whose retention window (per FR-019) has not yet elapsed, without disclosing which of these states applies — the email remains unavailable for a fresh registration until erasure actually completes.
 - **FR-003**: The system MUST require a person to verify control of their email address before their account can authenticate.
+- **FR-003a**: The verification link MUST expire after a set window, and the system MUST allow the person to request a new verification message as many times as needed before verification succeeds, with each new request invalidating the previously issued link.
 - **FR-004**: The system MUST enforce a minimum password strength rule at registration and reject weaker passwords with a specific, actionable reason.
 - **FR-005**: The system MUST never store a password in a recoverable (plaintext or reversibly-encrypted) form.
 - **FR-006**: The system MUST allow a verified account to authenticate with its email and password and, on success, issue a session.
 - **FR-007**: The system MUST reject authentication with a generic failure reason that does not reveal whether the rejection was due to an unknown email or an incorrect password.
 - **FR-008**: The system MUST throttle repeated failed authentication attempts against a single account within a short time window, independent of whether a later attempt's password would have succeeded.
 - **FR-009**: The system MUST associate every issued session with a device record, using whatever minimal client-identifying information is available, without blocking session issuance if that information is incomplete.
-- **FR-010**: The system MUST allow an active, unexpired session to be renewed, issuing a new session and invalidating the one it replaced (rotation).
+- **FR-010**: The system MUST allow an active, unexpired session to be renewed, issuing a new usable credential under that same session's stable identity and invalidating the credential it replaced (rotation, not a new session).
 - **FR-011**: The system MUST reject a session credential that has already been superseded by a rotation, and MUST treat that event as a possible compromise rather than an ordinary invalid-session error.
-- **FR-012**: The system MUST allow a user to revoke one of their own sessions individually, without affecting their other active sessions.
+- **FR-012**: The system MUST allow a user to revoke one of their own sessions individually, by its stable identity, invalidating every past and future rotated credential under it at once, without affecting their other active sessions.
 - **FR-013**: The system MUST enforce an absolute session lifetime after which renewal is no longer possible and fresh authentication is required.
 - **FR-014**: The system MUST allow an authenticated user to request deletion of their own account.
-- **FR-015**: The system MUST immediately revoke every active session for an account once its deletion has been requested.
+- **FR-015**: The system MUST immediately revoke every active session for an account once its deletion has been requested, per the checked-on-every-use guarantee in FR-023.
 - **FR-016**: The system MUST prevent any future authentication attempt against a deleted account's former credentials from succeeding.
 - **FR-017**: The system MUST publish a `UserRegistered` event when an account is created, a `UserAuthenticated` event when authentication succeeds, and a `UserDeletionRequested` event when account deletion is requested — regardless of whether any other part of the platform currently subscribes to them.
 - **FR-018**: The system MUST NOT record, reference, or expose any family-scoped concept (a family, a role within one, a membership, a capability) anywhere in this context — a `User` answers only who someone is, never what they may do.
@@ -111,11 +123,12 @@ A user who no longer wants an account can request its deletion, so that their cr
 - **FR-020**: The system MUST also erase an unverified, never-completed registration's credential data no later than the retention period stated under Personal Data, Deletion, and Export, with no deletion request required.
 - **FR-021**: The system MUST allow a user to export the personal data this context holds about them, as enumerated under Personal Data, Deletion, and Export.
 - **FR-022**: The system MUST treat an email address as case-insensitive for the purposes of uniqueness and lookup.
+- **FR-023**: The system MUST check a session's revocation and the owning account's deletion status on every use of that session, not merely at issuance — a revoked session or a deleted account's credential MUST be rejected on its very next use, with no self-contained credential able to remain valid past that point regardless of its own unexpired lifetime.
 
 ### Key Entities
 
 - **User**: The account of record for a person who can sign in. Holds an email address, a securely-hashed credential, verification status, and nothing about any family, role, or capability. Identified by a `UserId` that other, future bounded contexts may reference, but this context holds no reference back to them.
-- **Session**: A single authenticated period of access issued to a `User` after successful authentication. Tracks its own validity window, its renewal lineage (so a superseded session can be told apart from a live one), and which `Device` it was issued to. Independently revocable.
+- **Session**: A single continuous authenticated relationship between a `User` and a `Device`, holding one stable identity across every renewal it goes through — rotating its usable credential does not create a new session, only a new current form of the same one. Tracks its current validity window and revocation status. Revoking a session by its stable identity invalidates every past and future rotated form of it at once, which is what makes "log out this device" a single, reliable action.
 - **Device**: A record representing a client the user has authenticated from, identified by whatever minimal client-supplied information is available at session issuance. Exists to let a user recognize and individually manage ("log out this device") the sessions associated with it — it is not a fingerprinting or tracking mechanism.
 
 ## Success Criteria *(mandatory)*
@@ -128,6 +141,7 @@ A user who no longer wants an account can request its deletion, so that their cr
 - **SC-004**: A user who requests account deletion has their credential and session data fully and irrecoverably removed within the stated retention period, with zero exceptions observed in testing.
 - **SC-005**: Zero plaintext or reversible passwords are ever observed in storage, logs, error messages, or exported data, across the full test suite.
 - **SC-006**: A session that has been rotated cannot be successfully reused, in 100% of tested replay attempts.
+- **SC-007**: A revoked session or a deleted account's credential is rejected on its very next use in 100% of tested cases — never within a later window, and never merely at its own natural expiry.
 
 ## Personal Data, Deletion, and Export *(mandatory — Constitution Principle XI)*
 
