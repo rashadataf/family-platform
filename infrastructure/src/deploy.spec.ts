@@ -125,4 +125,24 @@ describe('infrastructure resource wiring', () => {
     const environment = await resolveOutput(deploy.environment);
     expect(environment).toBeUndefined();
   });
+
+  /**
+   * Without a `delete` script, `pulumi destroy` leaves everything running on
+   * the VPS untouched while Pulumi's own state reports a clean teardown —
+   * verified against the real VPS before this test existed. `--volumes` is
+   * asserted specifically because `docker compose down` alone keeps the
+   * named Postgres volume, which would silently defeat a destroy meant to
+   * leave nothing behind.
+   */
+  it('tears the deployment down on destroy, including its data volume', async () => {
+    const script = await resolveOutput(deploy.delete);
+    expect(script).toContain('docker compose');
+    expect(script).toContain('down');
+    expect(script).toContain('--volumes');
+  });
+
+  it('guards the teardown script against a missing remote directory', async () => {
+    const script = await resolveOutput(deploy.delete);
+    expect(script).toMatch(/if \[ -d .* \]; then/);
+  });
 });
