@@ -27,6 +27,9 @@ datasource db {
 model ScaffoldProbe {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now()) @map("created_at")
+  // Added purely to exercise T024's "a real migration applies automatically
+  // on redeploy" verification (spec 003) — no functional use.
+  note      String?
 
   @@map("_scaffold_probe")
 }
