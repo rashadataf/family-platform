@@ -65,6 +65,27 @@ describe('loadStackConfig', () => {
     expect(config.resetData).toBe(true);
   });
 
+  /**
+   * Reproduced for real: `z.coerce.boolean()` (the schema's original form)
+   * just calls JS's `Boolean(value)`, and `Boolean('false')` is `true` —
+   * only an empty string is falsy. Since Pulumi config values are always
+   * strings, `pulumi config set resetData false` produces the literal
+   * string `'false'`, which the old schema silently parsed as `true`: every
+   * deploy with `resetData` explicitly set to `'false'` was actually running
+   * the destructive wipe-and-reseed path, defeating FR-012/SC-002's
+   * "ordinary redeploys preserve data" guarantee. This exact case — the
+   * literal string `'false'` — is the one the previous test suite never
+   * covered, which is how it shipped unnoticed.
+   */
+  it('parses the literal string "false" as false, not as JS truthy-string coercion', () => {
+    const config = loadStackConfig({ ...VALID_RAW, resetData: 'false' });
+    expect(config.resetData).toBe(false);
+  });
+
+  it('rejects a resetData value that is neither "true" nor "false"', () => {
+    expect(() => loadStackConfig({ ...VALID_RAW, resetData: 'yes' })).toThrow(/resetData/);
+  });
+
   it('rejects an empty vpsHost', () => {
     expect(() => loadStackConfig({ ...VALID_RAW, vpsHost: '' })).toThrow(/vpsHost/);
   });
