@@ -91,6 +91,16 @@ $COMPOSE up -d
  * the same `-p family-platform-staging` project name `deployScript` already
  * uses (data-model.md / T028's isolation guarantee), not by any special
  * handling here.
+ *
+ * Empties `REMOTE_DIR` rather than removing it — verified against the real
+ * VPS that `rm -rf` on the directory itself fails with "Permission denied":
+ * deleting a directory needs write access to its *parent* (`/opt`, root-
+ * owned), not the directory being deleted, so `deploy` can remove
+ * everything it owns inside `REMOTE_DIR` but not the now-empty shell.
+ * `find -mindepth 1 -delete` (rather than a `rm -rf .[!.]* *` glob pair)
+ * catches dotfiles like the transferred `.env` without needing two
+ * patterns, and leaves a directory `deploy` already owns in place for the
+ * next deploy to write straight back into.
  */
 function teardownScript(): string {
   return `set -euo pipefail
@@ -99,7 +109,7 @@ if [ -d '${REMOTE_DIR}' ]; then
   COMPOSE='docker compose -p family-platform-staging -f docker-compose.yml -f docker-compose.staging.yml'
   $COMPOSE down --volumes --remove-orphans
   cd /
-  rm -rf '${REMOTE_DIR}'
+  find '${REMOTE_DIR}' -mindepth 1 -delete
 fi
 `;
 }

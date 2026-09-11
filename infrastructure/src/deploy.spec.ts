@@ -145,4 +145,17 @@ describe('infrastructure resource wiring', () => {
     const script = await resolveOutput(deploy.delete);
     expect(script).toMatch(/if \[ -d .* \]; then/);
   });
+
+  /**
+   * `rm -rf` on REMOTE_DIR itself was the first version of this script —
+   * verified against the real VPS that it fails with "Permission denied":
+   * removing a directory needs write access to its *parent* (`/opt`,
+   * root-owned), not the directory being removed. Asserting the replacement
+   * (`find ... -delete`) rather than just "not rm -rf" pins the actual fix,
+   * not just the absence of the broken one.
+   */
+  it('empties the remote directory rather than removing it (avoids a parent-permission failure)', async () => {
+    const script = await resolveOutput(deploy.delete);
+    expect(script).toContain('-mindepth 1 -delete');
+  });
 });
