@@ -2,7 +2,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { loadStackConfig } from './src/config.js';
 import { buildStagingImages } from './src/image.js';
 import { createTransfer } from './src/transfer.js';
-import { createDeployCommand } from './src/deploy.js';
+import { createDeployCommand, createTeardownCommand } from './src/deploy.js';
 
 const cfg = new pulumi.Config();
 
@@ -49,6 +49,11 @@ let deployOutput: pulumi.Output<string> = pulumi.output('(no deploy: preview onl
 if (!pulumi.runtime.isDryRun()) {
   const transfer = createTransfer(stackConfig, images, [images.runtimeSaved, images.migratorSaved]);
   const deploy = createDeployCommand(stackConfig, images, transfer);
+  // Registered every deploy so it exists to be destroyed later, but its own
+  // inputs never change across ordinary deploys (deploy.ts's comment on
+  // createTeardownCommand) — unlike `deploy` above, it is never replaced by
+  // a normal `pnpm staging:deploy`.
+  createTeardownCommand(stackConfig, transfer);
   deployOutput = deploy.stdout;
 }
 
