@@ -6,3 +6,8 @@ dist/
 coverage/
 .DS_Store
 packages/persistence/src/generated/
+
+# infrastructure/src/image.ts's `docker save` step (spec 003) writes these
+# next to the Pulumi program on whichever machine runs `pulumi up` — build
+# artifacts regenerated on every deploy, never meant to be committed.
+infrastructure/*.tar
