@@ -70,6 +70,40 @@ $COMPOSE up -d
 `;
 }
 
+/**
+ * `pulumi destroy` without this: verified against the real VPS that neither
+ * `remote.Command` nor `CopyToRemote` runs anything on delete unless a
+ * `delete` script is given (this one's own `create` was defined, `delete`
+ * never was) — the stack would just stop being tracked while `postgres` and
+ * `api` kept running and `${REMOTE_DIR}` kept every transferred file,
+ * completely undetected by Pulumi's own state.
+ *
+ * Guarded by `[ -d ... ]` rather than assuming the directory exists: a
+ * destroy must succeed even against a stack that never finished deploying
+ * (or was already torn down by hand) — a `cd` into a missing directory
+ * under `set -e` would fail the whole delete and leave Pulumi's state
+ * stuck expecting a resource that failed to go away, which is a much worse
+ * state than "nothing to clean up."
+ *
+ * `--volumes`: a destroy is expected to leave nothing behind, including the
+ * database's own data — `docker compose down` alone keeps the named
+ * `postgres_data` volume. Scoped safely to only this stack's own volume by
+ * the same `-p family-platform-staging` project name `deployScript` already
+ * uses (data-model.md / T028's isolation guarantee), not by any special
+ * handling here.
+ */
+function teardownScript(): string {
+  return `set -euo pipefail
+if [ -d '${REMOTE_DIR}' ]; then
+  cd '${REMOTE_DIR}'
+  COMPOSE='docker compose -p family-platform-staging -f docker-compose.yml -f docker-compose.staging.yml'
+  $COMPOSE down --volumes --remove-orphans
+  cd /
+  rm -rf '${REMOTE_DIR}'
+fi
+`;
+}
+
 export function createDeployCommand(
   stackConfig: StackConfig,
   images: StagingImages,
@@ -80,6 +114,7 @@ export function createDeployCommand(
     {
       connection: connectionFor(stackConfig),
       create: deployScript(stackConfig),
+      delete: teardownScript(),
       // `remote.Command`'s own `environment` option needs the SSH server to
       // list every one of those keys in `AcceptEnv` (OpenSSH denies
       // client-supplied environment variables by default, RFC 4254) — and it
