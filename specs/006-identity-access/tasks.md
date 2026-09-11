@@ -174,49 +174,65 @@ without revealing why.
 
 ### Tests for User Story 1
 
-- [ ] T028 [P] [US1] Unit test for the shared `email`/`password` Zod schemas (normalisation,
-      strength refinement) in `packages/contracts/src/v1/identity.contract.spec.ts`.
-- [ ] T029 [P] [US1] Integration test for `POST /v1/identity/registrations` — happy path, duplicate
+- [X] T028 [P] [US1] Unit test for the shared `email`/`password` Zod schemas in
+      `packages/contracts/src/v1/identity.contract.spec.ts`. **Revised**: `passwordSchema` carries no
+      strength assertion to test — ts-rest's automatic request validation would reject a too-short
+      password with its own generic 400 before a handler runs, pre-empting the specific
+      `identity/weak_password` problem response the contract requires. FR-004 is enforced and tested
+      in `registerUser` instead (see T037, T029).
+      Also built the shared test harness every identity integration spec uses:
+      `apps/api/src/identity/test-support/{bootstrap-test-app,fake-mailer}.ts` — boots the real
+      `buildAppModule` graph via `@nestjs/testing` against the real test database, with `MAILER`
+      overridden to an in-memory fake. Not separately enumerated in the original task list.
+- [X] T029 [P] [US1] Integration test for `POST /v1/identity/registrations` — happy path, duplicate
       email (any status) rejected without disclosing why, weak password rejected with a specific
       reason — in `apps/api/src/identity/registration.integration.spec.ts`.
-- [ ] T030 [P] [US1] Integration test for `POST /v1/identity/verifications` and
-      `.../verifications/resend` — resend invalidates the prior link (FR-003a), authentication before
-      verification is rejected — in `apps/api/src/identity/verification.integration.spec.ts`.
-- [ ] T031 [P] [US1] Unit test for the `User` aggregate's registration/verification state machine in
+- [X] T030 [P] [US1] Integration test for `POST /v1/identity/verifications` and
+      `.../verifications/resend` — resend invalidates the prior link (FR-003a) — in
+      `apps/api/src/identity/verification.integration.spec.ts`. **Scope note**: "authentication before
+      verification is rejected" is not tested here — the login route doesn't exist until US2 — and is
+      already planned as part of T046 instead.
+- [X] T031 [P] [US1] Unit test for the `User` aggregate's registration/verification state machine in
       `packages/core/identity/domain/user.aggregate.spec.ts`.
-- [ ] T032 [P] [US1] Integration test for the `erase-unverified` sweep — deletes a registration past
+- [X] T032 [P] [US1] Integration test for the `erase-unverified` sweep — deletes a registration past
       30 days unverified, is a no-op on rerun — in
       `apps/worker/src/sweeps/erase-unverified.sweep.integration.spec.ts`.
 
 ### Implementation for User Story 1
 
-- [ ] T033 [P] [US1] Implement the `EmailAddress` value object (case-insensitive normalisation,
+- [X] T033 [P] [US1] Implement the `EmailAddress` value object (case-insensitive normalisation,
       FR-022) in `packages/core/identity/domain/email-address.vo.ts`.
-- [ ] T034 [US1] Implement the `User` aggregate (register, verify, status enum) in
+- [X] T034 [US1] Implement the `User` aggregate (register, verify, status enum) in
       `packages/core/identity/domain/user.aggregate.ts` (depends on T033).
-- [ ] T035 [P] [US1] Implement the `EmailVerification` entity (token hash, expiry, consumed/superseded)
+- [X] T035 [P] [US1] Implement the `EmailVerification` entity (token hash, expiry, consumed/superseded)
       in `packages/core/identity/domain/email-verification.entity.ts`.
-- [ ] T036 [US1] Define `UserRegistered` in `packages/core/identity/domain/events.ts`.
-- [ ] T037 [US1] Implement the `RegisterUser` command handler in
+- [X] T036 [US1] Define `UserRegistered` in `packages/core/identity/domain/events.ts`.
+- [X] T037 [US1] Implement the `RegisterUser` command handler in
       `packages/core/identity/application/commands/register-user.command.ts`: checks uniqueness
       across every status (FR-002), hashes the password, creates `User` + `EmailVerification`, writes
       `UserRegistered` to the outbox, and sends the verification email — one transaction.
-- [ ] T038 [P] [US1] Implement `VerifyEmail` in
+- [X] T038 [P] [US1] Implement `VerifyEmail` in
       `packages/core/identity/application/commands/verify-email.command.ts`.
-- [ ] T039 [P] [US1] Implement `ResendVerification` (supersedes the previous token, FR-003a) in
+- [X] T039 [P] [US1] Implement `ResendVerification` (supersedes the previous token, FR-003a) in
       `packages/core/identity/application/commands/resend-verification.command.ts`.
-- [ ] T040 [US1] Implement `packages/persistence/src/repositories/identity/user.repository.ts` and
-      `email-verification.repository.ts` against the T017 schema.
-- [ ] T041 [US1] Register `POST /v1/identity/registrations`, `POST /v1/identity/verifications`, and
+- [X] T040 [US1] Implement `packages/persistence/src/repositories/identity/user.repository.ts` and
+      `email-verification.repository.ts` against the T017 schema. Also added
+      `identity-unit-of-work.ts` (`PrismaIdentityUnitOfWork`, implementing T022's
+      `IdentityUnitOfWorkPort` by opening one `prisma.$transaction` per `run()` call and
+      constructing every repository against that same transaction client) and a
+      `createIdentityUnitOfWork()` factory exported from persistence's public surface — not
+      separately enumerated in the original task list, but required for T037's multi-repository
+      write to be atomic without `core` ever importing Prisma.
+- [X] T041 [US1] Register `POST /v1/identity/registrations`, `POST /v1/identity/verifications`, and
       `POST /v1/identity/verifications/resend` in `identity.contract.ts`, with the
       `identity/email_unavailable`, `identity/weak_password`, and `identity/verification_invalid`
       error types.
-- [ ] T042 [US1] Implement the three route handlers in `identity.controller.ts`, honouring the
+- [X] T042 [US1] Implement the three route handlers in `identity.controller.ts`, honouring the
       `Idempotency-Key` header on registration (Principle IX).
-- [ ] T043 [US1] Wire T026's rate limiter: per-source on registration, per-account on resend.
-- [ ] T044 [US1] Add structured logging (UserId + correlation id, never the email) for registration
+- [X] T043 [US1] Wire T026's rate limiter: per-source on registration, per-account on resend.
+- [X] T044 [US1] Add structured logging (UserId + correlation id, never the email) for registration
       and verification outcomes.
-- [ ] T045 [US1] Implement `apps/worker/src/sweeps/erase-unverified.sweep.ts` (FR-020, 30 days,
+- [X] T045 [US1] Implement `apps/worker/src/sweeps/erase-unverified.sweep.ts` (FR-020, 30 days,
       idempotent, driven by the injected `Clock`).
 
 **Checkpoint**: User Story 1 is fully functional and independently testable.

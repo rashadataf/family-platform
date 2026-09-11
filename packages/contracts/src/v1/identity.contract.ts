@@ -19,19 +19,17 @@ import { z } from 'zod';
 export const emailSchema = z.string().trim().toLowerCase().email();
 
 /**
- * NIST SP 800-63B favours length over composition rules (no forced mix of
- * symbols/numbers/casing), so the one rule enforced is a minimum length —
- * long enough to resist offline guessing, short enough not to push people
- * toward predictable padding.
+ * Deliberately just `z.string()` here, with no `.min()`. FR-004's actual
+ * minimum-length rule is enforced by `registerUser` in
+ * `packages/core/identity`, not at this layer: ts-rest's automatic request
+ * validation would reject a too-short password with its own generic 400
+ * shape before a handler ever runs, pre-empting the specific
+ * `identity/weak_password` problem response contracts/identity-api.md
+ * requires. Enforcing it downstream, where the full `Result`/`DomainError`
+ * machinery already exists, is what lets the controller return the exact
+ * typed error instead of a generic validation failure.
  */
-const MIN_PASSWORD_LENGTH = 12;
-
-export const passwordSchema = z
-  .string()
-  .min(
-    MIN_PASSWORD_LENGTH,
-    `Password must be at least ${String(MIN_PASSWORD_LENGTH)} characters long.`,
-  );
+export const passwordSchema = z.string();
 
 /**
  * Machine-readable problem shape shared by every error response
@@ -44,11 +42,52 @@ export const problemSchema = z.object({
   detail: z.string().optional(),
 });
 
+/** FR-002: does not say which state (existing verified/unverified/pending-erasure) applies. */
+export const emailUnavailableSchema = z.object({ type: z.literal('identity/email_unavailable') });
+
+/** FR-004: the one error type that DOES carry a specific, actionable reason. */
+export const weakPasswordSchema = z.object({
+  type: z.literal('identity/weak_password'),
+  reason: z.string(),
+});
+
+/** FR-003a: unknown, expired, consumed, or superseded — never distinguished. */
+export const verificationInvalidSchema = z.object({
+  type: z.literal('identity/verification_invalid'),
+});
+
 const c = initContract();
 
 export const identityContract = c.router(
   {
-    // Populated story by story — see the file-level comment above.
+    register: {
+      method: 'POST',
+      path: '/registrations',
+      body: z.object({ email: emailSchema, password: passwordSchema }),
+      responses: {
+        201: z.object({}),
+        409: emailUnavailableSchema,
+        422: weakPasswordSchema,
+      },
+    },
+    verifyEmail: {
+      method: 'POST',
+      path: '/verifications',
+      body: z.object({ token: z.string() }),
+      responses: {
+        200: z.object({}),
+        422: verificationInvalidSchema,
+      },
+    },
+    resendVerification: {
+      method: 'POST',
+      path: '/verifications/resend',
+      body: z.object({ email: emailSchema }),
+      responses: {
+        200: z.object({}),
+      },
+    },
+    // Remaining routes populated story by story — see the file-level comment above.
   },
   { pathPrefix: '/v1/identity' },
 );
