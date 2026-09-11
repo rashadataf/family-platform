@@ -101,13 +101,27 @@ $COMPOSE up -d
  * catches dotfiles like the transferred `.env` without needing two
  * patterns, and leaves a directory `deploy` already owns in place for the
  * next deploy to write straight back into.
+ *
+ * Guarded again by `[ -f docker-compose.yml ]` before running `compose
+ * down` — hit for real: the `rm -rf` bug above deletes a directory's
+ * *contents* before failing on the directory itself (`rm -rf` removes
+ * children first), so a destroy that failed on that old bug leaves
+ * `REMOTE_DIR` existing but empty. A retried destroy then satisfies the
+ * `[ -d ... ]` check, `cd`s in, and fails immediately trying to read a
+ * `docker-compose.yml` that's already gone. There's nothing left to bring
+ * down via Compose at that point anyway (the earlier failed run's own
+ * `compose down` step already completed before the `rm -rf` line ran), so
+ * skipping straight to emptying the directory is correct, not just
+ * convenient.
  */
 function teardownScript(): string {
   return `set -euo pipefail
 if [ -d '${REMOTE_DIR}' ]; then
   cd '${REMOTE_DIR}'
-  COMPOSE='docker compose -p family-platform-staging -f docker-compose.yml -f docker-compose.staging.yml'
-  $COMPOSE down --volumes --remove-orphans
+  if [ -f docker-compose.yml ]; then
+    COMPOSE='docker compose -p family-platform-staging -f docker-compose.yml -f docker-compose.staging.yml'
+    $COMPOSE down --volumes --remove-orphans
+  fi
   cd /
   find '${REMOTE_DIR}' -mindepth 1 -delete
 fi
