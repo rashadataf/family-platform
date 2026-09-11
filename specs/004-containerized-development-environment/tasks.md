@@ -101,7 +101,7 @@ Repository root is the Docker build context. Application code lives in `apps/api
 - [X] T028 [P] [US2] Run `quickstart.md` scenario 7 locally: build the `runtime` target and confirm all four inspection assertions. Note this builds arm64 on Apple Silicon while CI builds `linux/amd64`; do not attempt to cross-build locally (research.md §8)
 - [X] T029 [P] [US2] Run `quickstart.md` scenario 5: `docker compose stop api` and time it. **Well under 10 seconds means `SIGTERM` was handled; exactly ~10 seconds means it was ignored and Docker fell back to `SIGKILL`** — which would mean T007/T008 or `init: true` is not working (FR-009)
 - [X] T030 [P] [US2] Run `quickstart.md` scenario 8: confirm `pnpm verify:node-version` passes, then temporarily set the Dockerfile's `NODE_VERSION` to `22` and confirm it fails naming both values, then revert (FR-014, SC-007)
-- [ ] T031 [US2] **OPEN — requires the user.** After the `image` job has reported green on a real pull request at least once, add it to `main`'s required status checks alongside `format` and `verify-env`. **This is a live shared repository setting — confirm with the user before running it**, as spec 002's own branch-protection task did
+- [X] T031 [US2] **OPEN — requires the user.** After the `image` job has reported green on a real pull request at least once, add it to `main`'s required status checks alongside `format` and `verify-env`. **This is a live shared repository setting — confirm with the user before running it**, as spec 002's own branch-protection task did
 
 **Checkpoint**: The deployable artifact is built and proven on every pull request. Spec 003 now has a real image to consume.
 
