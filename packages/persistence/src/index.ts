@@ -5,7 +5,11 @@ import { PrismaSessionRepository } from './repositories/identity/session.reposit
 
 export { checkDatabaseHealth } from './health.js';
 export { disconnectDatabase } from './lifecycle.js';
-export { deleteUnverifiedRegistrationsBefore } from './repositories/identity/retention.js';
+export {
+  deleteDeletedAccountsBefore,
+  deleteStaleSessionsBefore,
+  deleteUnverifiedRegistrationsBefore,
+} from './repositories/identity/retention.js';
 
 /**
  * The one place a composition root reaches for identity's unit of work. The

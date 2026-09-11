@@ -331,4 +331,65 @@ export class IdentityController {
       return { status: 200 as const, body: {} };
     });
   }
+
+  @UseGuards(SessionGuard)
+  @TsRestHandler(identityContract.requestAccountDeletion)
+  requestAccountDeletion(
+    @Req() req: RequestWithIdentityContext,
+  ): RouteHandler<typeof identityContract.requestAccountDeletion> {
+    return tsRestHandler(identityContract.requestAccountDeletion, async () => {
+      if (!req.identityContext) {
+        throw new Error('SessionGuard did not populate identityContext.');
+      }
+      const correlationId = randomUUID();
+      const result = await identity.requestAccountDeletion(
+        { userId: req.identityContext.userId, correlationId },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        // Only reachable if the session's own user vanished mid-request —
+        // session_invalid is the honest response without inventing a new
+        // disclosure for something that should never actually happen.
+        return { status: 401 as const, body: { type: 'identity/session_invalid' as const } };
+      }
+      this.logger.log(
+        `Deletion requested for ${req.identityContext.userId} [correlationId=${correlationId}]`,
+      );
+      return { status: 200 as const, body: {} };
+    });
+  }
+
+  @UseGuards(SessionGuard)
+  @TsRestHandler(identityContract.exportAccountData)
+  exportAccountData(
+    @Req() req: RequestWithIdentityContext,
+  ): RouteHandler<typeof identityContract.exportAccountData> {
+    return tsRestHandler(identityContract.exportAccountData, async () => {
+      if (!req.identityContext) {
+        throw new Error('SessionGuard did not populate identityContext.');
+      }
+      const result = await identity.exportAccountData(
+        { userId: req.identityContext.userId },
+        { unitOfWork: this.unitOfWork },
+      );
+
+      if (!result.ok) {
+        return { status: 401 as const, body: { type: 'identity/session_invalid' as const } };
+      }
+      return {
+        status: 200 as const,
+        body: {
+          email: result.value.email,
+          registeredAt: result.value.registeredAt.toISOString(),
+          verified: result.value.verified,
+          sessions: result.value.sessions.map((session) => ({
+            deviceLabel: session.deviceLabel,
+            issuedAt: session.issuedAt.toISOString(),
+            revokedAt: session.revokedAt?.toISOString() ?? null,
+          })),
+        },
+      };
+    });
+  }
 }

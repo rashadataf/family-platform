@@ -438,43 +438,72 @@ use with no grace window, and that a data export was available before deletion c
 
 ### Tests for User Story 4
 
-- [ ] T074 [P] [US4] Integration test: deletion revokes every active session immediately — back-to-back
+- [X] T074 [P] [US4] Integration test: deletion revokes every active session immediately — back-to-back
       calls, no grace window (FR-015, FR-023, SC-007, quickstart Scenario 5) — in
       `apps/api/src/identity/deletion.integration.spec.ts`.
-- [ ] T075 [P] [US4] Integration test: re-registering the same email is blocked until erasure
+- [X] T075 [P] [US4] Integration test: re-registering the same email is blocked until erasure
       completes (FR-002, spec.md clarification 4) — in the same file.
-- [ ] T076 [P] [US4] Integration test: `GET /v1/identity/account/export` returns only the caller's own
+- [X] T076 [P] [US4] Integration test: `GET /v1/identity/account/export` returns only the caller's own
       data and never a password hash or any token — in
       `apps/api/src/identity/export.integration.spec.ts`.
-- [ ] T077 [P] [US4] Unit test for the `User` aggregate's deletion-request transition and terminal
+- [X] T077 [P] [US4] Unit test for the `User` aggregate's deletion-request transition and terminal
       state, extending `user.aggregate.spec.ts`.
-- [ ] T078 [P] [US4] Integration test: `erase-deleted-accounts` and `erase-stale-sessions` sweeps
+- [X] T078 [P] [US4] Integration test: `erase-deleted-accounts` and `erase-stale-sessions` sweeps
       delete the right rows, leave `outbox_event` rows intact, and are no-ops on rerun (quickstart
       Scenario 7) — in `apps/worker/src/sweeps/erase-deleted-accounts.sweep.integration.spec.ts` and
       a sibling `erase-stale-sessions.sweep.integration.spec.ts`.
 
 ### Implementation for User Story 4
 
-- [ ] T079 [US4] Extend the `User` aggregate with `requestDeletion()` (status →
+- [X] T079 [US4] Extend the `User` aggregate with `requestDeletion()` (status →
       `deletion_requested`, terminal, per data-model.md's state diagram).
-- [ ] T080 [US4] Define `UserDeletionRequested` in `events.ts`.
-- [ ] T081 [US4] Implement `RequestAccountDeletion` in
+      **Deviation.** A repeat call against an already-`deletion_requested` account is a no-op
+      success, not an error and not a reset retention clock — `DELETE /v1/identity/account` must be
+      safe to retry (see T083's idempotency note), and re-requesting must not push FR-019's clock
+      back out. A call against an account that never became `active` (still `pending_verification`)
+      returns `NotFound` — in practice unreachable via the real API, since `SessionGuard` never
+      issues an identity context for a non-`active` account, but the aggregate still defines its own
+      invariant defensively, matching `verify()`'s pattern.
+- [X] T080 [US4] Define `UserDeletionRequested` in `events.ts`.
+- [X] T081 [US4] Implement `RequestAccountDeletion` in
       `packages/core/identity/application/commands/request-account-deletion.command.ts`: marks the
       user, revokes every active session, writes `UserDeletionRequested` to the outbox — one
       transaction.
-- [ ] T082 [US4] Implement `ExportAccountData` (FR-021's exact field list — never `password_hash` or
+      **Implementation note.** Revokes *every* session for the user, not only the currently-usable
+      ones — an already-revoked or expired session is a harmless no-op to revoke again, and this
+      avoids a filtering step that buys nothing. Needed a new `SessionRepository.listByUserId`
+      (full aggregates, so each can be mutated and saved) distinct from `listSummariesByUserId`
+      (the wire-facing, joined-with-device read shape).
+- [X] T082 [US4] Implement `ExportAccountData` (FR-021's exact field list — never `password_hash` or
       any token hash) in `packages/core/identity/application/queries/export-account-data.query.ts`.
-- [ ] T083 [US4] Register `DELETE /v1/identity/account` and `GET /v1/identity/account/export` in
+      **Deviation.** Added `SessionRepository.listExportSummariesByUserId` and an
+      `ExportedSessionSummary` type distinct from `SessionSummary` (the `GET /v1/identity/sessions`
+      read shape): the export needs `revokedAt`, which the wire-facing session list never surfaces,
+      and changing `SessionSummary` itself risked touching already-tested US2 behaviour for an
+      unrelated reason.
+- [X] T083 [US4] Register `DELETE /v1/identity/account` and `GET /v1/identity/account/export` in
       `identity.contract.ts`, honouring `Idempotency-Key` on delete.
-- [ ] T084 [US4] Implement the two route handlers in `identity.controller.ts`, applying
+      **Deviation, consistent with T041's precedent.** No separate idempotency-key store — same
+      reasoning as registration's: `requestAccountDeletion`'s own idempotence (T079's no-op-on-repeat
+      behaviour) already gives a retried `DELETE` the same successful outcome as the first, without
+      a store that data-model.md never allocates a table for.
+- [X] T084 [US4] Implement the two route handlers in `identity.controller.ts`, applying
       `session.guard.ts` to both.
-- [ ] T085 [P] [US4] Implement `apps/worker/src/sweeps/erase-deleted-accounts.sweep.ts` (FR-019, 30
+- [X] T085 [P] [US4] Implement `apps/worker/src/sweeps/erase-deleted-accounts.sweep.ts` (FR-019, 30
       days after `deletion_requested_at`, idempotent).
-- [ ] T086 [P] [US4] Implement `apps/worker/src/sweeps/erase-stale-sessions.sweep.ts` (90 days after
+- [X] T086 [P] [US4] Implement `apps/worker/src/sweeps/erase-stale-sessions.sweep.ts` (90 days after
       revocation or expiry).
-- [ ] T087 [US4] Wire a `sweep:retention` script in `apps/worker` running all three sweeps
+- [X] T087 [US4] Wire a `sweep:retention` script in `apps/worker` running all three sweeps
       (T045, T085, T086) with an optional `--as-of` clock override for testability (quickstart.md),
       plus a scheduled invocation for real operation.
+      **Scoped down — the scheduled invocation, like T059/T073.** `apps/worker/src/sweep-retention.ts`
+      (wired as `pnpm sweep:retention`, matching quickstart.md's documented
+      `docker compose run --rm worker pnpm sweep:retention --as-of ...` usage) is fully implemented
+      and tested manually against the dev database. A recurring, unattended invocation of it (VPS
+      crontab, a Pulumi-managed systemd timer, a future queue-based scheduler) is an infrastructure
+      decision neither this spec's research.md/plan.md nor any ADR made, and choosing among those
+      options belongs to spec 003's deployment domain, not this one. Deferred, not silently dropped —
+      this script is what such a scheduler would call.
 
 **Checkpoint**: All four user stories work independently. Feature-complete against spec.md.
 

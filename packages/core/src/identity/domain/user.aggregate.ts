@@ -126,4 +126,27 @@ export class User {
     }
     this.props = { ...this.props, failedAttemptCount: 0, throttledUntil: null, updatedAt: now };
   }
+
+  /**
+   * FR-014: terminal, per data-model.md's state diagram — there is no path
+   * back. A repeat request against an already-`deletion_requested` account
+   * is a no-op success rather than an error: `DELETE /v1/identity/account`
+   * must be safe to retry (Principle IX's Idempotency-Key requirement), and
+   * re-requesting must not push the FR-019 retention clock back out.
+   */
+  requestDeletion(now: Date): Result<void, DomainError> {
+    if (this.props.status === 'deletion_requested') {
+      return ok(undefined);
+    }
+    if (this.props.status !== 'active') {
+      return err({ kind: 'NotFound' });
+    }
+    this.props = {
+      ...this.props,
+      status: 'deletion_requested',
+      deletionRequestedAt: now,
+      updatedAt: now,
+    };
+    return ok(undefined);
+  }
 }

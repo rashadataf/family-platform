@@ -10,6 +10,7 @@ export {
 export {
   IDENTITY_EVENT_TYPES,
   userAuthenticatedEvent,
+  userDeletionRequestedEvent,
   userRegisteredEvent,
 } from './domain/events.js';
 export {
@@ -26,6 +27,7 @@ export type {
   IdentityUnitOfWorkPort,
 } from './application/ports/identity-unit-of-work.port.js';
 export type {
+  ExportedSessionSummary,
   SessionAuthContext,
   SessionMatch,
   SessionRepository,
@@ -51,6 +53,11 @@ export {
   type RenewSessionInput,
 } from './application/commands/renew-session.command.js';
 export {
+  requestAccountDeletion,
+  type RequestAccountDeletionDeps,
+  type RequestAccountDeletionInput,
+} from './application/commands/request-account-deletion.command.js';
+export {
   resendVerification,
   type ResendVerificationDeps,
   type ResendVerificationInput,
@@ -72,6 +79,12 @@ export {
   type AuthenticateSessionInput,
   type SessionContext,
 } from './application/queries/authenticate-session.query.js';
+export {
+  exportAccountData,
+  type AccountExport,
+  type ExportAccountDataDeps,
+  type ExportAccountDataInput,
+} from './application/queries/export-account-data.query.js';
 export {
   listSessions,
   type ListSessionsDeps,

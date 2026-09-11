@@ -201,7 +201,39 @@ export const identityContract = c.router(
         404: notFoundSchema,
       },
     },
-    // Remaining routes populated story by story — see the file-level comment above.
+    requestAccountDeletion: {
+      method: 'DELETE',
+      path: '/account',
+      // No separate Idempotency-Key store (Principle IX): `User.requestDeletion`
+      // is itself idempotent — a repeat call against an already
+      // `deletion_requested` account is a no-op success rather than an error
+      // or a reset retention clock, so a retried request already gets the
+      // same outcome as the first, the same reasoning `register`'s comment
+      // above documents for FR-002's uniqueness constraint.
+      responses: {
+        200: z.object({}),
+        401: sessionInvalidSchema,
+      },
+    },
+    exportAccountData: {
+      method: 'GET',
+      path: '/account/export',
+      responses: {
+        200: z.object({
+          email: z.string(),
+          registeredAt: z.string(),
+          verified: z.boolean(),
+          sessions: z.array(
+            z.object({
+              deviceLabel: z.string(),
+              issuedAt: z.string(),
+              revokedAt: z.string().nullable(),
+            }),
+          ),
+        }),
+        401: sessionInvalidSchema,
+      },
+    },
   },
   { pathPrefix: '/v1/identity' },
 );

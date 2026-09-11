@@ -79,4 +79,37 @@ describe('User', () => {
     expect(user.failedAttemptCount).toBe(0);
     expect(user.throttledUntil).toBeNull();
   });
+
+  it('requestDeletion() transitions an active account to the terminal deletion_requested state (FR-014)', () => {
+    const user = register();
+    user.verify(new Date(NOW.getTime() + 1000));
+    const requestedAt = new Date(NOW.getTime() + 2000);
+
+    const result = user.requestDeletion(requestedAt);
+
+    expect(result.ok).toBe(true);
+    expect(user.status).toBe('deletion_requested');
+    expect(user.deletionRequestedAt).toEqual(requestedAt);
+  });
+
+  it('requestDeletion() is idempotent and does not reset the retention clock on a repeat call', () => {
+    const user = register();
+    user.verify(new Date(NOW.getTime() + 1000));
+    const firstRequestedAt = new Date(NOW.getTime() + 2000);
+    user.requestDeletion(firstRequestedAt);
+
+    const result = user.requestDeletion(new Date(NOW.getTime() + 3000));
+
+    expect(result.ok).toBe(true);
+    expect(user.deletionRequestedAt).toEqual(firstRequestedAt);
+  });
+
+  it('rejects requestDeletion() against an account that never became active', () => {
+    const user = register();
+
+    const result = user.requestDeletion(new Date(NOW.getTime() + 1000));
+
+    expect(result).toEqual({ ok: false, error: { kind: 'NotFound' } });
+    expect(user.status).toBe('pending_verification');
+  });
 });

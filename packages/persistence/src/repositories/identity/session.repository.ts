@@ -74,6 +74,24 @@ export class PrismaSessionRepository implements identity.SessionRepository {
     }));
   }
 
+  async listByUserId(userId: UserId): Promise<identity.Session[]> {
+    const rows = await this.client.session.findMany({ where: { userId } });
+    return rows.map(toDomain);
+  }
+
+  async listExportSummariesByUserId(userId: UserId): Promise<identity.ExportedSessionSummary[]> {
+    const rows = await this.client.session.findMany({
+      where: { userId },
+      include: { device: { select: { label: true } } },
+      orderBy: { issuedAt: 'desc' },
+    });
+    return rows.map((row) => ({
+      deviceLabel: row.device.label,
+      issuedAt: row.issuedAt,
+      revokedAt: row.revokedAt,
+    }));
+  }
+
   async save(session: identity.Session): Promise<void> {
     const props = session.toProps();
     const data = {

@@ -27,6 +27,19 @@ export interface SessionMatch {
   matchedPrevious: boolean;
 }
 
+/**
+ * FR-021's export field list for a session: device label plus issued and
+ * revoked timestamps only — never a token hash, and distinct from
+ * `SessionSummary` (which never surfaces `revokedAt` — a revoked session
+ * still appears in the wire-facing session list unchanged; export needs the
+ * revocation timestamp specifically).
+ */
+export interface ExportedSessionSummary {
+  deviceLabel: string;
+  issuedAt: Date;
+  revokedAt: Date | null;
+}
+
 export interface SessionRepository {
   findById(id: SessionId): Promise<Session | null>;
   findByTokenHash(tokenHash: string): Promise<Session | null>;
@@ -45,5 +58,8 @@ export interface SessionRepository {
    */
   findByCurrentOrPreviousTokenHash(tokenHash: string): Promise<SessionMatch | null>;
   listSummariesByUserId(userId: UserId): Promise<SessionSummary[]>;
+  /** Every session for a user, as full aggregates — FR-015's "revoke every active session" needs to mutate and save each one. */
+  listByUserId(userId: UserId): Promise<Session[]>;
+  listExportSummariesByUserId(userId: UserId): Promise<ExportedSessionSummary[]>;
   save(session: Session): Promise<void>;
 }

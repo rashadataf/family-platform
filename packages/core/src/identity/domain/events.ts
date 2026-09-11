@@ -42,3 +42,16 @@ export function userAuthenticatedEvent(params: {
     correlationId: params.correlationId,
   };
 }
+
+export function userDeletionRequestedEvent(params: {
+  userId: UserId;
+  correlationId: string;
+}): OutboxEventToAppend {
+  return {
+    eventType: IDENTITY_EVENT_TYPES.UserDeletionRequested,
+    aggregateType: 'User',
+    aggregateId: params.userId,
+    payload: { userId: params.userId },
+    correlationId: params.correlationId,
+  };
+}
