@@ -27,6 +27,7 @@ export type {
 } from './application/ports/identity-unit-of-work.port.js';
 export type {
   SessionAuthContext,
+  SessionMatch,
   SessionRepository,
   SessionSummary,
 } from './application/ports/session.repository.js';
@@ -44,10 +45,21 @@ export {
   type RegisterUserInput,
 } from './application/commands/register-user.command.js';
 export {
+  renewSession,
+  type RenewedSession,
+  type RenewSessionDeps,
+  type RenewSessionInput,
+} from './application/commands/renew-session.command.js';
+export {
   resendVerification,
   type ResendVerificationDeps,
   type ResendVerificationInput,
 } from './application/commands/resend-verification.command.js';
+export {
+  revokeSession,
+  type RevokeSessionDeps,
+  type RevokeSessionInput,
+} from './application/commands/revoke-session.command.js';
 export {
   verifyEmail,
   type VerifyEmailDeps,

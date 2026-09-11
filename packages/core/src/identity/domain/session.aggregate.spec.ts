@@ -56,4 +56,43 @@ describe('Session', () => {
 
     expect(session.isUsable(new Date(NOW.getTime() + 1000))).toBe(false);
   });
+
+  it('rotate() replaces the current credential, retaining the superseded one (FR-010, FR-011)', () => {
+    const session = issue(NOW, ONE_DAY_MS);
+    const rotatedAt = new Date(NOW.getTime() + 1000);
+
+    const result = session.rotate('new-hash', rotatedAt);
+
+    expect(result.ok).toBe(true);
+    expect(session.tokenHash).toBe('new-hash');
+    expect(session.previousTokenHash).toBe('hash');
+    expect(session.rotatedAt).toEqual(rotatedAt);
+  });
+
+  it('rotate() refuses once past the absolute lifetime (FR-013)', () => {
+    const session = issue(NOW, ONE_DAY_MS);
+
+    const result = session.rotate('new-hash', new Date(NOW.getTime() + ONE_DAY_MS + 1));
+
+    expect(result).toEqual({ ok: false, error: { kind: 'SessionInvalid' } });
+    expect(session.tokenHash).toBe('hash');
+  });
+
+  it('rotate() refuses an already-revoked session', () => {
+    const session = issue(NOW, ONE_DAY_MS);
+    session.revoke('user_revoked', new Date(NOW.getTime() + 500));
+
+    const result = session.rotate('new-hash', new Date(NOW.getTime() + 1000));
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('revoke() invalidates the session regardless of its remaining lifetime (FR-012)', () => {
+    const session = issue(NOW, ONE_DAY_MS);
+
+    session.revoke('replay_detected', new Date(NOW.getTime() + 1000));
+
+    expect(session.revokedReason).toBe('replay_detected');
+    expect(session.isUsable(new Date(NOW.getTime() + 2000))).toBe(false);
+  });
 });

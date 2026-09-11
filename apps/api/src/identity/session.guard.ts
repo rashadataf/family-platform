@@ -24,6 +24,11 @@ export interface RequestWithIdentityContext {
 
 const BEARER_PREFIX = 'Bearer ';
 
+/** Shared by `SessionGuard` and `renewSession` — the latter authenticates the credential itself. */
+export function extractBearerToken(header: string | undefined): string | null {
+  return header?.startsWith(BEARER_PREFIX) ? header.slice(BEARER_PREFIX.length) : null;
+}
+
 /**
  * FR-023: revalidates the presented session credential's revocation state
  * and its owning account's status on **every** authenticated request, not
@@ -44,8 +49,7 @@ export class SessionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithIdentityContext>();
-    const header = request.headers.authorization;
-    const token = header?.startsWith(BEARER_PREFIX) ? header.slice(BEARER_PREFIX.length) : null;
+    const token = extractBearerToken(request.headers.authorization);
 
     if (!token) {
       throw new UnauthorizedException({ type: 'identity/session_invalid' });

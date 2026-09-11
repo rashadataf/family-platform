@@ -5,8 +5,15 @@ import type { AppRoute, ServerInferResponses } from '@ts-rest/core';
 import { TsRestHandler, tsRestHandler, type TsRestRequestShape } from '@ts-rest/nest';
 import { identityContract } from '@fp/contracts';
 import { identity } from '@fp/core';
-import type { Clock, MailerPort, PasswordHasherPort, TokenGeneratorPort } from '@fp/kernel';
+import {
+  asSessionId,
+  type Clock,
+  type MailerPort,
+  type PasswordHasherPort,
+  type TokenGeneratorPort,
+} from '@fp/kernel';
 import { PerAccountThrottlerGuard } from '../common/per-account-throttler.guard.js';
+import { PerSessionThrottlerGuard } from '../common/per-session-throttler.guard.js';
 import {
   CLOCK,
   IDENTITY_UNIT_OF_WORK,
@@ -15,7 +22,11 @@ import {
   SESSION_REPOSITORY,
   TOKEN_GENERATOR,
 } from './identity.tokens.js';
-import { SessionGuard, type RequestWithIdentityContext } from './session.guard.js';
+import {
+  extractBearerToken,
+  SessionGuard,
+  type RequestWithIdentityContext,
+} from './session.guard.js';
 
 /**
  * `tsRestHandler`'s own return type (`NestHandlerImplementation`) is not
@@ -233,6 +244,91 @@ export class IdentityController {
           })),
         },
       };
+    });
+  }
+
+  // Deliberately NOT guarded by SessionGuard (contracts/identity-api.md):
+  // the guard only ever recognises a session's *current* credential and
+  // treats anything else as simply invalid, but a *superseded* credential
+  // must reach this route's own logic to be recognised as a possible replay
+  // (FR-011) rather than rejected as an ordinary invalid session. This route
+  // authenticates the presented token itself, via `identity.renewSession`.
+  @UseGuards(PerSessionThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @TsRestHandler(identityContract.renewSession)
+  renewSession(
+    @Req() req: RequestWithIdentityContext,
+  ): RouteHandler<typeof identityContract.renewSession> {
+    return tsRestHandler(identityContract.renewSession, async () => {
+      // Read via `@Req()` rather than the ts-rest handler's own `headers`
+      // argument: that type resolves through `@ts-rest/nest`'s own default
+      // header type (Express's `Request['headers']`), which this app does
+      // not declare a direct dependency on (see `RequestWithIdentityContext`'s
+      // comment on why this app avoids that).
+      const token = extractBearerToken(req.headers.authorization);
+      if (!token) {
+        return { status: 401 as const, body: { type: 'identity/session_invalid' as const } };
+      }
+
+      const result = await identity.renewSession(
+        { token },
+        {
+          sessionRepository: this.sessionRepository,
+          tokenGenerator: this.tokenGenerator,
+          clock: this.clock,
+        },
+      );
+
+      if (result.ok) {
+        this.logger.log(`Renewed session ${result.value.sessionId}`);
+        return {
+          status: 201 as const,
+          body: {
+            sessionId: result.value.sessionId,
+            token: result.value.token,
+            issuedAt: result.value.issuedAt.toISOString(),
+            absoluteExpiresAt: result.value.absoluteExpiresAt.toISOString(),
+          },
+        };
+      }
+
+      if (result.error.kind === 'SessionReplayDetected') {
+        // T073: the alert distinct from an ordinary revocation. The session
+        // has already been revoked by `identity.renewSession` itself; this
+        // is a WARN-level log because no metrics/alerting pipeline exists
+        // yet in this codebase (see tasks.md's T059 note).
+        this.logger.warn(
+          `SECURITY: replayed session credential presented, session ${result.error.sessionId} revoked`,
+        );
+      } else {
+        this.logger.log(`Renewal rejected: ${result.error.kind}`);
+      }
+      return { status: 401 as const, body: { type: 'identity/session_invalid' as const } };
+    });
+  }
+
+  @UseGuards(SessionGuard)
+  @TsRestHandler(identityContract.revokeSession)
+  revokeSession(
+    @Req() req: RequestWithIdentityContext,
+  ): RouteHandler<typeof identityContract.revokeSession> {
+    return tsRestHandler(identityContract.revokeSession, async ({ params }) => {
+      if (!req.identityContext) {
+        throw new Error('SessionGuard did not populate identityContext.');
+      }
+      const result = await identity.revokeSession(
+        { userId: req.identityContext.userId, sessionId: asSessionId(params.sessionId) },
+        { sessionRepository: this.sessionRepository, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        // FR-012's authorization rule: another user's session id is
+        // indistinguishable from one that doesn't exist (not-found, not
+        // forbidden) — contracts/identity-api.md's Authorization matrix.
+        return { status: 404 as const, body: { type: 'identity/not_found' as const } };
+      }
+      this.logger.log(`Revoked session ${params.sessionId}`);
+      return { status: 200 as const, body: {} };
     });
   }
 }

@@ -344,39 +344,85 @@ dead; separately, revoke one of two active sessions and confirm only that one st
 
 ### Tests for User Story 3
 
-- [ ] T060 [P] [US3] Integration test: renewal issues a fresh credential and invalidates the prior
+- [X] T060 [P] [US3] Integration test: renewal issues a fresh credential and invalidates the prior
       one, in `apps/api/src/identity/renewal.integration.spec.ts`.
-- [ ] T061 [P] [US3] Integration test: presenting a superseded credential is rejected AND revokes the
+- [X] T061 [P] [US3] Integration test: presenting a superseded credential is rejected AND revokes the
       whole session lineage, asserting `revoked_reason = replay_detected` (FR-011, quickstart
       Scenario 3) — in `apps/api/src/identity/replay-detection.integration.spec.ts`.
-- [ ] T062 [P] [US3] Integration test: revoking one session by its stable id leaves the user's other
+- [X] T062 [P] [US3] Integration test: revoking one session by its stable id leaves the user's other
       sessions working, and the same id still revokes correctly after further rotations (spec.md
       clarification 2) — in `apps/api/src/identity/revocation.integration.spec.ts`.
-- [ ] T063 [P] [US3] Integration test: revoking another user's session id returns 404, not 403
+- [X] T063 [P] [US3] Integration test: revoking another user's session id returns 404, not 403
       (identity-api.md's Authorization matrix) — in the same file.
-- [ ] T064 [P] [US3] Integration test: a session past its absolute lifetime cannot be renewed
+- [X] T064 [P] [US3] Integration test: a session past its absolute lifetime cannot be renewed
       (FR-013) — in `renewal.integration.spec.ts`.
-- [ ] T065 [P] [US3] Unit test for `Session`'s `rotate`/`revoke`/replay-detection state machine,
+      **Implementation note.** No fake-clock plumbing exists for the whole HTTP stack (`CLOCK` is
+      swapped only via DI in unit tests), so this test reaches directly into the database via
+      `createSessionRepository()` (`@fp/persistence`) and `identity.Session.reconstitute()` to
+      set `absoluteExpiresAt` into the past on the row a real login just created, then exercises
+      renewal over real HTTP — the same "manipulate stored state directly" approach the worker's
+      erase-unverified sweep test already used in User Story 1.
+- [X] T065 [P] [US3] Unit test for `Session`'s `rotate`/`revoke`/replay-detection state machine,
       extending `session.aggregate.spec.ts`.
 
 ### Implementation for User Story 3
 
-- [ ] T066 [US3] Extend the `Session` aggregate with `rotate()`, `revoke(reason)`, and replay
+- [X] T066 [US3] Extend the `Session` aggregate with `rotate()`, `revoke(reason)`, and replay
       detection against `previous_token_hash`, in `session.aggregate.ts`.
-- [ ] T067 [US3] Implement `RenewSession` (FR-010, FR-013's absolute-lifetime check) in
+      **Deviation.** No `isReplay()` method was added to the aggregate: replay detection needs to
+      compare the *presented* hash against the stored one, and `SessionRepository.findByCurrentOrPreviousTokenHash`
+      (T069) already establishes that fact as part of its one lookup — adding a second method that
+      re-derives the same boolean from inside the aggregate would be a duplicate source of truth for
+      no benefit, so `RenewSession` (T067) uses the repository's answer directly.
+- [X] T067 [US3] Implement `RenewSession` (FR-010, FR-013's absolute-lifetime check) in
       `packages/core/identity/application/commands/renew-session.command.ts`.
-- [ ] T068 [US3] Implement `RevokeSession` (FR-012, ownership check returns not-found rather than
+      **Deviation — internal-only error kind.** Added `DomainError`'s `SessionReplayDetected {
+      sessionId }` variant (`packages/kernel/src/errors.ts`). The wire response for a replay is
+      identical to any other invalid session (`identity/session_invalid` — contracts/identity-api.md
+      is explicit that a replay must not be disclosed as such), but the composition root still needs
+      to know a replay specifically occurred in order to log/alert on it distinctly (T073). This kind
+      exists for that internal signal only; the controller collapses it to the same HTTP response as
+      every other rejection.
+- [X] T068 [US3] Implement `RevokeSession` (FR-012, ownership check returns not-found rather than
       forbidden) in `packages/core/identity/application/commands/revoke-session.command.ts`.
-- [ ] T069 [US3] Extend `session.repository.ts` with the lookups and atomic updates rotation and
+- [X] T069 [US3] Extend `session.repository.ts` with the lookups and atomic updates rotation and
       revocation need (by current hash, by previous hash, revoke-lineage).
-- [ ] T070 [US3] Register `POST /v1/identity/sessions/current/renewal` and
+      **Implementation note.** "Revoke-lineage" needs no lineage-spanning update: data-model.md's own
+      invariant (rotation never creates a new `SessionId`, so there is exactly one row per session)
+      means revoking that single row *is* revoking every past and future rotated credential under it
+      — the existing `save()` upsert already covers it, so no separate bulk-update method was added.
+      The new lookup is `findByCurrentOrPreviousTokenHash`, one query (`OR` on `tokenHash` /
+      `previousTokenHash`) that also reports which side matched.
+- [X] T070 [US3] Register `POST /v1/identity/sessions/current/renewal` and
       `DELETE /v1/identity/sessions/{sessionId}` in `identity.contract.ts` — no idempotency key on
       renewal, per contracts/identity-api.md — sharing `identity/session_invalid`.
-- [ ] T071 [US3] Implement the two route handlers in `identity.controller.ts`, applying
+      **Also added.** `identity/not_found` (contracts/identity-api.md's Authorization matrix
+      requires 404 for another user's session id, but the error-types table itself never named a
+      `type` value for it) and a shared `sessionCredentialSchema` (login and renewal return the same
+      shape).
+- [X] T071 [US3] Implement the two route handlers in `identity.controller.ts`, applying
       `session.guard.ts` to the `DELETE` route.
-- [ ] T072 [US3] Wire T026's rate limiter on renewal, per session.
-- [ ] T073 [US3] Add a replay-detection alert distinct from an ordinary revocation (contracts doc's
+      **Deviation — renewal does NOT use `SessionGuard`.** contracts/identity-api.md lists renewal
+      under "Unauthenticated" because it authenticates the presented credential itself; the concrete
+      reason is that `SessionGuard`/`authenticateSession` (US2) only ever look up a session by its
+      *current* token hash; a superseded credential simply isn't found by that path, so replay could
+      never be detected if the shared guard ran first. `renewSession`'s controller method instead
+      takes an `@Req()` parameter purely to read the raw `Authorization` header (the same structural
+      `RequestWithIdentityContext` type `SessionGuard` uses), then calls `identity.renewSession`
+      directly.
+- [X] T072 [US3] Wire T026's rate limiter on renewal, per session.
+      **Deviation — the number chosen.** `PerSessionThrottlerGuard` at 30/60s: "Moderate" per
+      contracts/identity-api.md's table, well above what any real client's rotation cadence needs,
+      chosen the same way login's limit was (T058) — generous enough not to interfere with a
+      session's own legitimate use, while still far stricter than the 100/60s global default.
+- [X] T073 [US3] Add a replay-detection alert distinct from an ordinary revocation (contracts doc's
       Observability section).
+      **Scoped to a proxy, like T059.** No alerting/metrics pipeline exists in this codebase (see
+      T059's note). The proxy here is a `Logger.warn(...)` call in `identity.controller.ts`'s
+      `renewSession` handler, keyed off the new `SessionReplayDetected` error kind — distinct in both
+      log level and message from the `Logger.log(...)` used for an ordinary rejection or a real
+      revocation. Replacing this with a real alert is future work once a metrics/alerting stack is
+      chosen.
 
 **Checkpoint**: User Stories 1, 2, and 3 all work independently.
 

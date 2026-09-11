@@ -1,4 +1,12 @@
-import type { DeviceId, SessionId, UserId } from '@fp/kernel';
+import {
+  err,
+  ok,
+  type DeviceId,
+  type DomainError,
+  type Result,
+  type SessionId,
+  type UserId,
+} from '@fp/kernel';
 
 /**
  * Matches the `session_revoked_reason` enum in
@@ -107,5 +115,33 @@ export class Session {
   /** FR-023: revoked or past its absolute ceiling both fail the same way, checked on every use. */
   isUsable(now: Date): boolean {
     return this.props.revokedAt === null && this.props.absoluteExpiresAt > now;
+  }
+
+  /**
+   * FR-010: replaces the current credential under this same `SessionId`,
+   * retaining the superseded hash for FR-011's replay check. Refuses once
+   * the session is no longer usable — revoked, or past FR-013's absolute
+   * ceiling — so a dead session can never be renewed back to life.
+   */
+  rotate(newTokenHash: string, now: Date): Result<void, DomainError> {
+    if (!this.isUsable(now)) {
+      return err({ kind: 'SessionInvalid' });
+    }
+    this.props = {
+      ...this.props,
+      previousTokenHash: this.props.tokenHash,
+      tokenHash: newTokenHash,
+      rotatedAt: now,
+    };
+    return ok(undefined);
+  }
+
+  /**
+   * FR-012/FR-015: invalidates every past and future rotated credential
+   * under this `SessionId` at once — there is only ever one row per session,
+   * so revoking it here is the whole of "log out this device."
+   */
+  revoke(reason: SessionRevokedReason, now: Date): void {
+    this.props = { ...this.props, revokedAt: now, revokedReason: reason };
   }
 }

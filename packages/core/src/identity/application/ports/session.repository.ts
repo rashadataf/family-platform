@@ -17,6 +17,16 @@ export interface SessionSummary {
   absoluteExpiresAt: Date;
 }
 
+/**
+ * What renewal needs to distinguish an ordinary rotation from a replay: the
+ * session, and whether the presented hash matched its *current* credential
+ * or the *immediately-superseded* one (FR-011).
+ */
+export interface SessionMatch {
+  session: Session;
+  matchedPrevious: boolean;
+}
+
 export interface SessionRepository {
   findById(id: SessionId): Promise<Session | null>;
   findByTokenHash(tokenHash: string): Promise<Session | null>;
@@ -27,6 +37,13 @@ export interface SessionRepository {
    * double the round trip this exists to avoid.
    */
   findAuthContextByTokenHash(tokenHash: string): Promise<SessionAuthContext | null>;
+  /**
+   * Matches a presented token against either the current or the
+   * immediately-superseded credential in one lookup — renewal's own use,
+   * distinct from `findAuthContextByTokenHash`, since an ordinary
+   * authenticated request never needs to know about a superseded hash.
+   */
+  findByCurrentOrPreviousTokenHash(tokenHash: string): Promise<SessionMatch | null>;
   listSummariesByUserId(userId: UserId): Promise<SessionSummary[]>;
   save(session: Session): Promise<void>;
 }

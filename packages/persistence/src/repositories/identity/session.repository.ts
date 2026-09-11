@@ -47,6 +47,18 @@ export class PrismaSessionRepository implements identity.SessionRepository {
     return row ? { session: toDomain(row), userStatus: row.user.status } : null;
   }
 
+  async findByCurrentOrPreviousTokenHash(tokenHash: string): Promise<identity.SessionMatch | null> {
+    const hash = Buffer.from(tokenHash, 'hex');
+    const row = await this.client.session.findFirst({
+      where: { OR: [{ tokenHash: hash }, { previousTokenHash: hash }] },
+    });
+    if (!row) {
+      return null;
+    }
+    const matchedPrevious = !Buffer.from(row.tokenHash).equals(hash);
+    return { session: toDomain(row), matchedPrevious };
+  }
+
   async listSummariesByUserId(userId: UserId): Promise<identity.SessionSummary[]> {
     const rows = await this.client.session.findMany({
       where: { userId },

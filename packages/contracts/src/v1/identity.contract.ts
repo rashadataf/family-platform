@@ -98,6 +98,21 @@ export const sessionSummarySchema = z.object({
   isCurrent: z.boolean(),
 });
 
+/** The one live credential a caller holds after login or renewal — shared since both hand back the same shape. */
+export const sessionCredentialSchema = z.object({
+  sessionId: z.string(),
+  token: z.string(),
+  issuedAt: z.string(),
+  absoluteExpiresAt: z.string(),
+});
+
+/**
+ * FR-012's authorization rule: acting on another user's session id returns
+ * this, not a forbidden error — existence of the resource is not disclosed
+ * (contracts/identity-api.md's Authorization matrix).
+ */
+export const notFoundSchema = z.object({ type: z.literal('identity/not_found') });
+
 const c = initContract();
 
 export const identityContract = c.router(
@@ -139,12 +154,7 @@ export const identityContract = c.router(
         deviceLabel: z.string().trim().min(1).optional(),
       }),
       responses: {
-        201: z.object({
-          sessionId: z.string(),
-          token: z.string(),
-          issuedAt: z.string(),
-          absoluteExpiresAt: z.string(),
-        }),
+        201: sessionCredentialSchema,
         401: invalidCredentialsSchema,
         403: notVerifiedSchema,
         // FR-008's per-account lock and the per-route rate limit are both
@@ -163,6 +173,32 @@ export const identityContract = c.router(
       responses: {
         200: z.object({ sessions: z.array(sessionSummarySchema) }),
         401: sessionInvalidSchema,
+      },
+    },
+    // Also credential-authenticated rather than guard-authenticated (see
+    // `identity.controller.ts`'s comment on `renewSession`): a replayed,
+    // superseded credential must be evaluated by this route's own logic, not
+    // rejected upstream by a guard that only knows about the current hash.
+    renewSession: {
+      method: 'POST',
+      path: '/sessions/current/renewal',
+      // No idempotency key (contracts/identity-api.md): a retried renewal
+      // presenting an already-rotated credential IS the replay signal
+      // FR-011 exists to catch, and a key would mask it.
+      body: z.object({}).optional(),
+      responses: {
+        201: sessionCredentialSchema,
+        401: sessionInvalidSchema,
+      },
+    },
+    revokeSession: {
+      method: 'DELETE',
+      path: '/sessions/:sessionId',
+      pathParams: z.object({ sessionId: z.string().uuid() }),
+      responses: {
+        200: z.object({}),
+        401: sessionInvalidSchema,
+        404: notFoundSchema,
       },
     },
     // Remaining routes populated story by story — see the file-level comment above.
