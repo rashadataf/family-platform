@@ -15,12 +15,12 @@ An ADR records a decision that is expensive to reverse, together with the altern
 | [013](ADR-013-staged-hosting-model.md) | Staged hosting model: VPS-first pre-launch, AWS at real-user data | Accepted | 2026-09-08 |
 | [014](ADR-014-containerized-development.md) | The container image is the unit of truth, including on a developer's laptop | Accepted | 2026-09-08 |
 | [015](ADR-015-repository-visibility.md) | Repository visibility: public, chosen deliberately | Accepted | 2026-09-09 |
+| [007](ADR-007-authentication.md) | Authentication: managed identity provider versus self-hosted | Accepted | 2026-09-11 |
 
 ## Planned
 
 | ADR | Title |
 |---|---|
-| 007 | Authentication: managed identity provider versus self-hosted |
 | 008 | AI provider abstraction, prompt management and evaluation |
 | 009 | Mobile state, offline behaviour and cache strategy |
 | 010 | Feature flags and remote configuration |

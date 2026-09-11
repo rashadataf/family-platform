@@ -495,6 +495,7 @@ family-platform/
 │   ├── kernel/                  # pure, dependency-free: Result, branded ids, errors,
 │   │                            #   Clock port, Money, recurrence (shared kernel)
 │   ├── core/                    # ALL bounded contexts. No framework, no ORM, no I/O.
+│   │   ├── identity/{domain,application}
 │   │   ├── family/{domain,application}
 │   │   ├── calendar/{domain,application}
 │   │   ├── tasks/{domain,application}
@@ -526,7 +527,7 @@ The original blueprint proposed `types`, `validation`, `auth`, `database`, `obse
 |---|---|---|
 | `types` | Rejected | Types belong with the code that owns them. A shared `types` package becomes a dumping ground that every package depends on, guaranteeing a rebuild of everything on any change. |
 | `validation` | Rejected | Wire validation is `contracts`. Domain invariants are value objects in `core`. There is no third kind. |
-| `auth` | Rejected | Authentication adapters are `platform`. Authorization is `core/family` capabilities plus a guard in `apps/api`. Splitting it hides where the decision is made. |
+| `auth` | Rejected | Authentication adapters are `platform`; the Identity and Access context's own aggregates and use cases live in `core/identity`, like every other context. Authorization is `core/family` capabilities plus a guard in `apps/api`. Splitting either into a separate `auth` package hides where the decision is made. |
 | `database` | Renamed | `persistence`, and it holds repository implementations too, not just a client. A package that exports a bare ORM client invites every other package to import it. |
 | `observability` | Merged | Part of `platform`. It is three adapters, not a package. |
 | `domain` | Restructured | `core`, containing every context, each with its own `domain` and `application` folders. |
