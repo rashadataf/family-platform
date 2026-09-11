@@ -7,4 +7,4 @@ config:
   infrastructure:postgresPassword:
     secure: AAABAPXy45x7R1WGkt7FIPdnBq6Ny9KFpkviwcveh/49Opfe2jAZCsm2MHCVR9fDI4sc/XdVs2tQ1b0qAVNiQagR5FLHqSDRp/q3KQ==
   infrastructure:apiPublishedPort: '8081'
-  infrastructure:resetData: 'true'
+  infrastructure:resetData: 'false'
