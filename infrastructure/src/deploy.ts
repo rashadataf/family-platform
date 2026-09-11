@@ -138,7 +138,9 @@ export function createDeployCommand(
     {
       connection: connectionFor(stackConfig),
       create: deployScript(stackConfig),
-      delete: teardownScript(),
+      // No `delete` here — see `createTeardownCommand`'s comment for why a
+      // real teardown script must never live on this particular resource.
+      //
       // `remote.Command`'s own `environment` option needs the SSH server to
       // list every one of those keys in `AcceptEnv` (OpenSSH denies
       // client-supplied environment variables by default, RFC 4254) — and it
@@ -157,8 +159,56 @@ export function createDeployCommand(
       // Content-addressed, not a timestamp: an unchanged deploy (US2
       // acceptance scenario 1 — "runs again with no changes") is then a
       // genuine no-op rather than an unconditional re-run, while a new image
-      // or a flipped resetData reliably re-executes the script.
+      // or a flipped resetData reliably re-executes the script. This ALSO
+      // means this resource is replaced on every single deploy (image.ts's
+      // cache-busting label changes the digest every time) — exactly why it
+      // must never own a real delete script (see below).
       triggers: [images.runtime.digest, images.migrator.digest, stackConfig.resetData],
+    },
+    { dependsOn },
+  );
+}
+
+/**
+ * A second, separate `remote.Command` whose only job is to own the real
+ * teardown script — reproduced for real against the VPS, and the reason this
+ * resource exists at all: `remote.Command` always treats a `triggers` (or
+ * `create`) change as a REPLACE, never an in-place update, and Pulumi's
+ * default replace order is create-the-new-instance-then-delete-the-old-one.
+ * `staging-migrate-and-deploy` above is *designed* to change its `triggers`
+ * on every single deploy (the cache-busting label in image.ts changes the
+ * image digest every time, on purpose — see image.ts's own comment on why).
+ * Putting `teardownScript()` on THAT resource meant every deploy silently
+ * self-destructed immediately after succeeding: create-new ran `deployScript`
+ * and brought the stack up, then Pulumi deleted the now-superseded old
+ * instance, which ran the exact same `teardownScript` against the exact same
+ * `REMOTE_DIR` and Compose project — tearing down the containers/volume the
+ * create step had just brought up and emptying the directory it had just
+ * populated, including files (`docker-compose.yml`, `.env`) that don't
+ * change often enough for their own `CopyToRemote` resources to notice
+ * they're gone and re-transfer them. Confirmed for real: a deploy reported
+ * success, and the very next deploy failed with the compose file missing —
+ * Pulumi never surfaces a replaced resource's own delete step as a problem
+ * even when its script tears down what the replacement just built.
+ *
+ * The fix is to keep the real teardown script on a resource whose inputs
+ * never change across ordinary deploys — no image digests, no `resetData`,
+ * nothing that varies deploy to deploy — so it is never replaced by a normal
+ * `pnpm staging:deploy`, and its `delete` therefore only ever runs when
+ * `pulumi destroy` genuinely means to tear down everything, including this
+ * resource itself. `create` here does nothing meaningful on purpose: this
+ * resource's only reason to exist is to hold `delete`.
+ */
+export function createTeardownCommand(
+  stackConfig: StackConfig,
+  dependsOn: pulumi.Resource[],
+): remote.Command {
+  return new remote.Command(
+    'staging-teardown',
+    {
+      connection: connectionFor(stackConfig),
+      create: 'true',
+      delete: teardownScript(),
     },
     { dependsOn },
   );

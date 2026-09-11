@@ -60,6 +60,7 @@ describe('infrastructure resource wiring', () => {
   let stackConfig: import('./config.js').StackConfig;
   let transfers: import('@pulumi/command').remote.CopyToRemote[];
   let deploy: import('@pulumi/command').remote.Command;
+  let teardown: import('@pulumi/command').remote.Command;
 
   beforeAll(async () => {
     await installMocks();
@@ -67,12 +68,13 @@ describe('infrastructure resource wiring', () => {
     const { loadStackConfig } = await import('./config.js');
     const { buildStagingImages } = await import('./image.js');
     const { createTransfer } = await import('./transfer.js');
-    const { createDeployCommand } = await import('./deploy.js');
+    const { createDeployCommand, createTeardownCommand } = await import('./deploy.js');
 
     stackConfig = loadStackConfig(VALID_RAW);
     const images = buildStagingImages();
     transfers = createTransfer(stackConfig, images, [images.runtimeSaved, images.migratorSaved]);
     deploy = createDeployCommand(stackConfig, images, transfers);
+    teardown = createTeardownCommand(stackConfig, transfers);
   });
 
   /**
@@ -84,12 +86,14 @@ describe('infrastructure resource wiring', () => {
   it('sources every remote connection from the same StackConfig.vpsHost', async () => {
     const transferHosts = await Promise.all(transfers.map((t) => resolveOutput(t.connection.host)));
     const deployHost = await resolveOutput(deploy.connection.host);
+    const teardownHost = await resolveOutput(teardown.connection.host);
 
     expect(transferHosts.length).toBeGreaterThan(0);
     for (const host of transferHosts) {
       expect(host).toBe(stackConfig.vpsHost);
     }
     expect(deployHost).toBe(stackConfig.vpsHost);
+    expect(teardownHost).toBe(stackConfig.vpsHost);
   });
 
   /**
@@ -127,6 +131,36 @@ describe('infrastructure resource wiring', () => {
   });
 
   /**
+   * The self-destruct bug, reproduced for real against the VPS: `deploy`'s
+   * `triggers` change on every single deploy (image.ts's cache-busting
+   * label), so `remote.Command`'s always-replace-on-change behaviour means
+   * `deploy` is replaced on every deploy — create the new instance, then
+   * delete the superseded old one. A real teardown script on THIS resource
+   * therefore ran on every ordinary deploy too, immediately tearing down
+   * what the create step had just brought up: a deploy reported success,
+   * and the very next one failed with `docker-compose.yml` missing —
+   * silently deleted by its own predecessor's delete step. `deploy` must
+   * never carry a `delete` again; the real teardown script belongs only on
+   * `createTeardownCommand`'s resource, whose inputs don't vary deploy to
+   * deploy.
+   */
+  it('never puts a delete script on the resource that replaces every deploy', async () => {
+    const deleteScript = await resolveOutput(deploy.delete);
+    expect(deleteScript).toBeUndefined();
+  });
+
+  /**
+   * The other half of the self-destruct fix: `teardown`'s inputs must be
+   * stable across ordinary deploys (no image digests, no `resetData`) so it
+   * is never replaced by a normal `pnpm staging:deploy` — only a genuine
+   * `pulumi destroy` should ever invoke its `delete`.
+   */
+  it('gives the teardown-owning resource no triggers that vary across ordinary deploys', async () => {
+    const triggers = await resolveOutput(teardown.triggers);
+    expect(triggers).toBeUndefined();
+  });
+
+  /**
    * Without a `delete` script, `pulumi destroy` leaves everything running on
    * the VPS untouched while Pulumi's own state reports a clean teardown —
    * verified against the real VPS before this test existed. `--volumes` is
@@ -135,14 +169,14 @@ describe('infrastructure resource wiring', () => {
    * leave nothing behind.
    */
   it('tears the deployment down on destroy, including its data volume', async () => {
-    const script = await resolveOutput(deploy.delete);
+    const script = await resolveOutput(teardown.delete);
     expect(script).toContain('docker compose');
     expect(script).toContain('down');
     expect(script).toContain('--volumes');
   });
 
   it('guards the teardown script against a missing remote directory', async () => {
-    const script = await resolveOutput(deploy.delete);
+    const script = await resolveOutput(teardown.delete);
     expect(script).toMatch(/if \[ -d .* \]; then/);
   });
 
@@ -155,7 +189,7 @@ describe('infrastructure resource wiring', () => {
    * not just the absence of the broken one.
    */
   it('empties the remote directory rather than removing it (avoids a parent-permission failure)', async () => {
-    const script = await resolveOutput(deploy.delete);
+    const script = await resolveOutput(teardown.delete);
     expect(script).toContain('-mindepth 1 -delete');
   });
 
@@ -167,7 +201,7 @@ describe('infrastructure resource wiring', () => {
    * compose file is still there just because the directory is.
    */
   it('guards the compose-down step against an already-emptied remote directory', async () => {
-    const script = await resolveOutput(deploy.delete);
+    const script = await resolveOutput(teardown.delete);
     expect(script).toMatch(/if \[ -f docker-compose\.yml \]; then/);
   });
 });
