@@ -19,6 +19,8 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p prisma/tsconfig.json"
   },
   "dependencies": {
+    "@fp/core": "workspace:*",
+    "@fp/kernel": "workspace:*",
     "@prisma/client": "^6.16.3"
   },
   "devDependencies": {
@@ -28,7 +30,8 @@
     "eslint": "^9.39.1",
     "prisma": "^6.16.3",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

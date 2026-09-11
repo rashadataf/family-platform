@@ -19,17 +19,118 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Scaffolding only. This table exists to prove the migration mechanism
-// builds schema from nothing (see specs/001-monorepo-dev-environment/spec.md
-// FR-005) and to back the API's /health/ready check. It is not product
-// domain schema and MUST be deleted once the first real domain migration
-// lands in a later feature.
-model ScaffoldProbe {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now()) @map("created_at")
-  // Added purely to exercise T024's "a real migration applies automatically
-  // on redeploy" verification (spec 003) — no functional use.
-  note      String?
+// Identity and Access (spec 006, data-model.md). The platform's first real
+// domain schema — `ScaffoldProbe` is retired in this same migration per its
+// own comment's instruction ("MUST be deleted once the first real domain
+// migration lands").
+//
+// Email case-insensitivity (FR-022) is enforced by normalising in the domain
+// layer (packages/core/identity/domain/email-address.vo.ts) before any write
+// or read reaches this schema, rather than by a Postgres `citext` column —
+// the repository is the only writer, so a plain unique index on the
+// already-normalised value gives the same guarantee without an extension.
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  status              UserStatus @default(pending_verification)
+  emailVerifiedAt     DateTime? @map("email_verified_at")
+  deletionRequestedAt DateTime? @map("deletion_requested_at")
+  failedAttemptCount  Int       @default(0) @map("failed_attempt_count")
+  throttledUntil      DateTime? @map("throttled_until")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  @@map("_scaffold_probe")
+  sessions           Session[]
+  devices            Device[]
+  emailVerifications EmailVerification[]
+
+  @@map("user")
+}
+
+enum UserStatus {
+  pending_verification
+  active
+  deletion_requested
+
+  @@map("user_status")
+}
+
+model Session {
+  id                String                @id @default(uuid())
+  userId            String                @map("user_id")
+  deviceId          String                @map("device_id")
+  tokenHash         Bytes                 @unique @map("token_hash")
+  previousTokenHash Bytes?                @map("previous_token_hash")
+  issuedAt          DateTime              @default(now()) @map("issued_at")
+  rotatedAt         DateTime?             @map("rotated_at")
+  absoluteExpiresAt DateTime              @map("absolute_expires_at")
+  revokedAt         DateTime?             @map("revoked_at")
+  revokedReason     SessionRevokedReason? @map("revoked_reason")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  // A user listing their own sessions is a routine query (data-model.md).
+  @@index([userId])
+  // Replay detection looks a presented token up against the immediately
+  // superseded hash (FR-011).
+  @@index([previousTokenHash])
+  @@map("session")
+}
+
+enum SessionRevokedReason {
+  user_revoked
+  account_deleted
+  replay_detected
+
+  @@map("session_revoked_reason")
+}
+
+model Device {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  label       String
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@index([userId])
+  @@map("device")
+}
+
+model EmailVerification {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  tokenHash    Bytes     @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  supersededAt DateTime? @map("superseded_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification")
+}
+
+// No foreign key to User, on purpose (data-model.md): this table must
+// survive the erasure of the account it refers to, carrying only an
+// identifier. A foreign key would either block erasure or cascade away the
+// audit trail, and both are wrong (ADR-005 Layer 2).
+model OutboxEvent {
+  id            String    @id @default(uuid())
+  eventType     String    @map("event_type")
+  aggregateType String    @map("aggregate_type")
+  aggregateId   String    @map("aggregate_id")
+  payload       Json
+  occurredAt    DateTime  @default(now()) @map("occurred_at")
+  publishedAt   DateTime? @map("published_at")
+  correlationId String    @map("correlation_id")
+
+  // The oldest unpublished row is the single most important operational
+  // metric in the system (constitution, ADR-005).
+  @@index([publishedAt])
+  @@map("outbox_event")
 }

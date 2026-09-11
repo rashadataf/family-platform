@@ -39,21 +39,25 @@ describe('the integration harness', () => {
 
   it('sees what the test itself writes', async () => {
     await withDatabase(async (tx) => {
-      const before = await tx.scaffoldProbe.count();
-      await tx.scaffoldProbe.create({ data: {} });
+      const before = await tx.user.count();
+      await tx.user.create({
+        data: { email: 'harness-write@example.com', passwordHash: 'not-a-real-hash' },
+      });
 
-      expect(await tx.scaffoldProbe.count()).toBe(before + 1);
+      expect(await tx.user.count()).toBe(before + 1);
     });
   });
 
   it('rolls the write back, so the next test starts clean', async () => {
     const created = await withDatabase(async (tx) => {
-      const row = await tx.scaffoldProbe.create({ data: {} });
+      const row = await tx.user.create({
+        data: { email: 'harness-rollback@example.com', passwordHash: 'not-a-real-hash' },
+      });
       return row.id;
     });
 
     await withDatabase(async (tx) => {
-      expect(await tx.scaffoldProbe.findUnique({ where: { id: created } })).toBeNull();
+      expect(await tx.user.findUnique({ where: { id: created } })).toBeNull();
     });
   });
 

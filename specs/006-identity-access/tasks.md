@@ -98,53 +98,63 @@ is identity-specific business logic — it is what makes writing that logic poss
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T012 [P] Implement `Result<T, E>` (ok/err constructors and combinators) in
+- [X] T012 [P] Implement `Result<T, E>` (ok/err constructors and combinators) in
       `packages/kernel/src/result.ts`.
-- [ ] T013 [P] Implement branded-id helpers and `UserId`, `SessionId`, `DeviceId` in
+- [X] T013 [P] Implement branded-id helpers and `UserId`, `SessionId`, `DeviceId` in
       `packages/kernel/src/branded-id.ts`.
-- [ ] T014 [P] Implement the domain error taxonomy in `packages/kernel/src/errors.ts` — a base
+- [X] T014 [P] Implement the domain error taxonomy in `packages/kernel/src/errors.ts` — a base
       `DomainError` plus the specific errors later commands raise (`EmailAlreadyRegistered`,
       `WeakPassword`, `InvalidCredentials`, `AccountNotVerified`, `SessionInvalid`,
       `VerificationInvalid`).
-- [ ] T015 [P] Define the `Clock` port (`now(): Date`, no implementation) in
+- [X] T015 [P] Define the `Clock` port (`now(): Date`, no implementation) in
       `packages/kernel/src/clock.port.ts`.
-- [ ] T016 [P] Export the public surface from `packages/kernel/src/index.ts` and add
+- [X] T016 [P] Export the public surface from `packages/kernel/src/index.ts` and add
       `packages/kernel/src/result.spec.ts` asserting `Result`'s ok/err behaviour.
-- [ ] T017 Author `User`, `Session`, `Device`, `EmailVerification`, and `OutboxEvent` in
+- [X] T017 Author `User`, `Session`, `Device`, `EmailVerification`, and `OutboxEvent` in
       `packages/persistence/prisma/schema.prisma` exactly per data-model.md (citext email with a
       unique index on the normalised form; `token_hash`/`previous_token_hash` as indexed `bytea`;
       `outbox_event` with no foreign key to `user`), then run
       `pnpm --filter @fp/persistence exec prisma migrate dev` to generate the migration.
-- [ ] T018 Implement `packages/platform/src/argon2-password-hasher.ts` (a `PasswordHasherPort`
+- [X] T018 Implement `packages/platform/src/argon2-password-hasher.ts` (a `PasswordHasherPort`
       implementation via `@node-rs/argon2`) and `packages/platform/src/argon2-password-hasher.spec.ts`.
       Parameters are placeholders here — T090 tunes and records them against the real VPS.
-- [ ] T019 [P] Implement `packages/platform/src/random-token-generator.ts` — a `TokenGeneratorPort`
+- [X] T019 [P] Implement `packages/platform/src/random-token-generator.ts` — a `TokenGeneratorPort`
       producing a 256-bit opaque token plus a SHA-256 hash helper, used for both session and
       verification tokens (research.md §3) — and its spec.
-- [ ] T020 [P] Implement `packages/platform/src/system-clock.ts` (the `Clock` port's real
+- [X] T020 [P] Implement `packages/platform/src/system-clock.ts` (the `Clock` port's real
       implementation) and its spec.
-- [ ] T021 Implement `packages/platform/src/smtp-mailer.ts` (a `MailerPort` implementation against
+- [X] T021 Implement `packages/platform/src/smtp-mailer.ts` (a `MailerPort` implementation against
       Mailpit's SMTP endpoint) and its spec (fake transport, no real network). Add `MAIL_HOST` /
       `MAIL_PORT` to `.env.example` and `apps/api/src/config/env.schema.ts`, and confirm
       `pnpm verify:env` passes.
-- [ ] T022 Define the application-layer ports in `packages/core/identity/application/ports/`:
-      `user.repository.ts`, `session.repository.ts`, `device.repository.ts`,
-      `email-verification.repository.ts`, `password-hasher.port.ts`, `token-generator.port.ts`,
-      `mailer.port.ts`, `outbox.port.ts` — interfaces only.
-- [ ] T023 Implement `packages/persistence/src/repositories/identity/outbox.repository.ts` (writes an
-      `OutboxEvent` row inside the caller's own Prisma transaction, satisfying `OutboxPort`) and
+- [X] T022 **Revised during implementation.** `password-hasher.port.ts`, `token-generator.port.ts`,
+      `mailer.port.ts`, and `outbox.port.ts` moved to `packages/kernel/src/` instead of
+      `packages/core/identity/application/ports/`: `platform-has-no-domain` in
+      `.dependency-cruiser.cjs` forbids `packages/platform` from importing `packages/core` at all,
+      so a port `platform` must implement cannot live inside a context — the kernel is the one
+      package both may import (the same reasoning that already placed `Clock` there). `outbox.port.ts`
+      moved for the same structural reason: it is one mechanism shared by every future context
+      (ADR-005), not identity-specific. The four **repository** ports
+      (`user.repository.ts`, `session.repository.ts`, `device.repository.ts`,
+      `email-verification.repository.ts`) remain to be defined in `core/identity/application/ports/`
+      — deferred to US1/US2 (T037/T040, T052/T054) because their signatures need the `User`/`Session`/
+      `Device` aggregate types those stories define, which do not exist yet at this point in the plan.
+- [X] T023 Implement `packages/persistence/src/repositories/outbox.repository.ts` (not nested under
+      `identity/` — see T022's note: shared across every context) satisfying kernel's `OutboxPort` by
+      taking a `PrismaClient | Prisma.TransactionClient` via constructor injection, so a command's
+      unit of work can construct it against the same transaction as its aggregate write. Verified by
       `outbox.repository.integration.spec.ts` against real PostgreSQL.
-- [ ] T024 Scaffold `packages/contracts/src/v1/identity.contract.ts`: the shared `email` schema
+- [X] T024 Scaffold `packages/contracts/src/v1/identity.contract.ts`: the shared `email` schema
       (trimmed, lowercased — FR-022) and `password` schema (minimum-strength refinement — FR-004),
       the machine-readable problem/error schema carrying a stable `type`, and an empty ts-rest router.
-- [ ] T025 Scaffold `apps/api/src/identity/identity.module.ts` and an empty
+- [X] T025 Scaffold `apps/api/src/identity/identity.module.ts` and an empty
       `apps/api/src/identity/identity.controller.ts`, wired into `apps/api/src/app.module.ts`, with DI
       providers for the kernel `Clock` and the platform adapters (hasher, token generator, mailer,
       outbox) built in T018–T021 and T023.
-- [ ] T026 Implement story-agnostic rate-limiting infrastructure (a reusable guard/interceptor
+- [X] T026 Implement story-agnostic rate-limiting infrastructure (a reusable guard/interceptor
       factory taking a key strategy and a limit) in `apps/api/src/common/rate-limit.guard.ts`, per
       contracts/identity-api.md's Rate limiting table. Each story wires its own routes to it later.
-- [ ] T027 Run `pnpm boundaries`, `pnpm lint`, and `pnpm typecheck` across the five new packages now
+- [X] T027 Run `pnpm boundaries`, `pnpm lint`, and `pnpm typecheck` across the five new packages now
       that they contain real files and real imports, and fix any `WORKSPACE_GRAPH` or
       `boundaries.js` gap the Setup phase's declarations missed.
 
