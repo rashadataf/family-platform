@@ -85,7 +85,23 @@ export const stackConfigSchema = z.object({
     .refine((name) => !DOCKER_RESERVED_NETWORK_NAMES.has(name), {
       message: `stagingNetworkName must not be one of Docker's reserved network names (${Array.from(DOCKER_RESERVED_NETWORK_NAMES).join(', ')})`,
     }),
-  resetData: z.coerce.boolean().default(false),
+  // NOT `z.coerce.boolean()` — reproduced for real: `z.coerce.boolean()`
+  // just calls JS's `Boolean(value)`, and `Boolean('false')` is `true` (only
+  // an empty string is falsy). Since Pulumi config values are always
+  // strings, `pulumi config set resetData false` produces the literal
+  // string `'false'`, which `z.coerce.boolean()` would silently parse as
+  // `true` — meaning every deploy with `resetData` explicitly set, however
+  // it was set, ran the destructive wipe-and-reseed path, defeating
+  // FR-012/SC-002's "ordinary redeploys preserve data" guarantee entirely.
+  // Explicitly enumerating the two accepted strings and rejecting anything
+  // else means a typo here fails loudly instead of silently either wiping
+  // data that should have been kept or skipping a reset that was intended.
+  resetData: z
+    .enum(['true', 'false'], {
+      message: "resetData must be the literal string 'true' or 'false'",
+    })
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 export type StackConfig = z.infer<typeof stackConfigSchema>;
