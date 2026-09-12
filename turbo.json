@@ -28,6 +28,8 @@
         "scripts/tsconfig.json",
         "apps/api/src/config/env.schema.ts",
         "apps/api/src/config/load-env.ts",
+        "packages/ui/src/tokens/**",
+        "design/tokens.json",
         "package.json"
       ],
       "outputs": []

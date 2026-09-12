@@ -39,37 +39,47 @@ installed rather than against this note.
 
 ---
 
-## R2. Workspace declaration checks must change
+## R2. Declaring the new packages — and the real problem, which is somewhere else
 
-**Decision**: Modify `scripts/verify-workspace-packages.ts` so the Dockerfile and compose-volume
-checks apply only to packages the API image actually needs, derived from the dependency graphs of
-`apps/api` and `apps/worker` rather than from a hand-maintained exclusion list.
+**Decision**: Declare both new packages in all three places the existing check requires. **No change
+to `scripts/verify-workspace-packages.ts`.** Separately, scope the API image's install so the mobile
+app cannot drag React Native into it — a Dockerfile change, not a check change.
 
-**Rationale**: The script currently requires *every* directory under `apps/*` and `packages/*` to
-appear in three places: a `COPY` line in `apps/api/Dockerfile`, a `node_modules` volume in
-`docker-compose.yml`, and `WORKSPACE_GRAPH` in `.dependency-cruiser.cjs`. Adding `apps/mobile` and
-`packages/ui` therefore fails the `verify-env` gate. Satisfying it literally would mean copying the
-mobile application's manifest into the API image — coupling the server image to the client, for no
-reason, in violation of the `image` gate's own intent that the runtime image carry nothing it does
-not need.
+**Rationale — this section was wrong and is corrected.** The original version argued that adding
+client packages to `apps/api/Dockerfile` would make the API runtime image carry client manifests, and
+proposed rewriting the verification script to derive an exempt set. Reading the Dockerfile before
+implementing showed the premise was false:
 
-The script's own comment anticipates this: *"Only workspace packages the API container mounts need
-a volume; every package under `apps/` or `packages/` currently does."* That "currently" expires with
-this feature.
+- `runtime` derives from `base`, **not** from `deps`, and copies only `/app/deploy` out of `build`.
+  Manifests copied into the deps stage never reach the shipped image, so the `image` gate — which
+  inspects the runtime image — is entirely unaffected. Declaring a package costs two lines.
+- The compose volumes point the same way. The repository is bind-mounted at `/app`, so every
+  workspace package needs a named volume at its `node_modules` or the container's install is shadowed
+  by, and written into, the host tree. A package without one pollutes the host checkout.
+
+So the check is right and the plan was wrong. Exempting anything would have solved a problem that
+does not exist.
+
+**The real problem is `apps/mobile`, and it is about the install, not the declaration.** The deps
+stage runs `pnpm install --frozen-lockfile` across the whole workspace. Once the mobile app is a
+workspace member, every API image build resolves and downloads React Native and the Expo toolchain —
+hundreds of megabytes, on a gate that already takes over two minutes, for code the image will never
+run. Exempting it from the declaration check would not help: pnpm validates the lockfile against the
+workspace it discovers, so the manifest must be present regardless of what any check requires.
+
+**Decision for `apps/mobile`**: declare it like every other package, and scope the deps-stage install
+with pnpm's filter so only what `@fp/api` and `@fp/worker` need is resolved. This touches the `image`
+gate's install semantics, so it is its own task, sequenced *before* the mobile app exists rather than
+alongside it.
 
 **Alternatives considered**:
 
-- A hardcoded `CLIENT_PACKAGES` exclusion set — simpler, and rejected on the script's own stated
-  principle. Its docstring argues that "a convention only a comment protects is one that drifts
-  silently"; a hand-maintained exclusion list is exactly such a convention. A derived set cannot
-  drift, because it is computed from the manifests that already declare the truth.
-- Leaving the script alone and adding the client packages to the Dockerfile anyway — rejected: it
-  makes the API image carry client manifests and makes a passing gate mean less than it did.
-
-**Consequence**: the third check (dependency-cruiser `WORKSPACE_GRAPH`) still applies to every
-package, and should — the boundary graph is about the whole repository, not about one image.
-
----
+- Rewriting the verification script to derive an exempt set — the original plan. Rejected: it solves
+  nothing and leaves the actual cost untouched.
+- Accepting a slower image build — rejected. It is waste on every pull request, and it grows with the
+  client's dependency tree.
+- Moving the mobile app outside the workspace — rejected: it would lose `packages/contracts`, which is
+  the whole argument of ADR-016.
 
 ## R3. The token layer's enforcement mechanism
 
@@ -253,3 +263,40 @@ that does not support Node 24 fails at install rather than at run time. Expo's s
 moves with its SDK releases. This note deliberately records no version numbers: any written here
 would be stale by the time the work starts, and a stale version in a planning document is worse than
 an explicit instruction to check.
+
+---
+
+## R12. The palette did not pass its own contrast rule (found during implementation)
+
+**Finding**: The first run of `verify:contrast` reported **seven failures** against the palette drawn
+on artboard 01 — a palette that had been chosen by eye and looked fine.
+
+| Pairing | Was | Floor |
+|---|---|---|
+| `text.tertiary` on canvas / raised, light | 3.63 / 3.88 | 4.5 |
+| `text.tertiary` on canvas / raised, dark | 4.44 / 4.00 | 4.5 |
+| `text.onAction` on `action.primary`, light | 4.49 | 4.5 |
+| `action.disabledFg` on `action.disabledBg`, light | 2.10 | 3.0 |
+| `action.disabledFg` on `action.disabledBg`, dark | 2.56 | 3.0 |
+
+**Resolution**: Five values were adjusted along their own hue, targeting a small margin above each
+floor rather than the floor exactly, so that rounding cannot put a shipped pairing back under it. The
+canvas was corrected first and the token layer follows it, which is the order the specification
+requires.
+
+| Token | Was | Now |
+|---|---|---|
+| `text.tertiary` light | `#8A8073` | `#786F64` |
+| `text.tertiary` dark | `#857C6E` | `#908779` |
+| `action.primary` light | `#B4603A` | `#B15E39` |
+| `action.disabledFg` light | `#A9A093` | `#8D8170` |
+| `action.disabledFg` dark | `#6B6355` | `#797060` |
+
+**Why this is worth recording.** Artboard 01 already carried the sentence "a pairing outside this
+table has not been checked and is not approved", and the table itself was wrong. The check earned its
+cost on its first run, before a single component existed — which is the argument for building
+enforcement in the foundational phase rather than treating it as polish.
+
+`text.onAction` at 4.49 is the one worth pausing on. It is indistinguishable from 4.50 to any human
+eye, and it failed. Rounding a value down to "basically fine" is exactly the judgement a design
+system exists to remove, so it was fixed like the others.

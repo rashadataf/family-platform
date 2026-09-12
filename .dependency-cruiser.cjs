@@ -56,6 +56,12 @@ const WORKSPACE_GRAPH = {
   // package everything else does, and exports no client of its own.
   'packages/testing': ['packages/persistence'],
 
+  // The design system (spec 007, ADR-016). A leaf on purpose: it reaches no
+  // bounded context, no wire contract, no API client and no data access
+  // (FR-011), and its token layer reaches nothing at all — see
+  // `token-layer-imports-nothing` below.
+  'packages/ui': [],
+
   // Shared configuration. Leaves: they depend on npm packages only.
   'packages/config-eslint': [],
   'packages/config-prettier': [],
@@ -122,6 +128,13 @@ module.exports = {
     // and `pnpm dev` validate against the one authoritative definition rather
     // than a second copy that drifts (Principle II).
     { from: { path: '^scripts/' }, to: { path: '^apps/api/src/config/' } },
+
+    // Same reasoning, for the design system: `pnpm verify:design-tokens`
+    // compares the token layer against design/tokens.json, which it can only
+    // do by reading the one authoritative definition (spec 007 FR-012). The
+    // edge is deliberately narrow — the tokens directory only, never a
+    // component.
+    { from: { path: '^scripts/' }, to: { path: '^packages/ui/src/tokens/' } },
   ],
   allowedSeverity: 'error',
 
@@ -220,6 +233,17 @@ module.exports = {
         'packages/contracts is the wire boundary and is consumed by the mobile app as well as the API. It must not drag domain or infrastructure code across that boundary.',
       from: { path: '^packages/contracts/' },
       to: { path: '^packages/(core|persistence|platform|ai)/|^apps/' },
+    },
+    {
+      name: 'token-layer-imports-nothing',
+      severity: 'error',
+      comment:
+        "packages/ui/src/tokens is spec 007 FR-006's portability promise: a future web client consumes these exact values, so the module must depend on nothing — not React, not React Native, not even @fp/kernel. An import here makes that promise conditional on whatever was imported. ADR-016 chose plain token objects over a styling framework precisely so this could be structural rather than aspirational.",
+      from: { path: '^packages/ui/src/tokens/' },
+      // Node built-ins are excluded too, deliberately. The blanket `allowed`
+      // entry above permits core modules everywhere, but a `node:fs` import
+      // here would break the browser just as surely as a React one.
+      to: { pathNot: '^packages/ui/src/tokens/' },
     },
     {
       name: 'platform-has-no-domain',

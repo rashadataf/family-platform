@@ -23,8 +23,10 @@ by preference, and one requirement that cannot be met as written:
 - pnpm's symlinked `node_modules` **must stay**, because Principle III names strict linking as one of
   its four enforcement layers. The conventional `node-linker=hoisted` fix would delete that layer
   repository-wide. Metro is configured for the workspace instead.
-- `scripts/verify-workspace-packages.ts` **must change**, because it requires every workspace package
-  to appear in the API image's Dockerfile, and a mobile application does not belong there.
+- The API image's **install must be scoped** before the mobile app joins the workspace, or every
+  image build downloads React Native. (An earlier draft of this plan proposed changing
+  `verify-workspace-packages.ts` instead; reading the Dockerfile showed that premise was false —
+  see [research R2](research.md).)
 - **FR-028 needs amending.** It requires every component state to be viewable "without running the
   product", which no option permitted by ADR-016 can satisfy.
 
@@ -167,7 +169,7 @@ makes the canvas normative and the check reads from canvas to code, not the othe
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| Modifying `scripts/verify-workspace-packages.ts`, an existing passing check | It requires every workspace package to appear in `apps/api/Dockerfile`. `apps/mobile` and `packages/ui` are client packages; adding them would make the API runtime image carry client manifests, which the `image` gate exists to prevent. The check's own comment anticipates this — "every package under `apps/` or `packages/` **currently** does" | A hardcoded exclusion list was rejected on the script's own stated principle, that "a convention only a comment protects is one that drifts silently". The set is derived from the `apps/api` and `apps/worker` dependency graphs instead, so it cannot drift |
+| Scoping the deps-stage `pnpm install` in `apps/api/Dockerfile` | Once `apps/mobile` is a workspace member, an unscoped `--frozen-lockfile` install pulls React Native and Expo into every API image build — hundreds of megabytes on a gate that already runs over two minutes, for code the image never executes | Exempting the mobile app from `verify-workspace-packages.ts` was the original proposal and does not work: pnpm validates the lockfile against the workspace it discovers, so the manifest must be present whatever a check requires. Leaving the install unscoped was rejected as waste that grows |
 | Three requirements (FR-008, FR-009, FR-012) delivered by bespoke tooling rather than by a library | ADR-016 chose no styling framework, and named this as its cost. Shopify Restyle would have made FR-009 a compile error for free | Rejected in ADR-016, not here: Restyle is React Native only, which defeats FR-006's portability requirement. ADR-016 names it as the fallback if this tooling proves inadequate, and that trigger stands |
 
 ## Amendment required before implementation

@@ -28,18 +28,19 @@ recorded in R6.
 
 **Purpose**: Make the workspace able to hold two new packages without breaking a gate.
 
-**Order matters here.** `scripts/verify-workspace-packages.ts` discovers packages by scanning for
-`package.json`, so the moment T005 or T006 lands, `verify-env` fails until T001 has changed how that
-check works. Creating the packages first means a red gate for no reason.
+**Order matters here.** `verify-workspace-packages.ts` discovers packages by scanning for
+`package.json`, so the moment T005 or T006 lands, `verify-env` fails until that package is declared.
+Declare first, create second. T003 must also precede T006, or the first image build after the mobile
+app appears starts downloading React Native.
 
-- [ ] T001 Change `scripts/verify-workspace-packages.ts` so the Dockerfile and compose-volume checks apply only to packages reachable from `apps/api` and `apps/worker`, derived from their manifests rather than a hand-maintained exclusion list ([research R2](research.md))
-- [ ] T002 [P] Unit test the derived-set logic, including a client-only package being correctly exempt, in `scripts/verify-workspace-packages.spec.ts`
-- [ ] T003 Add `'packages/ui': []` and `'apps/mobile': ['packages/ui']` to `WORKSPACE_GRAPH` in `.dependency-cruiser.cjs` (FR-011; deliberately narrow — `packages/contracts` is added when a feature actually calls the API)
-- [ ] T004 Add the `token-layer-imports-nothing` rule to `.dependency-cruiser.cjs`, making FR-006 a boundary failure rather than a review observation (see [contracts/package-api.md](contracts/package-api.md))
-- [ ] T005 [P] Create `packages/ui` — `package.json` as `@fp/ui`, `tsconfig.json`, `tsconfig.build.json`, `eslint.config.js` — mirroring `packages/kernel`'s manifest shape exactly
+- [X] T001 Declare `packages/ui` in the three places `verify-workspace-packages.ts` requires: a `COPY` line in the deps stage of `apps/api/Dockerfile`, a named `node_modules` volume in `docker-compose.yml`, and `'packages/ui': []` in `WORKSPACE_GRAPH` in `.dependency-cruiser.cjs` (FR-011). **No change to the verification script** — [research R2](research.md) records why its earlier proposed rewrite was based on a false premise
+- [X] T002 Add the `token-layer-imports-nothing` rule to `.dependency-cruiser.cjs`, making FR-006 a boundary failure rather than a review observation (see [contracts/package-api.md](contracts/package-api.md))
+- [ ] T003 Scope the deps-stage `pnpm install --frozen-lockfile` in `apps/api/Dockerfile` to what `@fp/api` and `@fp/worker` need, so the mobile app cannot pull React Native into every image build ([research R2](research.md)). **Must land before T006**, and the `image` gate must be re-run to prove it still builds
+- [ ] T004 Declare `apps/mobile` in the same three places, with `'apps/mobile': ['packages/ui']` in `WORKSPACE_GRAPH` — deliberately narrow; `packages/contracts` is added when a feature actually calls the API
+- [X] T005 [P] Create `packages/ui` — `package.json` as `@fp/ui`, `tsconfig.json`, `tsconfig.build.json`, `eslint.config.js` — mirroring `packages/kernel`'s manifest shape exactly
 - [ ] T006 Create the Expo application in `apps/mobile` — `package.json`, `app.config.ts`, `tsconfig.json`, `eslint.config.js`
 - [ ] T007 Configure Metro for the pnpm workspace in `apps/mobile/metro.config.js` — `watchFolders` at the repository root, `resolver.nodeModulesPaths` for both app and root, symlink resolution left on ([research R1](research.md); `node-linker=hoisted` is **not** an option and the reason is recorded there)
-- [ ] T008 Confirm the whole gate set is green with both packages still empty: `pnpm typecheck && pnpm lint && pnpm boundaries && pnpm verify:workspace && pnpm format:check`
+- [X] T008 Confirm the whole gate set is green with both packages still empty: `pnpm typecheck && pnpm lint && pnpm boundaries && pnpm verify:workspace && pnpm format:check`
 
 **Checkpoint**: Two empty packages exist and every gate passes. Nothing renders yet.
 
@@ -54,14 +55,14 @@ specified and unenforced.
 
 **⚠️ CRITICAL**: No user story work begins until this phase completes.
 
-- [ ] T009 Create `design/tokens.json` carrying every value from artboards 01–04 plus the `contrastPairs` list, per [contracts/tokens-json.md](contracts/tokens-json.md)
-- [ ] T010 [P] Define the `tokens.json` schema and parse it — **parsed, never cast**, because it is data entering from outside the program's memory (Principle II) — in `scripts/lib/design-tokens-schema.ts`
-- [ ] T011 Implement `scripts/verify-design-tokens.ts` comparing the TypeScript token module against `design/tokens.json` and failing on any divergence (FR-012)
-- [ ] T012 [P] Implement `scripts/verify-contrast.ts` computing the WCAG ratio for every `contrastPairs` entry in both themes, printing the count checked (FR-010)
-- [ ] T013 [P] Unit test the contrast computation against known-good ratios in `scripts/verify-contrast.spec.ts`
-- [ ] T014 Implement the `no-literal-design-values` ESLint rule in `packages/config-eslint/rules/no-literal-design-values.js`, scoped to exempt the token module itself (FR-008, FR-009)
-- [ ] T015 [P] Unit test the rule — a literal hex, an off-scale spacing, a hex in a comment that must NOT trigger — in `packages/config-eslint/rules/no-literal-design-values.spec.ts`
-- [ ] T016 Wire `verify:contrast` and `verify:design-tokens` into the root `package.json` `verify` script and into the existing `verify-env` CI job, rather than adding a twelfth required check (which would mean amending spec 002's required-checks contract and branch protection)
+- [X] T009 Create `design/tokens.json` carrying every value from artboards 01–04 plus the `contrastPairs` list, per [contracts/tokens-json.md](contracts/tokens-json.md)
+- [X] T010 [P] Define the `tokens.json` schema and parse it — **parsed, never cast**, because it is data entering from outside the program's memory (Principle II) — in `scripts/lib/design-tokens-schema.ts`
+- [X] T011 Implement `scripts/verify-design-tokens.ts` comparing the TypeScript token module against `design/tokens.json` and failing on any divergence (FR-012)
+- [X] T012 [P] Implement `scripts/verify-contrast.ts` computing the WCAG ratio for every `contrastPairs` entry in both themes, printing the count checked (FR-010)
+- [X] T013 [P] Unit test the contrast computation against known-good ratios in `scripts/verify-contrast.spec.ts`
+- [X] T014 Implement the `no-literal-design-values` ESLint rule in `packages/config-eslint/rules/no-literal-design-values.js`, scoped to exempt the token module itself (FR-008, FR-009)
+- [X] T015 [P] Unit test the rule — a literal hex, an off-scale spacing, a hex in a comment that must NOT trigger — in `packages/config-eslint/rules/no-literal-design-values.spec.ts`
+- [X] T016 Wire `verify:contrast` and `verify:design-tokens` into the root `package.json` `verify` script and into the existing `verify-env` CI job, rather than adding a twelfth required check (which would mean amending spec 002's required-checks contract and branch protection)
 
 **Checkpoint**: The enforcement exists and has been unit-tested. It has not yet been seen to fail on real code — that is T032.
 
@@ -76,12 +77,12 @@ contains no literal design value. **Note the honest dependency**: Today's remind
 Reminder *pattern*, which belongs to US3 — this phase delivers Today's schedule and tasks sections,
 and T044 completes the screen.
 
-- [ ] T017 [P] [US1] Colour tokens, every role carrying both a light and a dark value so a one-theme role does not compile (FR-002), in `packages/ui/src/tokens/colour.ts`
-- [ ] T018 [P] [US1] The thirteen typography steps in `packages/ui/src/tokens/typography.ts`
-- [ ] T019 [P] [US1] Space, radius and elevation as closed unions of their literal members, so an off-scale value is a type error (FR-009), in `packages/ui/src/tokens/space.ts`, `radius.ts`, `elevation.ts`
-- [ ] T020 [P] [US1] Breakpoints, columns, margins, gutters and control heights in `packages/ui/src/tokens/layout.ts`
-- [ ] T021 [US1] Barrel the token module in `packages/ui/src/tokens/index.ts`, importing nothing outside the directory (FR-006; T004 now enforces this)
-- [ ] T022 [P] [US1] Unit test that every scale matches `design/tokens.json` member for member, in `packages/ui/src/tokens/tokens.spec.ts`
+- [X] T017 [P] [US1] Colour tokens, every role carrying both a light and a dark value so a one-theme role does not compile (FR-002), in `packages/ui/src/tokens/colour.ts`
+- [X] T018 [P] [US1] The thirteen typography steps in `packages/ui/src/tokens/typography.ts`
+- [X] T019 [P] [US1] Space, radius and elevation as closed unions of their literal members, so an off-scale value is a type error (FR-009), in `packages/ui/src/tokens/space.ts`, `radius.ts`, `elevation.ts`
+- [X] T020 [P] [US1] Breakpoints, columns, margins, gutters and control heights in `packages/ui/src/tokens/layout.ts`
+- [X] T021 [US1] Barrel the token module in `packages/ui/src/tokens/index.ts`, importing nothing outside the directory (FR-006; T004 now enforces this)
+- [X] T022 [P] [US1] Unit test that every scale matches `design/tokens.json` member for member, in `packages/ui/src/tokens/tokens.spec.ts`
 - [ ] T023 [US1] `ThemeProvider` resolving one palette at the root — light only in this phase — in `packages/ui/src/theme/theme-provider.tsx` (FR-003)
 - [ ] T024 [US1] `useTheme` returning resolved values and **no theme name**, so a consumer has nothing to branch on (FR-003), in `packages/ui/src/theme/use-theme.ts`
 - [ ] T025 [P] [US1] Button — five variants, five states, three heights, width unchanged between states (FR-014), heights as floors per [research R8](research.md) — in `packages/ui/src/primitives/button/`
@@ -196,7 +197,7 @@ independently testable with two of its three sections.
 
 ### Parallel opportunities
 
-- T002 and T005 alongside T001.
+- T002 edits the same file as T001's third declaration site, so those two are sequential. T005 can run alongside either.
 - T010, T012, T013 and T015 are four separate files in Phase 2.
 - **T017–T020 are the largest parallel block**: four token files, no interdependency.
 - T025–T029: five primitive families, five directories.
@@ -262,4 +263,4 @@ a checkpoint.
 - Every task above traces to a requirement, a research decision, or a gate. A task that traces to
   none of those does not belong here.
 - The three tasks most likely to be underestimated: T014 (the ESLint rule), T053 (text scaling) and
-  T001 (the derived workspace set). None is hard; each is fiddlier than it reads.
+  T003 (scoping the image install). None is hard; each is fiddlier than it reads.

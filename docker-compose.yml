@@ -112,6 +112,7 @@ services:
       - config_prettier_node_modules:/app/packages/config-prettier/node_modules
       - config_typescript_node_modules:/app/packages/config-typescript/node_modules
       - testing_node_modules:/app/packages/testing/node_modules
+      - ui_node_modules:/app/packages/ui/node_modules
     healthcheck:
       test:
         [
@@ -155,6 +156,7 @@ services:
       - config_prettier_node_modules:/app/packages/config-prettier/node_modules
       - config_typescript_node_modules:/app/packages/config-typescript/node_modules
       - testing_node_modules:/app/packages/testing/node_modules
+      - ui_node_modules:/app/packages/ui/node_modules
 
   # Stage 0 mail sink (research.md §4, ADR-013). Browsable inbox at :8025;
   # nothing sent through it ever leaves the machine.
@@ -200,3 +202,4 @@ volumes:
   config_prettier_node_modules:
   config_typescript_node_modules:
   testing_node_modules:
+  ui_node_modules:
