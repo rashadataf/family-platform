@@ -11,14 +11,18 @@ import type { PasswordHasherPort } from '@fp/kernel';
  * it as an ambient `const enum`, which `verbatimModuleSyntax` (Principle I)
  * cannot import as a value.
  *
- * Parameters below are placeholders pending a real measurement against the
- * Stage 0 VPS (research.md §8's budget: ~100ms of the 300ms p95 auth
- * endpoint target). T090 replaces this comment with the measured values.
+ * Parameters (T090): OWASP's strongest standard argon2id recommendation,
+ * measured directly against the Stage 0 VPS (82.165.181.83, x86_64) on
+ * 2026-09-12 via an ephemeral `node:20-slim` container — verify p50 31.5ms /
+ * p95 59.2ms over 30 iterations, comfortably inside research.md §8's ~100ms
+ * budget with headroom for load from the portfolio site sharing that VPS.
+ * The four weaker OWASP options were also measured (verify p95 12-20ms) and
+ * rejected only because this one buys more security for the same budget.
  */
 const PARAMETERS = {
   algorithm: 2,
-  memoryCost: 19456,
-  timeCost: 2,
+  memoryCost: 47104,
+  timeCost: 1,
   parallelism: 1,
 };
 

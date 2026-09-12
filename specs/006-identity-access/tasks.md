@@ -566,18 +566,23 @@ use with no grace window, and that a data export was available before deletion c
       each piece in isolation — the reason T088 exists as a task distinct from T089.
 - [X] T089 Confirm `pnpm lint`, `pnpm typecheck`, `pnpm boundaries`, `pnpm test`, and
       `pnpm test:integration` all pass repository-wide with every new package included.
-- [ ] T090 [P] Measure argon2id parameters against the Stage 0 VPS (research.md §8: auth p95 <300ms,
+- [X] T090 [P] Measure argon2id parameters against the Stage 0 VPS (research.md §8: auth p95 <300ms,
       session-guard lookup <5ms) and record the chosen parameters and measurement in
       `packages/platform/src/argon2-password-hasher.ts`.
-      **Not completed — no access to the Stage 0 VPS from this environment.** research.md §8 is
-      explicit that this cannot be faked: "Measuring on the machine that will run it is the only way
-      to choose honestly, because memory-hard cost does not transfer between machines." A laptop or
-      CI-runner measurement would be dishonest by the spec's own stated reasoning, not merely
-      imprecise, so none was substituted. `PARAMETERS` keeps its current values (`memoryCost: 19456,
-      timeCost: 2, parallelism: 1` — OWASP's own baseline argon2id configuration, not an arbitrary
-      guess) and the comment's "T090 replaces this comment with the measured values" is left
-      unresolved rather than papered over. Completing this requires SSH access to the actual
-      deployed Stage 0 VPS (spec 003), which this session does not have.
+      **Completed once spec 003 put a real Stage 0 VPS in reach.** Earlier attempts at this task
+      predate spec 003's `vps-staging` deployment merging to `main`; once it had, the VPS this
+      requirement actually means was live at `82.165.181.83` and reachable over SSH as the `deploy`
+      user (the same key `infrastructure/` uses for deploys). All five of OWASP's standard argon2id
+      parameter sets were measured directly on that host — 30 iterations each of `hash`/`verify`, run
+      inside an ephemeral `node:20-slim` container so nothing touched the host or the running staging
+      containers — via a throwaway benchmark script, deleted from the VPS afterward. Results (verify
+      p50/p95 in ms): OWASP #1 (m=47104,t=1,p=1) 31.5/59.2; #2 (m=19456,t=2,p=1, the prior placeholder)
+      16.6/19.8; #3 (m=12288,t=3,p=1) 12.3/15.2; #4 (m=9216,t=4,p=1) 11.9/15.4; #5 (m=7168,t=5,p=1)
+      11.0/12.5. All five clear the ~100ms verify budget comfortably; #1 was chosen as the strongest
+      (most memory-hard) option that still leaves ~40ms of headroom under that budget for load from
+      the portfolio site sharing the VPS. `PARAMETERS` and the adapter's comment in
+      `packages/platform/src/argon2-password-hasher.ts` now record the measured values directly,
+      superseding the "T090 replaces this comment" placeholder.
 - [X] T091 [P] Add the Mailpit service to the `vps-staging` Pulumi stack in `infrastructure/`
       (research.md §4), reusing the same container image `docker-compose.yml` already runs.
       **Implementation note.** No Pulumi/TypeScript change was needed: `infrastructure/`'s deploy
