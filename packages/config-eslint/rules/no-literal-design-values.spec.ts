@@ -54,6 +54,15 @@ describe('no-literal-design-values', () => {
     expect(lint('const s = { borderTopLeftRadius: 24 };')).toEqual([]);
   });
 
+  // Regression (spec 007): `shadowRadius` is React Native's shadow blur
+  // radius, part of the elevation model, and ends in "Radius" the same as a
+  // corner-radius property — but it is not on the radius SCALE and never
+  // should be checked against it.
+  it('does not mistake a shadow blur radius for a corner radius', () => {
+    expect(lint('const s = { shadowRadius: 2 };')).toEqual([]);
+    expect(lint('const s = { shadowRadius: 0 };')).toEqual([]);
+  });
+
   it('catches type values that are not steps in the scale', () => {
     expect(lint('const s = { fontSize: 14 };')).toHaveLength(1);
     expect(lint('const s = { fontSize: 17 };')).toEqual([]);

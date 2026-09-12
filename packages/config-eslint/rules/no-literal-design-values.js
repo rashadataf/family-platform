@@ -29,7 +29,13 @@ const FONT_SIZE = new Set(Object.values(tokens.typography).map((s) => s.size));
 const LINE_HEIGHT = new Set(Object.values(tokens.typography).map((s) => s.lineHeight));
 
 const SPACING_PROP = /^(padding|margin|gap|rowGap|columnGap)/;
-const RADIUS_PROP = /Radius$/;
+// Anchored to `border`, not just a `Radius` suffix: React Native's
+// `shadowRadius` (a blur radius in px, part of the elevation model, not the
+// corner-radius scale) also ends in "Radius" and is not on this scale —
+// discovered when a real elevation adapter (internal/elevation-style.ts,
+// spec 007) tripped this rule on `shadowRadius: 2`, a value that was already
+// correct.
+const RADIUS_PROP = /^border.*Radius$/;
 const COLOUR_VALUE = /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\()/i;
 
 const sorted = (set) => [...set].sort((a, b) => a - b).join(', ');
