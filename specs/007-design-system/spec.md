@@ -254,11 +254,10 @@ is reachable there.
   [ADR-016](../../adr/ADR-016-mobile-client-and-styling.md)**, written alongside this specification
   to close a governance gap: `ARCHITECTURE.md` §4 and §8 named Expo and React Native, but `adr/`
   held no record of the decision, its alternatives or its cost — unlike every other foundational
-  technology in this repository. ADR-016 is currently `Proposed`. **It must be `Accepted` before
-  implementation begins**, because planning around it while it is still open would make the plan's
-  most consequential choice an undocumented one. Its second decision — plain token objects and no
-  styling framework — is what makes FR-006, FR-008 and FR-009 achievable as written, and it names
-  the lint rule those requirements depend on as work this feature has to do.
+  technology in this repository. ADR-016 is `Accepted`, so this specification's technical approach
+  rests on a recorded decision rather than an assumption. Its second decision — plain token objects
+  and no styling framework — is what makes FR-006, FR-008 and FR-009 achievable as written, and it
+  names the lint rule those requirements depend on as work this feature has to do.
 - Two new workspace entries — a `ui` package and a `mobile` application — must be declared to the
   workspace and given boundary rules. The boundary gate fails closed, so a package matching no rule
   is an error, not an omission.

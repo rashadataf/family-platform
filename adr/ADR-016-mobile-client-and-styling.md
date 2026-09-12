@@ -1,6 +1,6 @@
 # ADR-016: Mobile client — React Native via Expo, with a dependency-free styling layer
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-12
 - **Deciders:** Principal Engineer
 

@@ -16,7 +16,7 @@ An ADR records a decision that is expensive to reverse, together with the altern
 | [014](ADR-014-containerized-development.md) | The container image is the unit of truth, including on a developer's laptop | Accepted | 2026-09-08 |
 | [015](ADR-015-repository-visibility.md) | Repository visibility: public, chosen deliberately | Accepted | 2026-09-09 |
 | [007](ADR-007-authentication.md) | Authentication: managed identity provider versus self-hosted | Accepted | 2026-09-11 |
-| [016](ADR-016-mobile-client-and-styling.md) | Mobile client: React Native via Expo, with a dependency-free styling layer | Proposed | 2026-09-12 |
+| [016](ADR-016-mobile-client-and-styling.md) | Mobile client: React Native via Expo, with a dependency-free styling layer | Accepted | 2026-09-12 |
 
 ## Planned
 
