@@ -81,7 +81,24 @@ docker load -i '${RUNTIME_TARBALL_NAME}'
 docker load -i '${MIGRATOR_TARBALL_NAME}'
 COMPOSE='docker compose -p family-platform-staging -f docker-compose.yml -f docker-compose.staging.yml'
 ${migrateStep}
-$COMPOSE up -d
+# Named explicitly, not a bare \`up -d\`: broke a real deploy right after
+# spec 006 merged \`worker\` into the base docker-compose.yml with a
+# \`build:\` pointing at apps/worker/Dockerfile. docker-compose.staging.yml
+# only overrides postgres/migrate/api/mailpit to point at the transferred
+# tarball images (or, for migrate, exclude it from this line entirely — it
+# is a one-shot service already run above via \`run --rm\`, not one \`up -d\`
+# should manage); \`worker\` never got one, because there is no staging
+# worker runtime image to override it with yet — this deploy pipeline
+# builds and transfers only the api runtime and migrator tarballs. A bare
+# \`up -d\` therefore tries to BUILD worker from source that was never
+# transferred (only two tarballs, the compose files, and .env are), and
+# fails with "lstat REMOTE_DIR/apps: no such file or directory" before any
+# other service starts, since a build failure for one service aborts the
+# whole \`up\` command. Nothing is lost by leaving worker out: its
+# WorkerModule is currently an empty NestJS DI context with no queue
+# consumer or scheduled sweep (T087 in specs/006-identity-access/tasks.md
+# already defers wiring that up), so it does nothing when it does run.
+$COMPOSE up -d postgres api mailpit
 `;
 }
 
