@@ -83,8 +83,8 @@ and T044 completes the screen.
 - [X] T020 [P] [US1] Breakpoints, columns, margins, gutters and control heights in `packages/ui/src/tokens/layout.ts`
 - [X] T021 [US1] Barrel the token module in `packages/ui/src/tokens/index.ts`, importing nothing outside the directory (FR-006; T004 now enforces this)
 - [X] T022 [P] [US1] Unit test that every scale matches `design/tokens.json` member for member, in `packages/ui/src/tokens/tokens.spec.ts`
-- [ ] T023 [US1] `ThemeProvider` resolving one palette at the root — light only in this phase — in `packages/ui/src/theme/theme-provider.tsx` (FR-003)
-- [ ] T024 [US1] `useTheme` returning resolved values and **no theme name**, so a consumer has nothing to branch on (FR-003), in `packages/ui/src/theme/use-theme.ts`
+- [X] T023 [US1] `ThemeProvider` resolving one palette at the root — light only in this phase — in `packages/ui/src/theme/theme-provider.tsx` (FR-003)
+- [X] T024 [US1] `useTheme` returning resolved values and **no theme name**, so a consumer has nothing to branch on (FR-003), in `packages/ui/src/theme/use-theme.ts`
 - [ ] T025 [P] [US1] Button — five variants, five states, three heights, width unchanged between states (FR-014), heights as floors per [research R8](research.md) — in `packages/ui/src/primitives/button/`
 - [ ] T026 [P] [US1] Field — every state from artboard 06, persistent visible label, search as the one documented exception (FR-015) — in `packages/ui/src/primitives/field/`
 - [ ] T027 [P] [US1] The four row types with their loading forms at matching anatomy (FR-020) in `packages/ui/src/primitives/row/`

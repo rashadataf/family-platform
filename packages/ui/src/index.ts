@@ -5,8 +5,9 @@
  * layer re-exported here; 05-08 the primitives; 09 the four patterns that
  * carry constitution principles and refuse to render without their evidence.
  *
- * Only the token layer exists so far. Components arrive with the application
- * shell, which needs a decision recorded in tasks T003 and T006.
+ * Tokens and theme resolution exist so far. Primitives and patterns land with
+ * T025-T029 and T039-T042.
  */
 
 export * from './tokens/index.js';
+export * from './theme/index.js';

@@ -304,7 +304,12 @@ module.exports = {
       exportsFields: ['exports'],
       conditionNames: ['import', 'require', 'node', 'types', 'default'],
       mainFields: ['module', 'main', 'types'],
-      extensions: ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.d.ts', '.json'],
+      // .tsx joined the list with packages/ui's theme/ (spec 007, T023):
+      // TypeScript's NodeNext resolution maps a `./x.js` specifier to `x.tsx`
+      // same as it does `x.ts`, but dependency-cruiser's own resolver does
+      // not do that unless told — without this, every JSX-importing file in
+      // this repository would report as unresolvable.
+      extensions: ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.tsx', '.d.ts', '.json'],
     },
 
     reporterOptions: {

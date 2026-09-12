@@ -2,7 +2,11 @@
   "extends": "@fp/config-typescript/base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // src/tokens/ has no JSX; theme/ and (later) primitives/ and patterns/
+    // do. "react-jsx" is the automatic runtime — no `import React` needed in
+    // every file, matching how Expo's own template configures apps/mobile.
+    "jsx": "react-jsx"
   },
   "include": ["src"]
 }
