@@ -20,6 +20,8 @@ const stackConfig = loadStackConfig({
   apiPublishedPort: cfg.get('apiPublishedPort'),
   stagingNetworkName: cfg.get('stagingNetworkName'),
   resetData: cfg.get('resetData'),
+  founderEmail: cfg.get('founderEmail'),
+  founderPassword: cfg.get('founderPassword'),
 });
 
 // config -> image -> transfer -> deploy (T012's wiring order).

@@ -8,3 +8,6 @@ config:
     secure: AAABAPXy45x7R1WGkt7FIPdnBq6Ny9KFpkviwcveh/49Opfe2jAZCsm2MHCVR9fDI4sc/XdVs2tQ1b0qAVNiQagR5FLHqSDRp/q3KQ==
   infrastructure:apiPublishedPort: '8081'
   infrastructure:resetData: 'false'
+  infrastructure:founderEmail: rashadattaf@gmail.com
+  infrastructure:founderPassword:
+    secure: AAABACHft0k+235gHfmay2gailLW15du5rDzb3Hhee3x0Wo5Mo+QPb75QBURvF5b15lxqMdaeeAiZwqc/0j6XA==

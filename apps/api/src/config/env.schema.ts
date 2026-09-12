@@ -12,6 +12,8 @@ export const envSchema = z.object({
   POSTGRES_PORT: z.coerce.number().int().positive(),
   POSTGRES_DB: z.string().min(1),
   DATABASE_URL: z.string().url(),
+  MAIL_HOST: z.string().min(1),
+  MAIL_PORT: z.coerce.number().int().positive(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

@@ -60,7 +60,7 @@ function isWellFormedPrivateKey(pem: string): boolean {
  * Every field is read once, before any Pulumi resource is constructed
  * (Constitution Principle II) — see `loadStackConfig` below.
  */
-export const stackConfigSchema = z.object({
+const baseStackConfigSchema = z.object({
   vpsHost: z.string().min(1, 'vpsHost must not be empty'),
   vpsSshUser: z.string().min(1, 'vpsSshUser must not be empty'),
   vpsSshPort: z.coerce.number().int().positive().default(22),
@@ -102,6 +102,25 @@ export const stackConfigSchema = z.object({
     })
     .optional()
     .transform((value) => value === 'true'),
+  // Not required by spec 006 itself — no quickstart scenario needs a seeded
+  // account — but staging's own "founder dogfooding" purpose
+  // (docs/staging-environment.md) means the founder needs a real login
+  // without registering through Mailpit on every fresh deploy. Optional
+  // because most stack configurations (and every test fixture predating
+  // this) have neither; the superRefine below rejects the half-configured
+  // case rather than silently seeding an account with an empty password.
+  founderEmail: z.string().min(1, 'founderEmail must not be empty').optional(),
+  founderPassword: z.string().min(1, 'founderPassword must not be empty').optional(),
+});
+
+export const stackConfigSchema = baseStackConfigSchema.superRefine((data, ctx) => {
+  if (Boolean(data.founderEmail) !== Boolean(data.founderPassword)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'founderEmail and founderPassword must both be set, or neither',
+      path: ['founderPassword'],
+    });
+  }
 });
 
 export type StackConfig = z.infer<typeof stackConfigSchema>;
@@ -127,6 +146,8 @@ export interface RawStackConfig {
   apiPublishedPort?: string;
   stagingNetworkName?: string;
   resetData?: string;
+  founderEmail?: string;
+  founderPassword?: string;
 }
 
 /**

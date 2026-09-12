@@ -27,19 +27,34 @@ import { MIGRATOR_TARBALL_NAME, RUNTIME_TARBALL_NAME, type StagingImages } from 
  * single Prisma operation). The ordinary path runs `migrate deploy` (the
  * migrator image's default CMD, applying only new migrations) and then
  * `prisma db seed` explicitly — safe to repeat because the seed script
- * upserts on a fixed id (packages/persistence/prisma/seed.ts), so a repeat
- * deploy neither loses founder-generated data (FR-012) nor accumulates
- * duplicate fixture rows.
+ * upserts on an email-keyed lookup (packages/persistence/prisma/seed.ts), so
+ * a repeat deploy neither loses founder-generated data (FR-012) nor
+ * accumulates duplicate fixture rows.
+ *
+ * `resetData`'s reset branch runs `prisma migrate reset --force`, which
+ * (per `packages/persistence/package.json`'s `prisma.seed` config) invokes
+ * this same seed script itself as part of the reset — so `FOUNDER_EMAIL`/
+ * `FOUNDER_PASSWORD` must be exported before that branch too, not only the
+ * explicit `prisma db seed` call in the ordinary path below.
  */
 function deployScript(stackConfig: StackConfig): string {
+  const hasFounderCredentials = Boolean(stackConfig.founderEmail && stackConfig.founderPassword);
+
   const migrateStep = stackConfig.resetData
     ? `$COMPOSE run --rm migrate pnpm --filter @fp/persistence exec prisma migrate reset --force --skip-generate`
     : `$COMPOSE run --rm migrate
 $COMPOSE run --rm migrate pnpm --filter @fp/persistence exec prisma db seed`;
 
+  const founderCredentialsStep = hasFounderCredentials
+    ? `IFS= read -r FOUNDER_EMAIL
+IFS= read -r FOUNDER_PASSWORD
+export FOUNDER_EMAIL FOUNDER_PASSWORD`
+    : '';
+
   return `set -euo pipefail
 IFS= read -r POSTGRES_PASSWORD
 export POSTGRES_PASSWORD
+${founderCredentialsStep}
 # docker-compose.staging.yml's DATABASE_URL needs the password safe to sit
 # inside a postgresql:// URL. A real, randomly-generated password can
 # contain characters ('@', ':', '/', '%', ...) that are meaningful in URL
@@ -153,9 +168,19 @@ export function createDeployCommand(
       // the portfolio site's own containers doesn't extend to isolating a
       // system-level sshd_config edit). Every value the script needs is
       // instead either inlined directly above (synth-time-known, non-secret)
-      // or delivered over the session's stdin below (the one secret) — both
-      // work with zero server-side configuration.
-      stdin: pulumi.secret(`${stackConfig.postgresPassword}\n`),
+      // or delivered over the session's stdin below (the secrets) — both
+      // work with zero server-side configuration. `founderEmail`/
+      // `founderPassword` ride the same stdin stream as a second and third
+      // line, present only when configured (`deployScript`'s
+      // `founderCredentialsStep` reads them only in that case) — one
+      // `remote.Command.stdin` accepts one string, so every secret the
+      // script needs shares it, in a fixed line order both sides agree on.
+      stdin: pulumi.secret(
+        [stackConfig.postgresPassword, stackConfig.founderEmail, stackConfig.founderPassword]
+          .filter((value): value is string => value !== undefined)
+          .map((value) => `${value}\n`)
+          .join(''),
+      ),
       // Content-addressed, not a timestamp: an unchanged deploy (US2
       // acceptance scenario 1 — "runs again with no changes") is then a
       // genuine no-op rather than an unconditional re-run, while a new image

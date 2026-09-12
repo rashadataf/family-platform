@@ -16,6 +16,8 @@ const VALID_ENV = {
   POSTGRES_PORT: '5432',
   POSTGRES_DB: 'family_platform',
   DATABASE_URL: 'postgresql://postgres:localdev@localhost:5432/family_platform',
+  MAIL_HOST: 'localhost',
+  MAIL_PORT: '1025',
 } as const;
 
 class ProcessExitError extends Error {
@@ -68,6 +70,8 @@ describe('loadEnv', () => {
       POSTGRES_PORT: VALID_ENV.POSTGRES_PORT,
       POSTGRES_DB: VALID_ENV.POSTGRES_DB,
       DATABASE_URL: VALID_ENV.DATABASE_URL,
+      MAIL_HOST: VALID_ENV.MAIL_HOST,
+      MAIL_PORT: VALID_ENV.MAIL_PORT,
     });
 
     expect(env.NODE_ENV).toBe('development');

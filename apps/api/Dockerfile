@@ -25,7 +25,15 @@ FROM node:${NODE_VERSION}-bookworm-slim AS base
 # links against libssl, Debian slim carries only what its own packages need,
 # and the failure mode when it is missing is an image that builds cleanly and
 # dies at the first query (research.md §1).
+#
+# `apt-get upgrade` matters here, not just `install`: the base image's own
+# packages (e.g. libpcre2-8-0) can carry a Debian security fix released after
+# that base image itself was published, and CI's Trivy scan
+# (--ignore-unfixed, .github/workflows/ci.yml) blocks the build on exactly
+# that kind of fixed-but-unpatched HIGH/CRITICAL finding. Without this, the
+# gate stays permanently red for something this Dockerfile could have closed.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -53,7 +61,12 @@ RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/api/package.json                 apps/api/
+COPY apps/worker/package.json              apps/worker/
 COPY packages/persistence/package.json     packages/persistence/
+COPY packages/kernel/package.json          packages/kernel/
+COPY packages/core/package.json            packages/core/
+COPY packages/contracts/package.json       packages/contracts/
+COPY packages/platform/package.json        packages/platform/
 COPY packages/config-eslint/package.json   packages/config-eslint/
 COPY packages/config-prettier/package.json packages/config-prettier/
 COPY packages/config-typescript/package.json packages/config-typescript/

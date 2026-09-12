@@ -1,35 +1,83 @@
+import { randomUUID } from 'node:crypto';
+import { hash } from '@node-rs/argon2';
+import { identity } from '@fp/core';
+import { asUserId } from '@fp/kernel';
 import { prisma } from '../src/client.js';
+import { PrismaIdentityUnitOfWork } from '../src/repositories/identity/identity-unit-of-work.js';
 
 /**
- * Fixture-only (FR-010/FR-011). Seeds exactly one row into `ScaffoldProbe` —
- * the only table that exists today (spec 001's scaffolding). Proves the
- * seeding mechanism end to end against today's schema; a later feature that
- * adds real domain schema adds its own fixture content to this same script
- * (data-model.md's "growth path"), not a rebuilt seeding pipeline.
+ * Fixture-only (FR-010/FR-011 in spec 001), plus one deliberate exception:
+ * an already-verified founder account for staging's own "founder
+ * dogfooding" purpose (docs/staging-environment.md), not required by any
+ * spec 006 quickstart scenario. `FOUNDER_EMAIL`/`FOUNDER_PASSWORD` arrive as
+ * plain env vars, threaded through by `infrastructure/src/deploy.ts` from
+ * Pulumi secret config the same way `POSTGRES_PASSWORD` already is; both
+ * unset (true for every environment except a deploy configured with them)
+ * skips this entirely, so an ordinary local `prisma db seed` stays a no-op.
  *
- * `upsert` on a fixed id, not `create`, so this is safe to run on every
- * ordinary staging deploy (infrastructure/src/deploy.ts) without
- * accumulating a new row each time — FR-012 requires previously seeded or
- * founder-generated data to survive a repeat deploy, and an idempotent seed
- * is what makes "always run it" a safe choice instead of needing to track
- * whether this is the database's first deploy.
+ * This lives here, not in `apps/worker` alongside the retention sweeps,
+ * because the migrator image that already runs this script on every staging
+ * deploy is the only image the deploy pipeline builds and transfers today —
+ * there is no equivalent worker runtime image (T087's note in
+ * specs/006-identity-access/tasks.md). Hashing uses `@node-rs/argon2`
+ * directly with `packages/platform/src/argon2-password-hasher.ts`'s exact
+ * measured parameters, duplicated rather than imported: `packages/platform`
+ * is off-limits to `packages/persistence` (`.dependency-cruiser.cjs`'s
+ * `platform-has-no-domain`/layer rules run the other direction, but the
+ * layer table only grants persistence `core` and `kernel`, not `platform`
+ * either), so importing the real adapter class isn't an option here. If T090
+ * ever re-measures those parameters, this constant must be updated to match.
  */
-const FIXTURE_SCAFFOLD_PROBE_ID = '00000000-0000-4000-8000-000000000001';
+const ARGON2_PARAMETERS = {
+  algorithm: 2, // Algorithm.Argon2id
+  memoryCost: 47104,
+  timeCost: 1,
+  parallelism: 1,
+};
 
-async function main(): Promise<void> {
-  await prisma.scaffoldProbe.upsert({
-    where: { id: FIXTURE_SCAFFOLD_PROBE_ID },
-    create: { id: FIXTURE_SCAFFOLD_PROBE_ID },
-    update: {},
+async function seedFounderAccount(): Promise<void> {
+  const email = process.env.FOUNDER_EMAIL;
+  const password = process.env.FOUNDER_PASSWORD;
+
+  if (!email || !password) {
+    console.log('seed-founder: FOUNDER_EMAIL/FOUNDER_PASSWORD not set, skipping.');
+    return;
+  }
+
+  const emailAddress = identity.EmailAddress.from(email);
+  const passwordHash = await hash(password, ARGON2_PARAMETERS);
+  const now = new Date();
+
+  const uow = new PrismaIdentityUnitOfWork(prisma);
+  await uow.run(async ({ users }) => {
+    const existing = await users.findByEmailAcrossAllStatuses(emailAddress.value);
+
+    const user = identity.User.reconstitute({
+      ...(existing?.toProps() ?? {
+        id: asUserId(randomUUID()),
+        email: emailAddress,
+        emailVerifiedAt: now,
+        deletionRequestedAt: null,
+        createdAt: now,
+      }),
+      passwordHash,
+      status: 'active',
+      failedAttemptCount: 0,
+      throttledUntil: null,
+      updatedAt: now,
+    });
+
+    await users.save(user);
   });
-  console.log('Seeded fixture data.');
+
+  console.log(`seed-founder: ensured active account for ${emailAddress.value}`);
 }
 
-main()
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => {
-    void prisma.$disconnect();
-  });
+try {
+  await seedFounderAccount();
+} catch (error: unknown) {
+  console.error(error);
+  process.exitCode = 1;
+} finally {
+  await prisma.$disconnect();
+}
