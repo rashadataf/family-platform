@@ -192,7 +192,12 @@ is reachable there.
 - **FR-025**: The mobile application MUST boot to a rendered screen assembled entirely from this package.
 - **FR-026**: The shell MUST provide the five navigation destinations drawn on artboard 08, in that order.
 - **FR-027**: The shell MUST NOT contain any bounded-context logic, any network call, or any product behaviour beyond navigating between destinations.
-- **FR-028**: A component gallery MUST make every state drawn on artboards 05 through 09 viewable without running the product, labelled with the names the canvas uses.
+- **FR-028**: A component gallery MUST make every state drawn on artboards 05 through 09 viewable
+  without navigating product flows, labelled with the names the canvas uses. (Amended during
+  planning: this requirement originally said "without running the product", which no option
+  permitted by ADR-016 can satisfy — every component is React Native, so every way of viewing one
+  runs an application. Meeting the original wording would have required rendering components on
+  the web, which is the dependency ADR-016 declined. See research R9.)
 
 ### Key Entities
 

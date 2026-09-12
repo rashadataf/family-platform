@@ -56,8 +56,9 @@ One item was raised rather than assumed away, and has since been addressed: the 
 originally named a **missing ADR** for the mobile framework and the styling approach. That gap is
 now closed by [ADR-016](../../../adr/ADR-016-mobile-client-and-styling.md), written alongside this
 specification and referenced from its Dependencies section. ADR-016 is `Proposed`; it must be
-`Accepted` before `/speckit-plan`, because planning around an open decision would make the plan's
-most consequential choice an undocumented one.
+`Accepted` before implementation begins, matching the wording in the specification's Dependencies
+section. Planning against a proposed decision is fine — planning is how you find out whether the
+decision survives contact with the work — but writing code against one is not.
 
 ADR-016's second decision matters to this checklist directly. By choosing plain token objects over
 a styling framework, it makes FR-006 true by construction, and it makes FR-008 and FR-009 depend on
