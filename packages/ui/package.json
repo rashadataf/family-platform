@@ -18,7 +18,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "react-native": "*"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
@@ -27,6 +28,7 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.39.1",
     "react": "19.2.3",
+    "react-native": "0.86.3",
     "typescript": "^5.9.3"
   }
 }

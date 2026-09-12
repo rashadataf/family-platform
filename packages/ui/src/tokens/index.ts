@@ -12,7 +12,13 @@
  */
 
 export { colour, type ColourRole, type ThemedColour, type ThemeName } from './colour.js';
-export { typography, type TypeFamily, type TypeStep, type TypeToken } from './typography.js';
+export {
+  typography,
+  type TypeFamily,
+  type FontWeight,
+  type TypeStep,
+  type TypeToken,
+} from './typography.js';
 export { space, type Space } from './space.js';
 export { radius, type Radius, type RadiusToken } from './radius.js';
 export { elevation, type ElevationToken } from './elevation.js';

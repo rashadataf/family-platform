@@ -321,3 +321,46 @@ enforcement in the foundational phase rather than treating it as polish.
 `text.onAction` at 4.49 is the one worth pausing on. It is indistinguishable from 4.50 to any human
 eye, and it failed. Rounding a value down to "basically fine" is exactly the judgement a design
 system exists to remove, so it was fixed like the others.
+
+---
+
+## R13. `react-native` cannot be imported from a `.spec.ts` file (found during implementation)
+
+**Finding**: The first attempt at a unit test for a primitive's supporting code (`typeStepToTextStyle`,
+which converts a `TypeStep` into React Native `Text` style properties) failed before a single
+assertion ran. Vitest's transform pipeline (Rolldown) refused to parse `react-native`'s own source:
+
+```
+RolldownError: Parse failure: Parse failed with 1 error:
+Flow is not supported
+  File: .../node_modules/react-native/index.js:1:0
+```
+
+`react-native`'s package source is written in Flow, Meta's own type checker, not plain JS or
+TypeScript. Metro strips it via `babel-preset-expo`/`metro-react-native-babel-preset` at bundle time;
+Vitest has no such transform in its pipeline and was never going to grow one for this feature, per R6's
+"no second test runner is introduced". The practical effect is broader than R6's original scope:
+**not just component rendering**, but any module reached from a `.spec.ts` file, is untestable the
+moment it holds a real (not type-only) `import` from `react-native` — even a single `Platform.select`
+call is enough, because the import is not erased.
+
+**Decision**: split every primitive's presentation-adjacent logic at this exact seam. Pure
+computation (unit conversion, lookup tables, anything `.spec.ts` needs to reach) lives in its own
+module with no `react-native` import at all — `internal/tracking.ts` and `internal/font-weight.ts`,
+both unit-tested. The thin composition that actually calls into `react-native` (`Platform.select`,
+the final RN-shaped style object) lives in a separate file that imports it and is not unit-tested,
+consistent with R6.
+
+**Rationale**: This is a *structural* rule, not a per-file judgement call — a file that imports
+`react-native` is untestable here regardless of how simple its logic is, so the split has to happen
+before writing the logic, not be noticed afterwards. Every future primitive and pattern with
+non-trivial pure logic (a state-precedence rule, a formatting helper) should expect the same split.
+
+**Alternatives considered**:
+
+- Adding a Flow-stripping Babel transform to Vitest's config — solves this one import, but is exactly
+  the "second test runner's worth of configuration" R6 declined to take on, for a project that has
+  deliberately kept its testing surface narrow.
+- Testing `typeStepToTextStyle` itself by mocking `react-native` — adds a mock to maintain for a
+  three-line `Platform.select` table, and would not generalise to the next file with real RN logic
+  worth testing on its own.

@@ -18,12 +18,19 @@
  */
 export type TypeFamily = 'sans' | 'serif' | 'mono';
 
+/**
+ * Closed rather than `number`: every step below uses one of these four, and
+ * a fifth would need a decision (a new weight in the type family, not a typo)
+ * — the same reasoning FR-009 applies to space and radius, applied here too.
+ */
+export type FontWeight = 400 | 500 | 600 | 700;
+
 export interface TypeStep {
   readonly family: TypeFamily;
   /** Points on both platforms. Never a unitless multiplier — it resolves differently. */
   readonly size: number;
   readonly lineHeight: number;
-  readonly weight: number;
+  readonly weight: FontWeight;
   readonly tracking: string;
 }
 
