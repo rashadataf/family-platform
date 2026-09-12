@@ -86,7 +86,7 @@ and T044 completes the screen.
 - [X] T023 [US1] `ThemeProvider` resolving one palette at the root — light only in this phase — in `packages/ui/src/theme/theme-provider.tsx` (FR-003)
 - [X] T024 [US1] `useTheme` returning resolved values and **no theme name**, so a consumer has nothing to branch on (FR-003), in `packages/ui/src/theme/use-theme.ts`
 - [X] T025 [P] [US1] Button — five variants, five states, three heights, width unchanged between states (FR-014), heights as floors per [research R8](research.md) — in `packages/ui/src/primitives/button/`
-- [ ] T026 [P] [US1] Field — every state from artboard 06, persistent visible label, search as the one documented exception (FR-015) — in `packages/ui/src/primitives/field/`
+- [X] T026 [P] [US1] Field — every state from artboard 06, persistent visible label, search as the one documented exception (FR-015) — in `packages/ui/src/primitives/field/`
 - [ ] T027 [P] [US1] The four row types with their loading forms at matching anatomy (FR-020) in `packages/ui/src/primitives/row/`
 - [ ] T028 [P] [US1] Surfaces — card, status pill, avatar with the id-derived colour, empty state, toast — in `packages/ui/src/primitives/surface/`
 - [ ] T029 [P] [US1] Navigation — tab bar, headers, segmented control, sheet, dialog — in `packages/ui/src/primitives/navigation/`
