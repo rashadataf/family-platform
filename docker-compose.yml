@@ -45,6 +45,14 @@ services:
       # the host-based flow and wrong inside this network; one .env cannot
       # serve both, and this override is the resolution (data-model.md §4).
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+      # Pass-through, not a value: `packages/persistence/prisma/seed.ts`'s
+      # founder-account fixture reads these directly. Unset locally (a plain
+      # `docker compose up` never sets them), so the seed script's own
+      # both-unset check skips it — only a staging deploy configured with
+      # Pulumi's `founderEmail`/`founderPassword` secrets exports them before
+      # this service runs (infrastructure/src/deploy.ts).
+      FOUNDER_EMAIL:
+      FOUNDER_PASSWORD:
     volumes:
       # The schema and migrations are bind-mounted, not just baked into the
       # image at build time. Without this, `docker compose up` reuses a cached

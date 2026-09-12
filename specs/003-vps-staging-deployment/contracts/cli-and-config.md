@@ -25,6 +25,7 @@ validation rules. Contract-relevant points:
 
 - Every field is read once, at program start, through a single Zod schema — `infrastructure/src/config.ts` — mirroring `apps/api/src/config/env.schema.ts`'s pattern. A caller (human or CI) that provides an invalid or missing required value gets a specific, named error before any resource is touched, not a partial deploy.
 - Secret fields (`vpsSshPrivateKey`, `postgresPassword`) are set once via `pulumi config set --secret <key> <value>` against the `vps-staging` stack and are never passed as CLI arguments to the scripts above — only `resetData` is ever passed inline, and it is not a secret.
+- `founderEmail` (plain) and `founderPassword` (secret) are optional, added by spec 006 for staging's own "founder dogfooding" purpose (`docs/staging-environment.md`) rather than any requirement of this spec — when both are set, every deploy ensures one already-verified account exists via `packages/persistence/prisma/seed.ts`, so the founder can log in without registering through Mailpit after every fresh deploy or `resetData` wipe. Half-configured (only one of the pair set) fails `loadStackConfig` before any resource is touched, the same as any other invalid config.
 
 ## CI trigger contract
 

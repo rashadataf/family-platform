@@ -21,6 +21,7 @@
   "dependencies": {
     "@fp/core": "workspace:*",
     "@fp/kernel": "workspace:*",
+    "@node-rs/argon2": "^2.2.1",
     "@prisma/client": "^6.16.3"
   },
   "devDependencies": {
