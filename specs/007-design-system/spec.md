@@ -245,13 +245,15 @@ is reachable there.
 
 ## Dependencies
 
-- **An ADR recording the mobile framework choice does not yet exist.** `ARCHITECTURE.md` §4 and §8
-  name Expo and React Native, and this specification assumes them, but `adr/` holds no record of
-  that decision, its alternatives or its trade-offs — unlike every other foundational technology in
-  this repository, each of which has one. A new application and a new user-interface framework is a
-  larger commitment than several decisions that did get an ADR. **This should be recorded as an ADR
-  and merged before implementation begins**, alongside the styling approach the package will use,
-  which is an equally consequential and equally unrecorded choice.
+- **The mobile framework and the styling approach are recorded in
+  [ADR-016](../../adr/ADR-016-mobile-client-and-styling.md)**, written alongside this specification
+  to close a governance gap: `ARCHITECTURE.md` §4 and §8 named Expo and React Native, but `adr/`
+  held no record of the decision, its alternatives or its cost — unlike every other foundational
+  technology in this repository. ADR-016 is currently `Proposed`. **It must be `Accepted` before
+  implementation begins**, because planning around it while it is still open would make the plan's
+  most consequential choice an undocumented one. Its second decision — plain token objects and no
+  styling framework — is what makes FR-006, FR-008 and FR-009 achievable as written, and it names
+  the lint rule those requirements depend on as work this feature has to do.
 - Two new workspace entries — a `ui` package and a `mobile` application — must be declared to the
   workspace and given boundary rules. The boundary gate fails closed, so a package matching no rule
   is an error, not an omission.
@@ -277,8 +279,8 @@ is reachable there.
 
 ## Assumptions
 
-- The mobile client is Expo and React Native, per `ARCHITECTURE.md` §4 and §8, pending the ADR
-  named under Dependencies.
+- The mobile client is Expo and React Native, and the package uses plain token objects rather than
+  a styling framework, per [ADR-016](../../adr/ADR-016-mobile-client-and-styling.md).
 - Components target mobile in this feature; only the token layer is required to be platform-neutral
   now. Making the components themselves render on the web is a later decision with its own cost.
 - The canvas at `design/` is the source of truth for values, and a change is made there first. The

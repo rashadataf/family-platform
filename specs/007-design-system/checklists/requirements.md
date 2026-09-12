@@ -52,8 +52,14 @@ reviewer can disagree with it:
   family member holds, not an implementation choice, so they are treated as user-facing. SC-001 was
   reworded from "fails the build" to "fails an automated check" during validation.
 
-One item is deliberately raised rather than assumed away: the specification names a **missing ADR**
-for the mobile framework and the styling approach under Dependencies, and asks for it to be merged
-before implementation. This is a governance gap in the repository, not a gap in this specification,
-but proceeding to `/speckit-plan` without it would make the plan's most consequential choice an
-undocumented one.
+One item was raised rather than assumed away, and has since been addressed: the specification
+originally named a **missing ADR** for the mobile framework and the styling approach. That gap is
+now closed by [ADR-016](../../../adr/ADR-016-mobile-client-and-styling.md), written alongside this
+specification and referenced from its Dependencies section. ADR-016 is `Proposed`; it must be
+`Accepted` before `/speckit-plan`, because planning around an open decision would make the plan's
+most consequential choice an undocumented one.
+
+ADR-016's second decision matters to this checklist directly. By choosing plain token objects over
+a styling framework, it makes FR-006 true by construction, and it makes FR-008 and FR-009 depend on
+a lint rule that does not exist yet. That rule is therefore real work this feature owns, not an
+assumed capability — the plan must schedule it, or three requirements are specified and unenforced.
