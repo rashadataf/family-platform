@@ -30,6 +30,12 @@ const WORKSPACE_GRAPH = {
   'apps/api': ['packages'],
   'apps/worker': ['packages'],
 
+  // The Expo client (spec 007, ADR-016). Deliberately narrow rather than
+  // granted the same `['packages']` wholesale as the backend apps above: it
+  // reaches only the design system it exists to consume. `packages/contracts`
+  // joins this list the day a feature branch first calls the API, not before.
+  'apps/mobile': ['packages/ui'],
+
   // Pure, dependency-free primitives every context and every layer may use
   // (ARCHITECTURE §6). Depends on nothing but npm packages and Node built-ins,
   // which the blanket rules above already allow.

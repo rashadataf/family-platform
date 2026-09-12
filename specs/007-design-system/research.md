@@ -264,6 +264,27 @@ moves with its SDK releases. This note deliberately records no version numbers: 
 would be stale by the time the work starts, and a stale version in a planning document is worse than
 an explicit instruction to check.
 
+**Confirmed at implementation (T006)**: SDK 57 was current. `react-native@0.86.3` requires Node
+`^22.13.0 || ^24.3.0 || >= 26.0.0` in its own `engines` field — `.nvmrc`'s Node 24 clears that floor,
+so no toolchain amendment was needed. Versions pinned to the published `expo-template-default@sdk-57`
+set rather than to each package's own `latest` tag, because that is the combination Expo actually
+tests together: `expo ~57.0.22`, `expo-router ~57.0.21`, `react 19.2.3`, `react-native 0.86.3`,
+`react-native-screens ~4.26.0`, `react-native-safe-area-context ~5.7.0`,
+`react-native-gesture-handler ~2.32.0`.
+
+`pnpm install` reported peer warnings, not errors, and the install succeeded (exit 0):
+`expo-router`'s web code path (`vaul`, `@radix-ui/*`) wants `react-dom`, and
+`expo-modules-core` wants a `react-native-worklets` range older than what resolved. Both are
+consistent with this feature's scope — no web target, no animation library — and are warnings
+pnpm does not fail closed on. They are not silently accepted: if a later spec adds
+`react-native-web` or `react-native-reanimated`, re-run `pnpm install` and expect the warning list
+to change shape, not just grow.
+
+Trimmed from the template on purpose, because none of it serves this spec: `@expo/ui`,
+`expo-splash-screen`, `expo-symbols`, `expo-system-ui`, `expo-device`, `expo-image`, `expo-font`,
+`expo-glass-effect`, `expo-web-browser`, `react-native-web`, `react-dom`, `react-native-reanimated`,
+`react-native-worklets`. Any of these is one `pnpm add` away from a future spec that needs it.
+
 ---
 
 ## R12. The palette did not pass its own contrast rule (found during implementation)

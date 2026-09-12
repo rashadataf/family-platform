@@ -35,11 +35,11 @@ app appears starts downloading React Native.
 
 - [X] T001 Declare `packages/ui` in the three places `verify-workspace-packages.ts` requires: a `COPY` line in the deps stage of `apps/api/Dockerfile`, a named `node_modules` volume in `docker-compose.yml`, and `'packages/ui': []` in `WORKSPACE_GRAPH` in `.dependency-cruiser.cjs` (FR-011). **No change to the verification script** — [research R2](research.md) records why its earlier proposed rewrite was based on a false premise
 - [X] T002 Add the `token-layer-imports-nothing` rule to `.dependency-cruiser.cjs`, making FR-006 a boundary failure rather than a review observation (see [contracts/package-api.md](contracts/package-api.md))
-- [ ] T003 Scope the deps-stage `pnpm install --frozen-lockfile` in `apps/api/Dockerfile` to what `@fp/api` and `@fp/worker` need, so the mobile app cannot pull React Native into every image build ([research R2](research.md)). **Must land before T006**, and the `image` gate must be re-run to prove it still builds
-- [ ] T004 Declare `apps/mobile` in the same three places, with `'apps/mobile': ['packages/ui']` in `WORKSPACE_GRAPH` — deliberately narrow; `packages/contracts` is added when a feature actually calls the API
+- [X] T003 Scope the deps-stage `pnpm install --frozen-lockfile` in `apps/api/Dockerfile` to what `@fp/api` and `@fp/worker` need, so the mobile app cannot pull React Native into every image build ([research R2](research.md)). **Must land before T006**, and the `image` gate must be re-run to prove it still builds
+- [X] T004 Declare `apps/mobile` in the same three places, with `'apps/mobile': ['packages/ui']` in `WORKSPACE_GRAPH` — deliberately narrow; `packages/contracts` is added when a feature actually calls the API
 - [X] T005 [P] Create `packages/ui` — `package.json` as `@fp/ui`, `tsconfig.json`, `tsconfig.build.json`, `eslint.config.js` — mirroring `packages/kernel`'s manifest shape exactly
-- [ ] T006 Create the Expo application in `apps/mobile` — `package.json`, `app.config.ts`, `tsconfig.json`, `eslint.config.js`
-- [ ] T007 Configure Metro for the pnpm workspace in `apps/mobile/metro.config.js` — `watchFolders` at the repository root, `resolver.nodeModulesPaths` for both app and root, symlink resolution left on ([research R1](research.md); `node-linker=hoisted` is **not** an option and the reason is recorded there)
+- [X] T006 Create the Expo application in `apps/mobile` — `package.json`, `app.config.ts`, `tsconfig.json`, `eslint.config.js`
+- [X] T007 Configure Metro for the pnpm workspace in `apps/mobile/metro.config.js` — `watchFolders` at the repository root, `resolver.nodeModulesPaths` for both app and root, symlink resolution left on ([research R1](research.md); `node-linker=hoisted` is **not** an option and the reason is recorded there)
 - [X] T008 Confirm the whole gate set is green with both packages still empty: `pnpm typecheck && pnpm lint && pnpm boundaries && pnpm verify:workspace && pnpm format:check`
 
 **Checkpoint**: Two empty packages exist and every gate passes. Nothing renders yet.
