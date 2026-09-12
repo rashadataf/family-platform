@@ -1,10 +1,15 @@
 import { Slot } from 'expo-router';
+import { ThemeProvider } from '@fp/ui';
 
 /**
- * Deliberately minimal (T006/T007): proves the router boots. `ThemeProvider`
- * wraps this in T023 — until then there is nothing here for a screen to
- * consume, so nothing is added prematurely.
+ * Theme resolution happens once, here, at the root (FR-003) — nothing
+ * beneath this reads or branches on light versus dark. `Slot` renders
+ * whichever route matched; the five destinations live under `(tabs)`.
  */
 export default function RootLayout() {
-  return <Slot />;
+  return (
+    <ThemeProvider>
+      <Slot />
+    </ThemeProvider>
+  );
 }
