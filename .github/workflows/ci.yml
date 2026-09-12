@@ -128,6 +128,12 @@ jobs:
       - run: pnpm verify:node-version
       - run: pnpm verify:action-pins
       - run: pnpm verify:workspace
+      # Spec 007 FR-010 and FR-012. Steps in this job rather than a job of
+      # their own, for the reason given above: branch protection names required
+      # checks by job name, and a new one would not be required until somebody
+      # remembered to add it.
+      - run: pnpm verify:contrast
+      - run: pnpm verify:design-tokens
 
   # Closes TODO(SECURITY_SCAN_TOOLING), open since the constitution was
   # ratified. Two scanners, because they fail differently.

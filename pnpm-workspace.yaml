@@ -39,3 +39,9 @@ overrides:
   # loader, so it is proved by running prisma generate, the build and the
   # migrator rather than assumed compatible.
   deepmerge-ts: '^8.0.2'
+  # GHSA-w5hq-g745-h8pq (HIGH, CVSS 7.5). Pulled in by `xcode` (spec 007,
+  # apps/mobile's Expo tooling) at v7.0.3, a major behind the fix. `xcode`
+  # only calls `uuid.v4()` to generate pbxproj entry ids — an API stable
+  # since uuid's early majors — so forcing the fixed version needs no proof
+  # beyond `pnpm typecheck`/`build` passing, which they do.
+  uuid: '^11.1.1'

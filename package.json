@@ -19,6 +19,8 @@
     "verify:action-pins": "tsx scripts/verify-action-pins.ts",
     "verify:suppressions": "tsx scripts/verify-suppressions.ts",
     "verify:workspace": "tsx scripts/verify-workspace-packages.ts",
+    "verify:contrast": "tsx scripts/verify-contrast.ts",
+    "verify:design-tokens": "tsx scripts/verify-design-tokens.ts",
     "typecheck": "turbo run typecheck typecheck:workspace-root",
     "typecheck:workspace-root": "tsc -p scripts/tsconfig.json",
     "lint": "turbo run lint lint:workspace-root",
@@ -33,7 +35,7 @@
     "staging:deploy": "pulumi up --cwd infrastructure --stack vps-staging --yes",
     "staging:deploy:reset": "pulumi up --cwd infrastructure --stack vps-staging --yes --config resetData=true",
     "staging:destroy": "pulumi state unprotect --cwd infrastructure --stack vps-staging --all --yes && pulumi destroy --cwd infrastructure --stack vps-staging --yes",
-    "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm test:integration && pnpm format:check && pnpm verify:env && pnpm verify:node-version && pnpm verify:action-pins && pnpm verify:suppressions && pnpm verify:workspace && pnpm build"
+    "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm test && pnpm test:integration && pnpm format:check && pnpm verify:env && pnpm verify:node-version && pnpm verify:action-pins && pnpm verify:suppressions && pnpm verify:workspace && pnpm verify:contrast && pnpm verify:design-tokens && pnpm build"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",

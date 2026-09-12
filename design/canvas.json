@@ -1,0 +1,183 @@
+{
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Foundations"
+    },
+    {
+      "id": "page-2",
+      "name": "Components"
+    },
+    {
+      "id": "page-3",
+      "name": "Screens"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 0,
+      "w": 940,
+      "h": 2900,
+      "title": "01 Colour"
+    },
+    {
+      "file": "Typography.dc.html",
+      "page": "page-1",
+      "x": 1020,
+      "y": 0,
+      "w": 940,
+      "h": 2150,
+      "title": "02 Typography"
+    },
+    {
+      "file": "Spacing.dc.html",
+      "page": "page-1",
+      "x": 2040,
+      "y": 0,
+      "w": 940,
+      "h": 2200,
+      "title": "03 Space, shape, hit area"
+    },
+    {
+      "file": "Grid.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 3020,
+      "w": 1520,
+      "h": 1900,
+      "title": "04 Layout and platform"
+    },
+    {
+      "file": "Buttons.dc.html",
+      "page": "page-2",
+      "x": 0,
+      "y": 0,
+      "w": 1000,
+      "h": 2050,
+      "title": "05 Buttons"
+    },
+    {
+      "file": "Inputs.dc.html",
+      "page": "page-2",
+      "x": 1080,
+      "y": 0,
+      "w": 1000,
+      "h": 1900,
+      "title": "06 Fields"
+    },
+    {
+      "file": "Surfaces.dc.html",
+      "page": "page-2",
+      "x": 2160,
+      "y": 0,
+      "w": 1000,
+      "h": 1500,
+      "title": "07 Rows and surfaces"
+    },
+    {
+      "file": "Navigation.dc.html",
+      "page": "page-2",
+      "x": 0,
+      "y": 2170,
+      "w": 1000,
+      "h": 1500,
+      "title": "08 Navigation"
+    },
+    {
+      "file": "Patterns.dc.html",
+      "page": "page-2",
+      "x": 1080,
+      "y": 2170,
+      "w": 1000,
+      "h": 2450,
+      "title": "09 Non-negotiable patterns"
+    },
+    {
+      "file": "Identity.dc.html",
+      "page": "page-3",
+      "x": 0,
+      "y": 0,
+      "w": 1330,
+      "h": 2200,
+      "title": "10 Identity and access"
+    },
+    {
+      "file": "Dashboard.dc.html",
+      "page": "page-3",
+      "x": 1410,
+      "y": 0,
+      "w": 900,
+      "h": 1270,
+      "title": "11 Today"
+    },
+    {
+      "file": "Vault.dc.html",
+      "page": "page-3",
+      "x": 2390,
+      "y": 0,
+      "w": 900,
+      "h": 1270,
+      "title": "12 Document vault"
+    },
+    {
+      "file": "Family.dc.html",
+      "page": "page-3",
+      "x": 1410,
+      "y": 1390,
+      "w": 900,
+      "h": 1270,
+      "title": "13 Family and child record"
+    },
+    {
+      "file": "Web.dc.html",
+      "page": "page-3",
+      "x": 2390,
+      "y": 1390,
+      "w": 1520,
+      "h": 1280,
+      "title": "14 Desktop"
+    },
+    {
+      "file": "IdentityStates.dc.html",
+      "page": "page-3",
+      "x": 0,
+      "y": 2790,
+      "w": 1760,
+      "h": 2100,
+      "title": "15 Identity \u2014 the remaining states"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-foundations",
+      "page": "page-1",
+      "x": -340,
+      "y": 0,
+      "w": 260,
+      "text": "FOUNDATIONS\n\nThese four boards are the contract. Everything else in the product is assembled from them.\n\nRead a value here, and it is the value \u2014 the artboards are drawn at true size, so a 48px control really is 48px on screen.\n\nWhen this becomes packages/ui, these four boards are what the token file has to contain. Nothing in Components or Screens introduces a value that is not on this page."
+    },
+    {
+      "id": "note-components",
+      "page": "page-2",
+      "x": -340,
+      "y": 0,
+      "w": 260,
+      "text": "COMPONENTS\n\nEvery state is drawn rather than triggered, so nothing that a developer has to build is left undocumented.\n\nBoard 09 is the one to read first. Those four patterns are not style choices \u2014 each one is a constitution principle that only exists if the interface carries it, and each names the rule it comes from."
+    },
+    {
+      "id": "note-screens",
+      "page": "page-3",
+      "x": -340,
+      "y": 0,
+      "w": 260,
+      "text": "SCREENS\n\nAssembled only from Components, using only Foundations values. If a screen here needed something new, it went back into a component board first.\n\nContent is realistic sample data, not real records. The household, the names and the document ids are invented.\n\nBoards 10 and 15 together cover spec 006: 10 is the paths taken when things go right, 15 is every other state the spec requires. Frame labels cite the acceptance scenario.\n\nBoard 14 is the same system at 1440px: no new components, a rail instead of a tab bar, 40px controls instead of 48."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-1"
+  }
+}
