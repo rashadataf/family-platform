@@ -364,3 +364,35 @@ non-trivial pure logic (a state-precedence rule, a formatting helper) should exp
 - Testing `typeStepToTextStyle` itself by mocking `react-native` — adds a mock to maintain for a
   three-line `Platform.select` table, and would not generalise to the next file with real RN logic
   worth testing on its own.
+
+---
+
+## R14. A new workspace package needs a fourth declaration site, not three (found via CI)
+
+**Finding**: `pnpm boundaries` passed locally after every commit through T030, and failed in CI the moment
+`apps/mobile` first imported `@fp/ui`. The error was `no-unresolvable` — dependency-cruiser could not find
+`@fp/ui` at all on a fresh checkout.
+
+**Root cause**: `.dependency-cruiser.cjs`'s own comment explains why cross-package edges resolve through
+source, not `dist/`: "resolving through dist instead would make the gate depend on build state... on a
+clean checkout... there would be no dist and so no cross-package edges." The mechanism is
+`tsconfig.depcruise.json`, which maps every cross-package bare specifier (`@fp/kernel`, `@fp/core`,
+`@fp/persistence`, ...) straight to its source entry point. `@fp/ui` was never added to that map when
+`packages/ui` was created (T005) — invisible locally because `packages/ui/dist/` already existed from
+running `pnpm --filter @fp/ui build` repeatedly in the same working tree, which dependency-cruiser's
+generic `enhancedResolveOptions` resolution found and used as a fallback. A CI runner has no such leftover
+`dist/`, so the fallback had nothing to find.
+
+**Decision**: added `@fp/ui` and `@fp/ui/tokens` to `tsconfig.depcruise.json`. Verified by deleting
+`packages/ui/dist` locally and re-running `pnpm boundaries` before trusting the fix — the same discipline
+R12 and T032 already established: a fix to an environment-dependent check is not verified until proven in
+the state that actually breaks (here, no local `dist/` standing in for CI's fresh one).
+
+**The general lesson, for the next new package**: `verify-workspace-packages.ts` catches a missing
+Dockerfile `COPY`, compose volume, and `WORKSPACE_GRAPH` entry — three of the four places a new package
+must be declared. `tsconfig.depcruise.json` is the fourth, and nothing currently checks it. It is only
+needed for a package something else imports by bare specifier under a `boundaries` job that does not
+build first — which is every package with a dependent, i.e. every package that is not a leaf app. Adding
+it as a fourth check to `verify-workspace-packages.ts` was considered and deferred: detecting "is this
+package imported by bare specifier anywhere" is real static analysis, not a text match against three
+fixed filenames, and this finding was caught by CI within one push regardless.

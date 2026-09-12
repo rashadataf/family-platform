@@ -9,7 +9,9 @@
       "@fp/core": ["packages/core/src/index.ts"],
       "@fp/contracts": ["packages/contracts/src/index.ts"],
       "@fp/platform": ["packages/platform/src/index.ts"],
-      "@fp/config-eslint": ["packages/config-eslint/index.js"]
+      "@fp/config-eslint": ["packages/config-eslint/index.js"],
+      "@fp/ui": ["packages/ui/src/index.ts"],
+      "@fp/ui/tokens": ["packages/ui/src/tokens/index.ts"]
     }
   }
 }

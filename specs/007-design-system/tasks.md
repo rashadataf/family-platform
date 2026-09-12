@@ -91,8 +91,8 @@ and T044 completes the screen.
 - [X] T028 [P] [US1] Surfaces — card, status pill, avatar with the id-derived colour, empty state, toast — in `packages/ui/src/primitives/surface/`
 - [X] T029 [P] [US1] Navigation — tab bar, headers, segmented control, sheet, dialog — in `packages/ui/src/primitives/navigation/`
 - [X] T030 [US1] The five Expo Router destinations in the order artboard 08 fixes (FR-026) in `apps/mobile/src/app/`
-- [ ] T031 [US1] Today assembled from `@fp/ui` only, from static sample content, in `apps/mobile/src/app/index.tsx` (SC-001, FR-027 — no network call)
-- [ ] T032 [US1] **Prove the enforcement fires**: write `padding: 13` and a literal hex into a screen, confirm `pnpm lint` and `pnpm typecheck` fail naming file, line and value, then revert. A check never seen to fail has not been verified
+- [X] T031 [US1] Today assembled from `@fp/ui` only, from static sample content, in `apps/mobile/src/app/index.tsx` (SC-001, FR-027 — no network call)
+- [X] T032 [US1] **Prove the enforcement fires**: write `padding: 13` and a literal hex into a screen, confirm `pnpm lint` and `pnpm typecheck` fail naming file, line and value, then revert. A check never seen to fail has not been verified
 
 **Checkpoint**: The app boots to Today in light mode, and a literal value cannot reach `main`.
 

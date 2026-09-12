@@ -1,8 +1,15 @@
 // @ts-check
 import fpConfig from '@fp/config-eslint';
+import designSystem from '@fp/config-eslint/design-system.js';
 
 export default [
   ...fpConfig,
+  // T032 found this missing: packages/ui enforces FR-008/FR-009 on itself,
+  // but apps/mobile — where a screen actually WRITES a style object using
+  // @fp/ui — never had the rule wired in at all. A literal hex or an
+  // off-scale spacing value in a screen file passed lint silently until
+  // this was added; "prove the enforcement fires" caught its own gap.
+  ...designSystem,
   {
     ignores: ['.expo/**', 'dist/**'],
   },
