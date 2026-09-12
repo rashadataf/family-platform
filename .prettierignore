@@ -13,3 +13,11 @@ pnpm-lock.yaml
 .specify/
 adr/
 **/src/generated/
+
+# The design canvas artboards are generated, not hand-written: `design/*.dc.html`
+# and `canvas.json` are emitted by the seed pipeline and re-emitted in full on
+# every change, so formatting them here would desync them from their generator
+# and produce a diff on every regeneration. Prettier's HTML formatter also
+# introduces line breaks between inline elements, and a whitespace text node
+# inside a flex container is a layout change, not a cosmetic one.
+design/

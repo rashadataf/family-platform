@@ -11,3 +11,11 @@ packages/persistence/src/generated/
 # next to the Pulumi program on whichever machine runs `pulumi up` — build
 # artifacts regenerated on every deploy, never meant to be committed.
 infrastructure/*.tar
+
+# The seeded design canvas (design/*.html) embeds a ~2MB copy of the canvas
+# editor alongside the artboards, and it is regenerated in full by the seed
+# step on every change. The artboard sources next to it (design/*.dc.html and
+# design/canvas.json) ARE tracked — they are what the canvas is rebuilt from,
+# and a token change is meant to read as a reviewable diff.
+design/*.html
+!design/*.dc.html

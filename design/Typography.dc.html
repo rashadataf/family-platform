@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,300..500&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #FAF7F2; color: #1F1B16;
+      font-family: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #8A4A2C; text-decoration: none; }
+    a:hover { color: #B4603A; }
+    .serif { font-family: 'Newsreader', Georgia, 'Times New Roman', serif; }
+    .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-variant-ligatures: none; }
+  </style>
+</helmet>
+<div style="width: 940px; padding: 40px; background: #FAF7F2; display: flex; flex-direction: column; gap: 36px;">
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #8A8073;">FOUNDATIONS &middot; 02</div>
+    <div class="serif" style="font-size: 40px; line-height: 44px; font-weight: 400; letter-spacing: -0.01em;">Typography</div>
+    <div style="font-size: 15px; line-height: 23px; color: #5C544A; max-width: 620px; text-wrap: pretty;">Two faces and the system monospace. Newsreader sets dates and screen titles and is never used below 20px, because a serif at 13px on a phone is unreadable in daylight. Instrument Sans does everything else, and mono is reserved for machine identifiers. Thirteen steps, and a screen that needs a fourteenth is a screen with too much on it.</div>
+  </div>
+  <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1F1B16; padding-bottom: 10px; border-bottom: 1px solid #1F1B16;">The scale<span style="font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #8A8073; margin-left: 12px;">shown at true size &mdash; measure these, they are not illustrations</span></div>
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="serif" style="font-size: 34px; line-height: 38px; font-weight: 400; letter-spacing: -0.01em; color: #1F1B16; text-wrap: pretty;">Thursday 12 September</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">display.lg</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Newsreader &middot; 34/38 &middot; 400 &middot; -0.01em</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Screen title at the top of a scroll. One per screen.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="serif" style="font-size: 25px; line-height: 30px; font-weight: 400; letter-spacing: 0; color: #1F1B16; text-wrap: pretty;">Documents expiring soon</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">display.sm</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Newsreader &middot; 25/30 &middot; 400 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Section headers and standalone dates.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -0.005em; color: #1F1B16; text-wrap: pretty;">Ella&rsquo;s passport</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">title.lg</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 20/26 &middot; 600 &middot; -0.005em</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Card titles, sheet titles, dialog titles.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 17px; line-height: 23px; font-weight: 600; letter-spacing: 0; color: #1F1B16; text-wrap: pretty;">Nursery pickup</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">title.sm</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 17/23 &middot; 600 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">List row primary line. The most-used title.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 16px; line-height: 24px; font-weight: 400; letter-spacing: 0; color: #1F1B16; text-wrap: pretty;">Renewals take up to ten weeks at present.</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">body.lg</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 16/24 &middot; 400 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Reading copy in sheets and empty states.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 15px; line-height: 22px; font-weight: 400; letter-spacing: 0; color: #1F1B16; text-wrap: pretty;">Added by Rashad on 4 September</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">body.md</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 15/22 &middot; 400 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Default UI text. When in doubt, this one.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 13px; line-height: 19px; font-weight: 400; letter-spacing: 0; color: #1F1B16; text-wrap: pretty;">Guardians only &middot; every read is logged</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">body.sm</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 13/19 &middot; 400 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Metadata and helper text under a field.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 15px; line-height: 20px; font-weight: 600; letter-spacing: 0.005em; color: #1F1B16; text-wrap: pretty;">Confirm expiry date</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">label.lg</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 15/20 &middot; 600 &middot; 0.005em</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Button labels at 48 and 56px heights.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 13px; line-height: 16px; font-weight: 600; letter-spacing: 0.005em; color: #1F1B16; text-wrap: pretty;">Add document</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">label.sm</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 13/16 &middot; 600 &middot; 0.005em</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Field labels, chips, and 40px buttons.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.01em; color: #1F1B16; text-wrap: pretty;">2 days ago</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">caption</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 12/16 &middot; 500 &middot; 0.01em</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Timestamps and counts. The floor for any text.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 11px; line-height: 14px; font-weight: 700; letter-spacing: 0.08em; color: #1F1B16; text-transform: uppercase; text-wrap: pretty;">THIS WEEK</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">overline</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 11/14 &middot; 700 &middot; 0.08em</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Eyebrow above a section. Always uppercase.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="" style="font-size: 15px; line-height: 22px; font-weight: 500; letter-spacing: 0; color: #1F1B16; font-variant-numeric: tabular-nums; text-wrap: pretty;">15:30 &middot; 12/09/2026 &middot; &pound;84.50</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">numeric</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">Instrument Sans &middot; 15/22 &middot; 500 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Times, dates, money. Tabular figures, always.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: baseline; padding: 18px 0;">
+      <div class="mono" style="font-size: 11px; line-height: 16px; font-weight: 400; letter-spacing: 0; color: #1F1B16; text-wrap: pretty;">passport-expiry rule v3 &middot; document 8f2c</div>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">mono</div>
+        <div class="mono" style="font-size: 11px; line-height: 16px; color: #8A8073;">System mono &middot; 11/16 &middot; 400 &middot; 0</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Rule ids, versions, document ids. Never prose.</div>
+      </div>
+    </div>
+  </div>
+  <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1F1B16; padding-bottom: 10px; border-bottom: 1px solid #1F1B16;">Rules</div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 7px; padding: 18px 20px;
+      background: #FFFFFF; border: 1px solid #E7E0D5; border-radius: 12px;">
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #B4603A;">Measure</div>
+      <div style="font-size: 13.5px; line-height: 20px; color: #1F1B16; text-wrap: pretty;">Body copy is capped at 62 characters. A 390px phone reaches about 48 characters of body.md inside the 24px inset, so the cap only ever binds on tablet and web — where it means a column, never the full window width.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 7px; padding: 18px 20px;
+      background: #FFFFFF; border: 1px solid #E7E0D5; border-radius: 12px;">
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #B4603A;">Sizes per screen</div>
+      <div style="font-size: 13.5px; line-height: 20px; color: #1F1B16; text-wrap: pretty;">At most three type steps in one screen region. A row with a title, a subtitle, a time and a badge is four, and one of them is a badge, not text.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 7px; padding: 18px 20px;
+      background: #FFFFFF; border: 1px solid #E7E0D5; border-radius: 12px;">
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #B4603A;">Fallbacks</div>
+      <div style="font-size: 13.5px; line-height: 20px; color: #1F1B16; text-wrap: pretty;">Newsreader falls back to Georgia, Instrument Sans to Helvetica Neue. Both are metric-close, so an export or a font failure shifts line breaks but never the layout.</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 7px; padding: 18px 20px;
+      background: #FFFFFF; border: 1px solid #E7E0D5; border-radius: 12px;">
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #B4603A;">Never</div>
+      <div style="font-size: 13.5px; line-height: 20px; color: #1F1B16; text-wrap: pretty;">No italic for emphasis in UI, weight carries it. No letter-spacing on body sizes. No text below 12px, with one exception: the 11px overline and mono steps, which are short, uppercase or numeric, and never the only place a fact appears.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
