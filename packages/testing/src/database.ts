@@ -225,7 +225,32 @@ export function prepareTestDatabase(): Promise<TestDatabase> {
     // @fp/persistence — which reads DATABASE_URL when it first connects —
     // never touches the development one.
     process.env.DATABASE_URL = target.url;
+
+    // A second env var, propagated to worker processes the same way
+    // `DATABASE_URL` is (`vitest-global-setup.ts`'s own comment on why this
+    // must happen before workers fork): a test that needs the owner
+    // connection — to read `audit_log`, which the application role cannot
+    // (ADR-017) — must not call `prepareTestDatabase()` itself to get one.
+    // This module's `prepared` cache is per-process; a worker importing this
+    // file fresh would re-run everything above against an ALREADY-suffixed
+    // `DATABASE_URL` and double-suffix the name. Reading the env var this
+    // process already resolved is the only correct path from a worker.
+    process.env.TEST_DATABASE_OWNER_URL = target.ownerUrl;
     return target;
   })();
   return prepared;
+}
+
+/**
+ * The owner connection to the SAME test database `DATABASE_URL` already
+ * points the application role at — for test verification only (reading
+ * `audit_log`, which the application role has no `SELECT` grant on). See
+ * `prepareTestDatabase`'s comment on why this reads an env var rather than
+ * calling `prepareTestDatabase()` again.
+ */
+export function resolvedTestDatabaseOwnerUrl(): string {
+  return requireEnv(
+    'TEST_DATABASE_OWNER_URL',
+    'Not set — this must be read after prepareTestDatabase() has run in this process (normally via globalSetup), not before.',
+  );
 }

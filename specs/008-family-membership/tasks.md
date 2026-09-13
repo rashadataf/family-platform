@@ -271,10 +271,13 @@ as its owner and the owner capabilities resolved, with no other feature required
       `POST /v1/families` returns 201, creates exactly one owner member linked to the caller, and
       rejects a missing name with `422 family/name_required`. Also covers ADR-006's
       `Idempotency-Key` replay (see T043's note). The "same transaction" half of this task's
-      original wording is instead a unit test on `createFamily` itself
-      (`create-family.command.spec.ts`, against the fake unit of work) — `apps/api` cannot reach
-      the outbox table directly (`persistence-client-is-private`), so asserting a raw row from
-      here was never possible; the command test asserts the same fact at the layer that can see it.
+      original wording is a unit test on `createFamily` itself (`create-family.command.spec.ts`,
+      against the fake unit of work) rather than a row read back from `apps/api` — corrected by
+      T046's discovery that `outbox_event` (unlike `audit_log`) DOES carry a `SELECT` grant for the
+      application role, reachable from a test via `@fp/testing`'s `withDatabase`; T046 uses that
+      path directly, and this note is left here only because a straight re-read of `outbox_event`
+      still would not have shown the writes landed in the SAME transaction, which the command test
+      is what actually proves.
 - [X] T035 [P] [US1] Integration test `apps/api/src/family/list-families.integration.spec.ts`:
       `GET /v1/families` returns only the caller's memberships with capabilities present and role
       names not load-bearing; a user in two families sees both and not a third (FR-024).
@@ -352,52 +355,78 @@ and a second adult member with no guardianship cannot read the child's details.
 
 ### Tests for User Story 2
 
-- [ ] T045 [P] [US2] Unit test `packages/core/src/family/domain/guardianship.spec.ts`: eligibility
+- [X] T045 [P] [US2] Unit test `packages/core/src/family/domain/guardianship.spec.ts`: eligibility
       is `owner`/`adult` and `kind = adult` only (FR-006); the last-guardian rule refuses all three
       routes to zero guardians (FR-008).
-- [ ] T046 [P] [US2] Integration test `apps/api/src/family/add-child.integration.spec.ts`: the
+- [X] T046 [P] [US2] Integration test `apps/api/src/family/add-child.integration.spec.ts`: the
       created member has no `user_id`, no credential and no verification email; the adder is a
-      guardian; both `MemberAdded` and `GuardianshipEstablished` outbox rows are written in the same
-      transaction.
-- [ ] T047 [P] [US2] Integration test `apps/api/src/family/child-access.integration.spec.ts` — the
+      guardian; both `MemberAdded` and `GuardianshipEstablished` outbox rows are written for the
+      same aggregate (read back via `@fp/testing`'s `withDatabase` — `outbox_event`, unlike
+      `audit_log`, carries a `SELECT` grant for the application role, so this is a real read, not a
+      stand-in).
+- [X] T047 [P] [US2] Integration test `apps/api/src/family/child-access.integration.spec.ts` — the
       test this whole feature exists for. **An `owner` who is not a guardian is denied; a `viewer`
       who is a guardian is allowed.** Both directions, because either alone would still pass with
-      role-based logic and the point is that guardianship is not a capability.
-- [ ] T048 [P] [US2] Integration test in `apps/api/src/family/child-access.integration.spec.ts`:
+      role-based logic and the point is that guardianship is not a capability. The viewer-guardian
+      state is reached by direct seeding (`seedChild`'s `guardianMemberId` param), not through
+      `POST …/guardians` — that route correctly refuses to GRANT a new guardianship to an
+      ineligible member (FR-006, its own test alongside this one), so the only way to observe an
+      already-existing one on a viewer is the state FR-008 describes as legitimate: a guardian's
+      role changing away from eligible (US5, not yet built) does not itself end their guardianship.
+- [X] T048 [P] [US2] Integration test in `apps/api/src/family/child-access.integration.spec.ts`:
       `GET …/members` omits `dateOfBirth` for
       every child the caller does not guard — the key absent, not null, so the response shape
       carries no oracle.
-- [ ] T049 [P] [US2] Integration test `apps/api/src/family/child-audit.integration.spec.ts`: a
+- [X] T049 [P] [US2] Integration test `apps/api/src/family/child-audit.integration.spec.ts`: a
       granted read and a denied read each write exactly one `audit_log` row carrying actor, subject,
       purpose and result. A missing denial row is a failure even when the API behaved correctly —
-      Principle VI logs reads, not only mutations.
+      Principle VI logs reads, not only mutations. Reading `audit_log` back needed new
+      infrastructure: the application role holds no `SELECT` on it by design (ADR-017), so
+      `packages/testing` gained `readAuditLogRows` (a raw `pg` client against the OWNER connection —
+      the one path that can actually see these rows) and `resolvedTestDatabaseOwnerUrl()`. The
+      latter reads an env var (`TEST_DATABASE_OWNER_URL`) that `prepareTestDatabase()` now also
+      sets, rather than calling `prepareTestDatabase()` again from a test file — that function's own
+      cache is per-process, and `globalSetup` runs in a different process than the test files, so a
+      second call would re-derive the test database name from an ALREADY-suffixed `DATABASE_URL`
+      and double-suffix it (caught by running this exact mistake first).
 
 ### Implementation for User Story 2
 
-- [ ] T050 [US2] Implement the guardianship entity and eligibility policy in
+- [X] T050 [US2] Implement the guardianship entity and eligibility policy in
       `packages/core/src/family/domain/guardianship.ts`, and the `assertGuardianCoverage` rule the
       three mutating paths share.
-- [ ] T051 [US2] Implement `guardianship.repository.ts` in
+- [X] T051 [US2] Implement `guardianship.repository.ts` in
       `packages/persistence/src/repositories/family/`.
-- [ ] T052 [US2] Implement `addMember` (child path) in
+- [X] T052 [US2] Implement `addMember` (child path) in
       `packages/core/src/family/application/commands/add-member.command.ts`: member, guardianship
-      and both outbox rows in one transaction (FR-005).
-- [ ] T053 [US2] Implement `readMember` in
+      and both outbox rows in one transaction (FR-005). Implemented the `extended` path (FR-014,
+      originally T071/US4) in the same file: `FamilyMember.createUnlinked` already generalises over
+      both, so gating `extended` out here and re-adding it later would have been pure churn.
+- [X] T053 [US2] Implement `readMember` in
       `packages/core/src/family/application/queries/read-member.query.ts`: the guardianship gate for
       a child subject, and an audit append on **both** outcomes, inside the transaction on the
       granted path.
-- [ ] T054 [US2] Implement `listMembers` in
+- [X] T054 [US2] Implement `listMembers` in
       `packages/core/src/family/application/queries/list-members.query.ts` with per-row field
       omission for unguarded children. Omission happens in the query, not the controller — a
       serialization-layer filter is one refactor away from being forgotten.
-- [ ] T055 [US2] Implement `grantGuardianship` and `endGuardianship` in
+- [X] T055 [US2] Implement `grantGuardianship` and `endGuardianship` in
       `packages/core/src/family/application/commands/`, both publishing
-      `GuardianshipEstablished` / enforcing FR-008 respectively.
-- [ ] T056 [US2] Add, to `packages/contracts/src/v1/family.contract.ts` and
+      `GuardianshipEstablished` / enforcing FR-008 respectively. `grantGuardianship` treats an
+      already-active pair as success rather than a new error type, matching the unique partial
+      index's own semantics. `endGuardianship` has no replacement parameter (the route names none),
+      so it can only refuse outright when this is the last guardian — a caller wanting to swap the
+      sole guardian grants the replacement first, in a separate call.
+- [X] T056 [US2] Add, to `packages/contracts/src/v1/family.contract.ts` and
       `apps/api/src/family/family.controller.ts`: `POST /v1/families/:familyId/members`, `GET …/members`,
       `GET …/members/:memberId`, `POST …/members/:memberId/guardians` and
       `DELETE …/guardians/:guardianMemberId` to the contract and the controller, with
-      `AddMemberRequest`'s `kind` union deliberately omitting `'adult'`.
+      `AddMemberRequest`'s `kind` union deliberately omitting `'adult'`. `addMember` also honours
+      `Idempotency-Key` (contracts/family-api.md's own requirement), scoped by family as well as by
+      caller (`${familyId}:${key}`) so the same key reused across two families never collides.
+      Dropped `displayName`'s `.min(1)` for the same reason `familyNameSchema` dropped its own in
+      T043 — it was pre-empting `FamilyMember.createUnlinked`'s own `422 family/name_required`
+      with a generic `400`.
 
 **Checkpoint**: quickstart Scenario 2 passes, audit rows included. The platform's core privacy
 promise is enforced and tested.

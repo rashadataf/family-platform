@@ -4,12 +4,18 @@ import type { AppRoute, ServerInferResponses } from '@ts-rest/core';
 import { TsRestHandler, tsRestHandler, type TsRestRequestShape } from '@ts-rest/nest';
 import { familyContract } from '@fp/contracts';
 import { family } from '@fp/core';
-import { asFamilyId, asFamilyMemberId, type Clock, type IdempotencyPort } from '@fp/kernel';
+import {
+  asFamilyId,
+  asFamilyMemberId,
+  asGuardianshipId,
+  type Clock,
+  type IdempotencyPort,
+} from '@fp/kernel';
 import { hashIdempotentRequest, readIdempotencyKey } from '../common/idempotency.js';
 import type { RequestWithIdentityContext } from '../identity/session.guard.js';
 import { SessionGuard } from '../identity/session.guard.js';
 import { CapabilityGuard, RequiresCapability } from './capability.guard.js';
-import { FamilyMembershipGuard } from './family-membership.guard.js';
+import { FamilyMembershipGuard, type RequestWithFamilyContext } from './family-membership.guard.js';
 import {
   FAMILY_CLOCK,
   FAMILY_DIRECTORY,
@@ -17,9 +23,18 @@ import {
   IDEMPOTENCY_STORE,
 } from './family.tokens.js';
 
-/** `createFamily`'s own `@Req()` needs one header `RequestWithIdentityContext` doesn't declare. */
+/** A handler's own `@Req()` needs one header neither base request type declares. */
 interface RequestWithIdempotencyKey extends RequestWithIdentityContext {
   headers: RequestWithIdentityContext['headers'] & { 'idempotency-key'?: string };
+}
+
+interface RequestWithFamilyContextAndIdempotencyKey extends RequestWithFamilyContext {
+  headers: RequestWithFamilyContext['headers'] & { 'idempotency-key'?: string };
+}
+
+/** `@db.Date` columns round-trip as `Date`; the wire only ever sees the date part. */
+function toIsoDate(date: Date | null): string | null {
+  return date === null ? null : date.toISOString().slice(0, 10);
 }
 
 /**
@@ -229,6 +244,228 @@ export class FamilyController {
       }
 
       return { status: 200 as const, body: toFamilyBody(result.value) };
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:read')
+  @TsRestHandler(familyContract.listMembers)
+  listMembers(
+    @Req() req: RequestWithFamilyContext,
+  ): RouteHandler<typeof familyContract.listMembers> {
+    return tsRestHandler(familyContract.listMembers, async ({ params }) => {
+      if (!req.familyContext) {
+        throw new Error('FamilyMembershipGuard did not populate familyContext.');
+      }
+
+      const members = await family.listMembers(
+        { familyId: asFamilyId(params.familyId), callerMemberId: req.familyContext.memberId },
+        { unitOfWork: this.unitOfWork },
+      );
+
+      return {
+        status: 200 as const,
+        body: members.map((member) => ({
+          id: member.id,
+          kind: member.kind,
+          role: member.role,
+          displayName: member.displayName,
+          // Spread, not a `?? null`: an absent key must stay absent on the
+          // wire (contracts/family-api.md), and `dateOfBirth === undefined`
+          // is exactly the guardianship gate that decided that.
+          ...(member.dateOfBirth !== undefined
+            ? { dateOfBirth: toIsoDate(member.dateOfBirth) }
+            : {}),
+        })),
+      };
+    });
+  }
+
+  /**
+   * FR-003, FR-005, FR-014. Honours `Idempotency-Key` the same way
+   * `createFamily` does (ADR-006), scoped by family as well as by caller —
+   * two different families' add-member calls from the same user must never
+   * collide on a key the client happened to reuse across both.
+   */
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:add')
+  @TsRestHandler(familyContract.addMember)
+  addMember(
+    @Req() req: RequestWithFamilyContextAndIdempotencyKey,
+  ): RouteHandler<typeof familyContract.addMember> {
+    return tsRestHandler(familyContract.addMember, async ({ params, body }) => {
+      if (!req.familyContext || !req.identityContext) {
+        throw new Error('Guards did not populate familyContext/identityContext.');
+      }
+      const userId = req.identityContext.userId;
+      const familyId = asFamilyId(params.familyId);
+      const idempotencyKey = readIdempotencyKey(req.headers);
+      const scopedKey = idempotencyKey !== null ? `${familyId}:${idempotencyKey}` : null;
+      const requestHash = scopedKey !== null ? hashIdempotentRequest('addMember', body) : null;
+
+      if (scopedKey !== null && requestHash !== null) {
+        const existing = await this.idempotencyStore.findByKey(userId, scopedKey);
+        if (existing !== null) {
+          if (existing.requestHash !== requestHash) {
+            this.logger.warn(`Idempotency-Key ${scopedKey} reused with a different request`);
+          }
+          return {
+            status: existing.responseStatus,
+            body: existing.responseBody,
+          } as ServerInferResponses<typeof familyContract.addMember>;
+        }
+      }
+
+      const correlationId = randomUUID();
+      const result = await family.addMember(
+        {
+          familyId,
+          memberId: asFamilyMemberId(randomUUID()),
+          addedByMemberId: req.familyContext.memberId,
+          // Wire 'extended' is domain kind 'adult' + role 'extended' — see
+          // `AddMemberInput.kind`'s own comment.
+          kind: body.kind === 'extended' ? 'adult' : 'child',
+          displayName: body.displayName,
+          dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
+          guardianshipId: asGuardianshipId(randomUUID()),
+          correlationId,
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        this.logger.log(
+          `Add member rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+        );
+        if (result.error.kind === 'NameRequired') {
+          return {
+            status: 422 as const,
+            body: { type: 'family/name_required' as const, reason: result.error.reason },
+          };
+        }
+        if (result.error.kind === 'GuardianIneligible') {
+          return {
+            status: 422 as const,
+            body: { type: 'family/guardian_ineligible' as const, reason: result.error.reason },
+          };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      const response = { status: 201 as const, body: { memberId: result.value.memberId } };
+
+      if (scopedKey !== null && requestHash !== null) {
+        await this.idempotencyStore.save({
+          userId,
+          key: scopedKey,
+          requestHash,
+          responseStatus: response.status,
+          responseBody: response.body,
+        });
+      }
+
+      return response;
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:read')
+  @TsRestHandler(familyContract.readMember)
+  readMember(@Req() req: RequestWithFamilyContext): RouteHandler<typeof familyContract.readMember> {
+    return tsRestHandler(familyContract.readMember, async ({ params }) => {
+      if (!req.familyContext) {
+        throw new Error('FamilyMembershipGuard did not populate familyContext.');
+      }
+      const correlationId = req.correlationId ?? randomUUID();
+
+      const result = await family.readMember(
+        {
+          familyId: asFamilyId(params.familyId),
+          memberId: asFamilyMemberId(params.memberId),
+          callerMemberId: req.familyContext.memberId,
+          callerUserId: req.identityContext?.userId ?? null,
+          correlationId,
+        },
+        { unitOfWork: this.unitOfWork },
+      );
+
+      if (!result.ok) {
+        // FR-007: 403, not 404 — the roster already told the caller this
+        // child exists, so pretending otherwise would be a lie that buys
+        // nothing (contracts/family-api.md).
+        if (result.error.kind === 'GuardianshipRequired') {
+          return { status: 403 as const, body: { type: 'family/guardianship_required' as const } };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return {
+        status: 200 as const,
+        body: {
+          id: result.value.id,
+          kind: result.value.kind,
+          role: result.value.role,
+          displayName: result.value.displayName,
+          dateOfBirth: toIsoDate(result.value.dateOfBirth),
+        },
+      };
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('guardianship:manage')
+  @TsRestHandler(familyContract.grantGuardianship)
+  grantGuardianship(): RouteHandler<typeof familyContract.grantGuardianship> {
+    return tsRestHandler(familyContract.grantGuardianship, async ({ params, body }) => {
+      const correlationId = randomUUID();
+
+      const result = await family.grantGuardianship(
+        {
+          familyId: asFamilyId(params.familyId),
+          childMemberId: asFamilyMemberId(params.memberId),
+          guardianMemberId: asFamilyMemberId(body.guardianMemberId),
+          guardianshipId: asGuardianshipId(randomUUID()),
+          correlationId,
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        if (result.error.kind === 'GuardianIneligible') {
+          return {
+            status: 422 as const,
+            body: { type: 'family/guardian_ineligible' as const, reason: result.error.reason },
+          };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 201 as const, body: { guardianshipId: result.value.guardianshipId } };
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('guardianship:manage')
+  @TsRestHandler(familyContract.endGuardianship)
+  endGuardianship(): RouteHandler<typeof familyContract.endGuardianship> {
+    return tsRestHandler(familyContract.endGuardianship, async ({ params }) => {
+      const result = await family.endGuardianship(
+        {
+          familyId: asFamilyId(params.familyId),
+          childMemberId: asFamilyMemberId(params.memberId),
+          guardianMemberId: asFamilyMemberId(params.guardianMemberId),
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        if (result.error.kind === 'LastGuardian') {
+          return { status: 409 as const, body: { type: 'family/last_guardian' as const } };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 200 as const, body: {} };
     });
   }
 }

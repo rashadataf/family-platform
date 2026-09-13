@@ -50,8 +50,25 @@ export {
   updateFamily,
   type UpdateFamilyInput,
 } from './application/commands/update-family.command.js';
+export { addMember, type AddMemberInput } from './application/commands/add-member.command.js';
+export {
+  grantGuardianship,
+  type GrantGuardianshipInput,
+} from './application/commands/grant-guardianship.command.js';
+export {
+  endGuardianship,
+  type EndGuardianshipInput,
+} from './application/commands/end-guardianship.command.js';
+export { readMember, type MemberDetail } from './application/queries/read-member.query.js';
+export { listMembers, type MemberSummary } from './application/queries/list-members.query.js';
 export { Family, type FamilyProps } from './domain/family.aggregate.js';
 export { FamilyMember, type FamilyMemberProps } from './domain/family-member.aggregate.js';
+export {
+  Guardianship,
+  type GuardianshipProps,
+  assertGuardianCoverage,
+} from './domain/guardianship.js';
+export { type GuardianshipRepository } from './application/ports/guardianship.repository.js';
 export {
   HouseholdProfile,
   type HouseholdComposition,

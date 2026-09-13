@@ -132,6 +132,63 @@ export const nameRequiredSchema = problemSchema.extend({
   reason: z.string(),
 });
 
+/**
+ * The domain's `MemberKind` ('adult' | 'child'), NOT `directMemberKindSchema`
+ * above — that one names what a caller may ADD ('child' | 'extended'); this
+ * one names what a member IS. An "extended" member is a `kind: 'adult'` with
+ * `role: 'extended'`, so it never appears as a kind on the wire either.
+ */
+export const memberKindSchema = z.enum(['adult', 'child']);
+
+export const addMemberRequestSchema = z.object({
+  kind: directMemberKindSchema,
+  // No `.min(1)`, for the same reason `familyNameSchema` above has none: an
+  // empty name must reach `FamilyMember.createUnlinked`, which is what turns
+  // it into `422 family/name_required` with an actionable reason, not a
+  // generic `400` from body validation that never gets there.
+  displayName: z.string().trim().max(120),
+  /** ISO date (`YYYY-MM-DD`). Only meaningful for `kind: 'child'`. */
+  dateOfBirth: z.string().nullish(),
+});
+
+/**
+ * The roster shape (`GET …/members`). `dateOfBirth` is an OPTIONAL key, not a
+ * nullable one: contracts/family-api.md requires the key itself absent for a
+ * child the caller does not guard, so a client cannot distinguish "withheld"
+ * from "never recorded".
+ */
+export const memberSummarySchema = z.object({
+  id: z.string().uuid(),
+  kind: memberKindSchema,
+  role: memberRoleSchema,
+  displayName: z.string().nullable(),
+  dateOfBirth: z.string().nullable().optional(),
+});
+
+/** The single-member shape (`GET …/members/:memberId`) — only reachable once any guardianship gate has already passed. */
+export const memberDetailSchema = z.object({
+  id: z.string().uuid(),
+  kind: memberKindSchema,
+  role: memberRoleSchema,
+  displayName: z.string().nullable(),
+  dateOfBirth: z.string().nullable(),
+});
+
+/** FR-006: guardianship offered to a member who is not an adult holding owner/adult. */
+export const guardianIneligibleSchema = problemSchema.extend({
+  type: z.literal('family/guardian_ineligible'),
+  reason: z.string(),
+});
+
+/** FR-008, SC-006: the action would leave a child with zero active guardians. */
+export const lastGuardianSchema = problemSchema.extend({
+  type: z.literal('family/last_guardian'),
+});
+
+export const grantGuardianshipRequestSchema = z.object({
+  guardianMemberId: z.string().uuid(),
+});
+
 const c = initContract();
 
 export const familyContract = c.router(
@@ -173,6 +230,75 @@ export const familyContract = c.router(
         422: nameRequiredSchema,
       },
       summary: 'Update the name or household profile (requires family:manage, FR-002)',
+    },
+
+    listMembers: {
+      method: 'GET',
+      path: '/families/:familyId/members',
+      pathParams: z.object({ familyId: z.string().uuid() }),
+      responses: {
+        200: z.array(memberSummarySchema),
+        403: capabilityRequiredSchema,
+      },
+      summary:
+        'The household roster, dateOfBirth omitted for unguarded children (requires members:read, FR-007)',
+    },
+
+    addMember: {
+      method: 'POST',
+      path: '/families/:familyId/members',
+      pathParams: z.object({ familyId: z.string().uuid() }),
+      body: addMemberRequestSchema,
+      responses: {
+        201: z.object({ memberId: z.string().uuid() }),
+        403: capabilityRequiredSchema,
+        422: z.discriminatedUnion('type', [nameRequiredSchema, guardianIneligibleSchema]),
+      },
+      summary:
+        'Add a child or extended member with no account (requires members:add, FR-003/FR-014); adding a child establishes the caller as guardian in the same action (FR-005)',
+    },
+
+    readMember: {
+      method: 'GET',
+      path: '/families/:familyId/members/:memberId',
+      pathParams: z.object({ familyId: z.string().uuid(), memberId: z.string().uuid() }),
+      responses: {
+        200: memberDetailSchema,
+        403: z.discriminatedUnion('type', [capabilityRequiredSchema, guardianshipRequiredSchema]),
+      },
+      summary:
+        'One member, in full (requires members:read; a child subject also requires an active guardianship, FR-007)',
+    },
+
+    grantGuardianship: {
+      method: 'POST',
+      path: '/families/:familyId/members/:memberId/guardians',
+      pathParams: z.object({ familyId: z.string().uuid(), memberId: z.string().uuid() }),
+      body: grantGuardianshipRequestSchema,
+      responses: {
+        201: z.object({ guardianshipId: z.string().uuid() }),
+        403: capabilityRequiredSchema,
+        422: guardianIneligibleSchema,
+      },
+      summary:
+        'Grant guardianship of an existing child to another eligible member (requires guardianship:manage, FR-005)',
+    },
+
+    endGuardianship: {
+      method: 'DELETE',
+      path: '/families/:familyId/members/:memberId/guardians/:guardianMemberId',
+      pathParams: z.object({
+        familyId: z.string().uuid(),
+        memberId: z.string().uuid(),
+        guardianMemberId: z.string().uuid(),
+      }),
+      responses: {
+        200: z.object({}),
+        403: capabilityRequiredSchema,
+        409: lastGuardianSchema,
+      },
+      summary:
+        'End a guardianship, refused if it would leave the child with none (requires guardianship:manage, FR-008)',
     },
   },
   {

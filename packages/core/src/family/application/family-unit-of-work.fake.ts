@@ -2,6 +2,7 @@ import type { FamilyId, FamilyMemberId, OutboxEventToAppend } from '@fp/kernel';
 import type { AuditEntry } from '../../compliance/domain/audit-entry.js';
 import type { Family } from '../domain/family.aggregate.js';
 import type { FamilyMember } from '../domain/family-member.aggregate.js';
+import type { Guardianship } from '../domain/guardianship.js';
 import type { MemberStanding } from './ports/family-member.repository.js';
 import type { FamilyUnitOfWork, FamilyUnitOfWorkPort } from './ports/family-unit-of-work.port.js';
 
@@ -24,8 +25,10 @@ export interface FakeFamilyState {
   family: Family | null;
   standing: MemberStanding | null;
   members: FamilyMember[];
+  guardianships: Guardianship[];
   savedFamilies: Family[];
   savedMembers: FamilyMember[];
+  savedGuardianships: Guardianship[];
   events: OutboxEventToAppend[];
   auditEntries: AuditEntry[];
   scopedTo: FamilyId[];
@@ -36,8 +39,10 @@ export function emptyFamilyState(overrides: Partial<FakeFamilyState> = {}): Fake
     family: null,
     standing: null,
     members: [],
+    guardianships: [],
     savedFamilies: [],
     savedMembers: [],
+    savedGuardianships: [],
     events: [],
     auditEntries: [],
     scopedTo: [],
@@ -70,6 +75,32 @@ export function fakeFamilyUnitOfWork(state: FakeFamilyState): FamilyUnitOfWorkPo
           // The fake models no per-user lookup: a handler test that needs a
           // different standing sets a different `state.standing`.
           findStandingByUserId: () => Promise.resolve(state.standing),
+        },
+        guardianships: {
+          save: (guardianship: Guardianship) => {
+            state.savedGuardianships.push(guardianship);
+            return Promise.resolve();
+          },
+          countActiveForChild: (childMemberId: FamilyMemberId) =>
+            Promise.resolve(
+              state.guardianships.filter((g) => g.childMemberId === childMemberId && g.isActive)
+                .length,
+            ),
+          findActive: (guardianMemberId: FamilyMemberId, childMemberId: FamilyMemberId) =>
+            Promise.resolve(
+              state.guardianships.find(
+                (g) =>
+                  g.guardianMemberId === guardianMemberId &&
+                  g.childMemberId === childMemberId &&
+                  g.isActive,
+              ) ?? null,
+            ),
+          listActiveChildIdsGuardedBy: (guardianMemberId: FamilyMemberId) =>
+            Promise.resolve(
+              state.guardianships
+                .filter((g) => g.guardianMemberId === guardianMemberId && g.isActive)
+                .map((g) => g.childMemberId),
+            ),
         },
         outbox: {
           append: (event: OutboxEventToAppend) => {

@@ -23,4 +23,11 @@ export {
   updateFamilyRequestSchema,
   familySchema,
   nameRequiredSchema,
+  memberKindSchema,
+  addMemberRequestSchema,
+  memberSummarySchema,
+  memberDetailSchema,
+  guardianIneligibleSchema,
+  lastGuardianSchema,
+  grantGuardianshipRequestSchema,
 } from './v1/family.contract.js';

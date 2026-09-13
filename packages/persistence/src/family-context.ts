@@ -4,6 +4,7 @@ import { prisma } from './client.js';
 import { PrismaAuditLogRepository } from './repositories/compliance/audit-log.repository.js';
 import { PrismaFamilyMemberRepository } from './repositories/family/family-member.repository.js';
 import { PrismaFamilyRepository } from './repositories/family/family.repository.js';
+import { PrismaGuardianshipRepository } from './repositories/family/guardianship.repository.js';
 import { PrismaOutboxRepository } from './repositories/outbox.repository.js';
 
 /**
@@ -52,6 +53,7 @@ class PrismaFamilyUnitOfWork implements family.FamilyUnitOfWorkPort {
         familyId,
         families: new PrismaFamilyRepository(tx),
         members: new PrismaFamilyMemberRepository(tx),
+        guardianships: new PrismaGuardianshipRepository(tx),
         outbox: new PrismaOutboxRepository(tx),
         audit: new PrismaAuditLogRepository(tx),
       });
