@@ -6,7 +6,7 @@
 
 You do not need Node.js, pnpm, a version manager, or PostgreSQL installed. The container carries all of them.
 
-> **What this does not cover.** This guarantee is for backend work — `apps/api`, and `apps/worker` when it exists. It will **not** extend to the mobile app. Expo requires host-native simulators and platform SDKs that cannot live in a Linux container, so when `apps/mobile` lands it will have its own prerequisites. Better to know that now than to discover it later. See [ADR-014](../adr/ADR-014-containerized-development.md).
+> **What this does not cover.** This guarantee is for backend work — `apps/api`, and `apps/worker` when it exists. It does **not** extend to the mobile app: Expo requires host-native simulators and platform SDKs that cannot live in a Linux container, so `apps/mobile` has its own prerequisites — see "Mobile app" below. See [ADR-014](../adr/ADR-014-containerized-development.md).
 
 ## From a fresh clone to a running environment
 
@@ -135,6 +135,27 @@ Step 3 is the boundary gate's fail-closed behaviour: until the graph knows about
 Step 1 is the one that is easy to miss and expensive to diagnose. Without it the image installs no dependencies for the package, and the containerized path dies with `Cannot find package '@fp/…'` — which reads like a broken install rather than a missing line in a Dockerfile, and which a contributor working on the host path never sees at all.
 
 Step 2 is not optional and not decorative. pnpm links workspace packages by symlink, and those symlinks point outside their own directory — so a package without its own volume gets its `node_modules` shadowed by the source bind mount, and its imports break in ways that look like application bugs. The comment block at the bottom of `docker-compose.yml` explains why the simpler one-volume alternative is rejected.
+
+## Mobile app (`apps/mobile`)
+
+Everything above is Docker-only and stays that way — this is the exception the prerequisites section already warns about. `apps/mobile` is an Expo app, and Expo needs host-native simulators and platform SDKs that cannot live in a Linux container (ADR-014).
+
+**Prerequisites, on top of Docker:**
+
+- **Node.js** and **pnpm**, matching the versions in the root `package.json`'s `engines` field — the same host-based path described above.
+- **iOS**: Xcode (from the Mac App Store) with its command-line tools, for the iOS Simulator. macOS only.
+- **Android**: Android Studio, with an emulator image created through its Device Manager.
+
+**Running it:**
+
+```sh
+pnpm install
+pnpm --filter @fp/mobile ios       # or: pnpm --filter @fp/mobile android
+```
+
+This starts Metro and opens the app in whichever simulator/emulator you have running. `apps/mobile` depends on `@fp/ui` (the design system built in spec 007) as a workspace package — pnpm's symlink resolves it automatically, same as any other `@fp/*` import.
+
+There is no containerized path for this app, and none is planned: the whole point of a simulator is testing against the platform surface a container cannot provide.
 
 ## Troubleshooting
 

@@ -167,11 +167,11 @@ and T044 completes the screen.
 - [X] T053 Text-scaling pass at the largest standard OS text size across every screen — no clipping, no overlap, controls grown past their token height (FR-018). [Research R8](research.md) predicts this is the most likely first-implementation failure
 - [X] T054 [P] Accessible name on every icon-only control (FR-017)
 - [X] T055 [P] Honour the OS reduced-motion setting wherever a transition exists (FR-019)
-- [ ] T056 [P] Note on artboard 05 that control heights are **floors, not fixed values**, in `design/Buttons.dc.html`, and re-seed the canvas — the boards currently read as though the heights are exact
-- [ ] T057 [P] Update `ARCHITECTURE.md` §8 repository structure to include `design/`, `packages/ui` and `apps/mobile`, which it does not currently mention
-- [ ] T058 [P] Update `README.md` so the mobile app's host-native prerequisites sit alongside the Docker-only guarantee, which applies to backend work only
+- [X] T056 [P] Note on artboard 05 that control heights are **floors, not fixed values**, in `design/Buttons.dc.html`, and re-seed the canvas — the boards currently read as though the heights are exact
+- [X] T057 [P] Update `ARCHITECTURE.md` §8 repository structure to include `design/`, `packages/ui` and `apps/mobile`, which it does not currently mention
+- [X] T058 [P] Update `README.md` so the mobile app's host-native prerequisites sit alongside the Docker-only guarantee, which applies to backend work only
 - [ ] T059 Run the full [quickstart.md](quickstart.md) validation on both iOS and Android (SC-008)
-- [ ] T060 Confirm every enforcement check has been seen to fail on a deliberate violation — contrast, drift, literal value, off-scale value, token-layer import
+- [X] T060 Confirm every enforcement check has been seen to fail on a deliberate violation — contrast, drift, literal value, off-scale value, token-layer import
 
 ---
 

@@ -481,6 +481,8 @@ family-platform/
 │   ├── product/ domain/ api/ mobile/ ai/ security/ infrastructure/ testing/
 ├── docs/                        # explanatory material, runbooks, onboarding
 ├── diagrams/                    # mermaid sources referenced from docs
+├── design/                      # the design canvas: artboards (*.dc.html) and tokens.json —
+│                                 #   the normative source packages/ui is built from (spec 007)
 │
 ├── docker-compose.yml           # the local service set: postgres, migrate, api (ADR-014)
 │

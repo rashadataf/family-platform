@@ -21,7 +21,7 @@ That starts PostgreSQL, applies every committed migration, and runs the API with
 
 See [`docs/local-development.md`](docs/local-development.md) for the full guide, including the optional faster host-based flow for contributors who already have Node.js and pnpm, and [`ADR-014`](adr/ADR-014-containerized-development.md) for why it works this way.
 
-> This guarantee covers backend work. It will not extend to the Expo mobile app, which needs host-native simulators.
+> This guarantee covers backend work. It does not extend to the Expo mobile app, which needs host-native simulators and its own prerequisites — see [`docs/local-development.md`](docs/local-development.md#mobile-app-appsmobile).
 
 ## Continuous Integration
 

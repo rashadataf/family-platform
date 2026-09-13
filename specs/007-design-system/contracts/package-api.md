@@ -66,5 +66,6 @@ A new named rule accompanies them:
 | FR-008, FR-009 | `pnpm lint` | A literal or off-scale design value appears outside the token module |
 | FR-010 | `pnpm verify:contrast` | Any documented pairing misses its floor in either theme |
 | FR-012 | `pnpm verify:design-tokens` | The token module and `design/tokens.json` disagree |
-| FR-006, FR-011 | `pnpm boundaries` | The token layer imports anything, or `@fp/ui` reaches a context |
+| FR-006, FR-011 | `pnpm boundaries` | The token layer imports a workspace package (another local file, `@fp/kernel`), or `@fp/ui` reaches a context |
+| FR-006 | `pnpm verify:token-portability` | The token layer imports an npm package — `react`, `react-native` — which `pnpm boundaries` cannot see: `node_modules` is excluded from its graph entirely (research R17), so this runtime check is what closes that half of the promise |
 | FR-002 | `pnpm typecheck` | A colour role is declared with only one theme's value |

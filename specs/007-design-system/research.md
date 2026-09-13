@@ -511,3 +511,45 @@ Walked artboards 05–09 against the gallery built for T050/T051, section by sec
 
 No further gaps found. The one addition (avatar stack) is committed alongside the gallery itself
 rather than as a follow-up, since T052 exists precisely to catch this before calling the phase done.
+
+---
+
+## R17. `pnpm boundaries` cannot catch an npm-package import into the token layer (found doing T060)
+
+**Finding**: T060 asks for every enforcement check named in the contract to be seen fail on a real
+violation. Injecting `import { Platform } from 'react-native';` at the top of
+`packages/ui/src/tokens/colour.ts` and running `pnpm boundaries` reported **no violations** — the
+exact case `contracts/package-api.md`'s verification table names `pnpm boundaries` as covering
+("FR-006, FR-011 | `pnpm boundaries` | The token layer imports anything, or `@fp/ui` reaches a
+context"). Injecting `import { ok } from '@fp/kernel';` in the same spot, by contrast, was caught
+immediately and precisely by the `token-layer-imports-nothing` rule.
+
+The difference is `.dependency-cruiser.cjs`'s `options.exclude.path`, which matches
+`node_modules` and removes anything resolving there from the graph entirely, before any named rule
+runs — a repository-wide setting (`options.doNotFollow` and `options.exclude` are global, not
+per-rule), justified by keeping the graph to source the project actually owns rather than every
+package's own internals. `@fp/kernel` resolves to a workspace member's source file, so it is in the
+graph and `token-layer-imports-nothing`'s `to: { pathNot: '^packages/ui/src/tokens/' }` matches it
+normally. `react-native` resolves inside `node_modules`, so it is excluded before that `to` clause
+ever sees it — the rule cannot forbid an edge that was never added to the graph.
+
+**Decision**: correct `contracts/package-api.md`'s claim rather than change the exclusion. The two
+enforcement commands split FR-006 exactly along this line, and the contract now says so:
+`pnpm boundaries` proves the token layer imports no *workspace* package (another local file,
+`@fp/kernel`, a context); `pnpm verify:token-portability` (T048, added in Phase 6) proves it imports
+no *npm* package either, including `react` and `react-native`, by actually running the built output
+in an environment where neither can resolve. Together they are FR-006's full portability claim;
+apart, each covers a different half, and the table naming only the first for both halves was true for
+one and false for the other.
+
+**Alternatives considered**:
+
+- Removing `node_modules` from `options.exclude` (or adding a per-directory override) — would let
+  `token-layer-imports-nothing` see npm imports too, but `doNotFollow`/`exclude` are global config,
+  not scoped to a rule's `from`, so this would re-include node_modules in the graph for **every**
+  rule, not just this one — cruising every dependency's own internals, for a repository whose
+  `boundaries` job already runs on every push. `verify-token-portability.ts` already closes this exact
+  gap at a fraction of the cost, at the one place it matters.
+- Leaving the contract's wording as-is — rejected: T060 exists precisely so a check that reads as
+  covering something it does not gets corrected before the phase is called done, not discovered later
+  by someone trusting the table.
