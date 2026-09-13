@@ -8,6 +8,7 @@
     "**/*.ts",
     "../apps/api/src/config/env.schema.ts",
     "../apps/api/src/config/load-env.ts",
+    "../packages/ui/src/tokens/**/*.ts",
     "../vitest.config.ts"
   ]
 }

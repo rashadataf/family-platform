@@ -30,6 +30,12 @@ const WORKSPACE_GRAPH = {
   'apps/api': ['packages'],
   'apps/worker': ['packages'],
 
+  // The Expo client (spec 007, ADR-016). Deliberately narrow rather than
+  // granted the same `['packages']` wholesale as the backend apps above: it
+  // reaches only the design system it exists to consume. `packages/contracts`
+  // joins this list the day a feature branch first calls the API, not before.
+  'apps/mobile': ['packages/ui'],
+
   // Pure, dependency-free primitives every context and every layer may use
   // (ARCHITECTURE §6). Depends on nothing but npm packages and Node built-ins,
   // which the blanket rules above already allow.
@@ -55,6 +61,12 @@ const WORKSPACE_GRAPH = {
   // The integration-test harness. It drives a real database through the same
   // package everything else does, and exports no client of its own.
   'packages/testing': ['packages/persistence'],
+
+  // The design system (spec 007, ADR-016). A leaf on purpose: it reaches no
+  // bounded context, no wire contract, no API client and no data access
+  // (FR-011), and its token layer reaches nothing at all — see
+  // `token-layer-imports-nothing` below.
+  'packages/ui': [],
 
   // Shared configuration. Leaves: they depend on npm packages only.
   'packages/config-eslint': [],
@@ -122,6 +134,13 @@ module.exports = {
     // and `pnpm dev` validate against the one authoritative definition rather
     // than a second copy that drifts (Principle II).
     { from: { path: '^scripts/' }, to: { path: '^apps/api/src/config/' } },
+
+    // Same reasoning, for the design system: `pnpm verify:design-tokens`
+    // compares the token layer against design/tokens.json, which it can only
+    // do by reading the one authoritative definition (spec 007 FR-012). The
+    // edge is deliberately narrow — the tokens directory only, never a
+    // component.
+    { from: { path: '^scripts/' }, to: { path: '^packages/ui/src/tokens/' } },
   ],
   allowedSeverity: 'error',
 
@@ -222,6 +241,17 @@ module.exports = {
       to: { path: '^packages/(core|persistence|platform|ai)/|^apps/' },
     },
     {
+      name: 'token-layer-imports-nothing',
+      severity: 'error',
+      comment:
+        "packages/ui/src/tokens is spec 007 FR-006's portability promise: a future web client consumes these exact values, so the module must depend on nothing — not React, not React Native, not even @fp/kernel. An import here makes that promise conditional on whatever was imported. ADR-016 chose plain token objects over a styling framework precisely so this could be structural rather than aspirational.",
+      from: { path: '^packages/ui/src/tokens/' },
+      // Node built-ins are excluded too, deliberately. The blanket `allowed`
+      // entry above permits core modules everywhere, but a `node:fs` import
+      // here would break the browser just as surely as a React one.
+      to: { pathNot: '^packages/ui/src/tokens/' },
+    },
+    {
       name: 'platform-has-no-domain',
       severity: 'error',
       comment:
@@ -274,7 +304,12 @@ module.exports = {
       exportsFields: ['exports'],
       conditionNames: ['import', 'require', 'node', 'types', 'default'],
       mainFields: ['module', 'main', 'types'],
-      extensions: ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.d.ts', '.json'],
+      // .tsx joined the list with packages/ui's theme/ (spec 007, T023):
+      // TypeScript's NodeNext resolution maps a `./x.js` specifier to `x.tsx`
+      // same as it does `x.ts`, but dependency-cruiser's own resolver does
+      // not do that unless told — without this, every JSX-importing file in
+      // this repository would report as unresolvable.
+      extensions: ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.tsx', '.d.ts', '.json'],
     },
 
     reporterOptions: {

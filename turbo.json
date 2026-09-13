@@ -28,6 +28,8 @@
         "scripts/tsconfig.json",
         "apps/api/src/config/env.schema.ts",
         "apps/api/src/config/load-env.ts",
+        "packages/ui/src/tokens/**",
+        "design/tokens.json",
         "package.json"
       ],
       "outputs": []
@@ -53,6 +55,26 @@
     "infrastructure#lint": {
       "dependsOn": [],
       "inputs": ["index.ts", "src/**", "eslint.config.js", "package.json"],
+      "outputs": []
+    },
+
+    // app.config.ts lives at the package root, not under src/ like the
+    // default typecheck inputs assume, but tsconfig.json's `include` covers
+    // it — without this override, editing it would not invalidate the cache.
+    "@fp/mobile#typecheck": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["src/**", "app.config.ts", "tsconfig.json", "expo-env.d.ts"],
+      "outputs": []
+    },
+
+    // apps/mobile's eslint config is eslint.config.mjs, not .js — Metro loads
+    // metro.config.js directly with `require`, so the package has no
+    // "type": "module", and the flat config needed the explicit ESM
+    // extension instead. Without this override the default `lint` task's
+    // hardcoded "eslint.config.js" input would never see it change.
+    "@fp/mobile#lint": {
+      "dependsOn": ["^build", "db:generate"],
+      "inputs": ["src/**", "eslint.config.mjs", "metro.config.js", "app.config.ts", "package.json"],
       "outputs": []
     },
 

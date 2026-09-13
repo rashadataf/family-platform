@@ -21,7 +21,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 
-const DOCKERFILE = 'apps/api/Dockerfile';
+/**
+ * Both images built from this repository, not just the API's. `apps/worker`
+ * has its own Dockerfile with its own deps stage and its own copy of the
+ * manifest list, and checking only the API's is how `packages/ui` came to be
+ * declared in one image and missing from the other — the exact drift this
+ * check exists to catch, reproduced by the check itself.
+ */
+const DOCKERFILES = ['apps/api/Dockerfile', 'apps/worker/Dockerfile'] as const;
 const COMPOSE = 'docker-compose.yml';
 const CRUISER = '.dependency-cruiser.cjs';
 
@@ -49,18 +56,20 @@ function discoverPackages(baseUrl: URL): string[] {
 
 export function checkDeclarations(
   packages: readonly string[],
-  files: { dockerfile: string; compose: string; cruiser: string },
+  files: { dockerfiles: Readonly<Record<string, string>>; compose: string; cruiser: string },
 ): WorkspaceReport {
   const problems: string[] = [];
 
   for (const pkg of packages) {
     const name = pkg.split('/')[1] ?? '';
 
-    if (!files.dockerfile.includes(`COPY ${pkg}/package.json`)) {
-      problems.push(
-        `  ${pkg}\n    missing from ${DOCKERFILE}: add \`COPY ${pkg}/package.json ${pkg}/\` to the deps stage.\n` +
-          `    Without it the image installs no dependencies for this package and the containerized path fails at import.`,
-      );
+    for (const [dockerfile, contents] of Object.entries(files.dockerfiles)) {
+      if (!contents.includes(`COPY ${pkg}/package.json`)) {
+        problems.push(
+          `  ${pkg}\n    missing from ${dockerfile}: add \`COPY ${pkg}/package.json ${pkg}/\` to the deps stage.\n` +
+            `    Without it the image installs no dependencies for this package and the containerized path fails at import.`,
+        );
+      }
     }
 
     // Only workspace packages the API container mounts need a volume; every
@@ -93,14 +102,14 @@ export function checkDeclarations(
   return {
     ok: true,
     packages: [...packages],
-    message: `All ${String(packages.length)} workspace packages are declared in ${DOCKERFILE}, ${COMPOSE} and ${CRUISER}.`,
+    message: `All ${String(packages.length)} workspace packages are declared in ${DOCKERFILES.join(', ')}, ${COMPOSE} and ${CRUISER}.`,
   };
 }
 
 export function checkWorkspacePackages(): WorkspaceReport {
   const read = (path: string) => readFileSync(new URL(path, root), 'utf-8');
   return checkDeclarations(discoverPackages(root), {
-    dockerfile: read(DOCKERFILE),
+    dockerfiles: Object.fromEntries(DOCKERFILES.map((path) => [path, read(path)])),
     compose: read(COMPOSE),
     cruiser: read(CRUISER),
   });

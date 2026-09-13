@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,300..500&amp;display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #FAF7F2; color: #1F1B16;
+      font-family: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    a { color: #8A4A2C; text-decoration: none; }
+    a:hover { color: #B15E39; }
+    .serif { font-family: 'Newsreader', Georgia, 'Times New Roman', serif; }
+    .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-variant-ligatures: none; }
+  </style>
+</helmet>
+<div style="width: 940px; padding: 40px; background: #FAF7F2; display: flex; flex-direction: column; gap: 36px;">
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #786F64;">FOUNDATIONS &middot; 01</div>
+    <div class="serif" style="font-size: 40px; line-height: 44px; font-weight: 400; letter-spacing: -0.01em;">Colour</div>
+    <div style="font-size: 15px; line-height: 23px; color: #5C544A; max-width: 620px; text-wrap: pretty;">Every colour in the product is one of these roles. A screen never names a colour, it names a role, and the role resolves per theme. This is why dark mode costs nothing later: no component knows which theme it is in. A raw hex in a component is a defect.</div>
+  </div>
+  <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1F1B16; padding-bottom: 10px; border-bottom: 1px solid #1F1B16;">Surface, text, border, action</div>
+  <div style="display: flex; flex-direction: column;">    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: end; padding-bottom: 8px; border-bottom: 1px solid #D2C8B8;">
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">ROLE TOKEN</div>
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">LIGHT</div>
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">DARK</div>
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">WHERE IT IS ALLOWED</div>
+    </div>
+    <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+      color: #B15E39; padding: 16px 0 6px;">SURFACE</div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">surface.canvas</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #FAF7F2; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#FAF7F2</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #17150F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#17150F</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">App background. The only full-bleed fill.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">surface.raised</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #FFFFFF; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#FFFFFF</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #221F18; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#221F18</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Cards, list rows, sheets, headers.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">surface.sunken</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #F2EDE5; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#F2EDE5</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #100E0A; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#100E0A</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Input wells, grouped containers, skeletons.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">surface.inverse</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #1F1B16; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#1F1B16</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #F2EDE4; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#F2EDE4</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Toasts and tooltips only.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">surface.scrim</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: rgba(31,27,22,.48); border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">rgba(31,27,22,.48)</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: rgba(6,5,3,.64); border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">rgba(6,5,3,.64)</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Behind modals and bottom sheets.</div>
+    </div>
+    <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+      color: #B15E39; padding: 16px 0 6px;">TEXT</div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">text.primary</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #1F1B16; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#1F1B16</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #F2EDE4; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#F2EDE4</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Titles, values, body copy.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">text.secondary</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #5C544A; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#5C544A</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #B5AC9E; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#B5AC9E</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Supporting copy, metadata, helper text.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">text.tertiary</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #786F64; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#786F64</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #908779; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#908779</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Timestamps, placeholders, disabled labels.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">text.inverse</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #FAF7F2; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#FAF7F2</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #17150F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#17150F</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">On surface.inverse.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">text.onAction</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #FFFFFF; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#FFFFFF</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #17150F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#17150F</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">On action.primary only. Never on a status tint.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">text.link</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #8A4A2C; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#8A4A2C</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #E0A077; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#E0A077</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Inline links. Underline on press, not at rest.</div>
+    </div>
+    <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+      color: #B15E39; padding: 16px 0 6px;">BORDER</div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">border.subtle</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #E7E0D5; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#E7E0D5</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #332E25; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#332E25</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Row dividers and card edges, 1px.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">border.strong</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #D2C8B8; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#D2C8B8</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #4A4236; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#4A4236</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Inputs and outline buttons, 1px.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">border.focus</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #B15E39; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#B15E39</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #D98A5F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#D98A5F</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">2px ring at 2px offset. Never removed.</div>
+    </div>
+    <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+      color: #B15E39; padding: 16px 0 6px;">ACTION</div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.primary</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #B15E39; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#B15E39</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #D98A5F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#D98A5F</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">One primary action per screen.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.primaryPressed</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #94492A; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#94492A</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #C0764C; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#C0764C</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Pressed and hovered.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.quiet</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #F2EDE5; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#F2EDE5</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #2A251D; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#2A251D</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Secondary fill and icon buttons.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.disabledBg</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #EDE7DD; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#EDE7DD</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #2A251D; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#2A251D</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Disabled fill. Height never changes.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.disabledFg</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #8D8170; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#8D8170</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #797060; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#797060</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Disabled label. 3:1 floor, never lower.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.destructive</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #8A352C; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#8A352C</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #E0897B; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#E0897B</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Deletes data. Only ever behind a confirm dialog.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">action.destructivePressed</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #70291F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#70291F</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #C9705F; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#C9705F</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Pressed and hovered.</div>
+    </div>
+  </div>
+  <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1F1B16; padding-bottom: 10px; border-bottom: 1px solid #1F1B16;">Status<span style="font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #786F64; margin-left: 12px;">shown at real size &mdash; the tint carries the meaning, the dot carries it again for colour-blind readers</span></div>
+  <div style="display: flex; flex-direction: column;">
+    <div style="display: grid; grid-template-columns: 210px 156px 156px 1fr; gap: 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid #E7E0D5;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600;">status.positive</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Task complete. Document verified by a person.</div>
+      </div>
+      <div style="padding: 14px; border-radius: 10px; background: #FAF7F2; border: 1px solid #E7E0D5;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #E8F0E6; border: 1px solid #C6D9C4;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #3C5A41;"></div><div style="font-size: 12.5px; font-weight: 600; color: #3C5A41;">Complete</div></div></div>
+      <div style="padding: 14px; border-radius: 10px; background: #17150F; border: 1px solid #332E25;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #1E2A20; border: 1px solid #35472F;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #8FB093;"></div><div style="font-size: 12.5px; font-weight: 600; color: #8FB093;">Complete</div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 1px;"><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">fg     #3C5A41 / #8FB093</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">bg     #E8F0E6 / #1E2A20</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">border #C6D9C4 / #35472F</div></div>
+    </div>
+    <div style="display: grid; grid-template-columns: 210px 156px 156px 1fr; gap: 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid #E7E0D5;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600;">status.caution</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Inside a reminder window. Expiring, not yet expired.</div>
+      </div>
+      <div style="padding: 14px; border-radius: 10px; background: #FAF7F2; border: 1px solid #E7E0D5;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #FBF1DC; border: 1px solid #E8D3A2;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #7A5310;"></div><div style="font-size: 12.5px; font-weight: 600; color: #7A5310;">In 9 months</div></div></div>
+      <div style="padding: 14px; border-radius: 10px; background: #17150F; border: 1px solid #332E25;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #2E2513; border: 1px solid #4A3C1B;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #D4A33F;"></div><div style="font-size: 12.5px; font-weight: 600; color: #D4A33F;">In 9 months</div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 1px;"><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">fg     #7A5310 / #D4A33F</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">bg     #FBF1DC / #2E2513</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">border #E8D3A2 / #4A3C1B</div></div>
+    </div>
+    <div style="display: grid; grid-template-columns: 210px 156px 156px 1fr; gap: 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid #E7E0D5;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600;">status.critical</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Overdue, expired, or a destructive confirmation.</div>
+      </div>
+      <div style="padding: 14px; border-radius: 10px; background: #FAF7F2; border: 1px solid #E7E0D5;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #FBE9E6; border: 1px solid #EFC7BF;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #8A352C;"></div><div style="font-size: 12.5px; font-weight: 600; color: #8A352C;">Overdue</div></div></div>
+      <div style="padding: 14px; border-radius: 10px; background: #17150F; border: 1px solid #332E25;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #301A17; border: 1px solid #4D2721;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #E0897B;"></div><div style="font-size: 12.5px; font-weight: 600; color: #E0897B;">Overdue</div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 1px;"><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">fg     #8A352C / #E0897B</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">bg     #FBE9E6 / #301A17</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">border #EFC7BF / #4D2721</div></div>
+    </div>
+    <div style="display: grid; grid-template-columns: 210px 156px 156px 1fr; gap: 20px; align-items: center; padding: 14px 0; border-bottom: 1px solid #E7E0D5;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600;">status.info</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">Neutral system information. Carries no urgency.</div>
+      </div>
+      <div style="padding: 14px; border-radius: 10px; background: #FAF7F2; border: 1px solid #E7E0D5;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #E9EEF6; border: 1px solid #C4D2E4;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #3E5372;"></div><div style="font-size: 12.5px; font-weight: 600; color: #3E5372;">Scheduled</div></div></div>
+      <div style="padding: 14px; border-radius: 10px; background: #17150F; border: 1px solid #332E25;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #1A2130; border: 1px solid #2E3A4D;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #93A9C7;"></div><div style="font-size: 12.5px; font-weight: 600; color: #93A9C7;">Scheduled</div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 1px;"><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">fg     #3E5372 / #93A9C7</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">bg     #E9EEF6 / #1A2130</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">border #C4D2E4 / #2E3A4D</div></div>
+    </div>
+    <div style="display: grid; grid-template-columns: 210px 156px 156px 1fr; gap: 20px; align-items: center; padding: 14px 0;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="mono" style="font-size: 12.5px; font-weight: 600;">status.proposed</div>
+        <div style="font-size: 12.5px; line-height: 18px; color: #5C544A; text-wrap: pretty;">An AI proposal. Not yet a fact. See Components &middot; 09 and Screens &middot; 12.</div>
+      </div>
+      <div style="padding: 14px; border-radius: 10px; background: #FAF7F2; border: 1px solid #E7E0D5;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #F0EAF6; border: 1px solid #D6C7E4;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #5A4372;"></div><div style="font-size: 12.5px; font-weight: 600; color: #5A4372;">Proposed</div></div></div>
+      <div style="padding: 14px; border-radius: 10px; background: #17150F; border: 1px solid #332E25;"><div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #241C30; border: 1px solid #3D3150;"><div style="width: 6px; height: 6px; border-radius: 999px; background: #AD93C7;"></div><div style="font-size: 12.5px; font-weight: 600; color: #AD93C7;">Proposed</div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 1px;"><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">fg     #5A4372 / #AD93C7</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">bg     #F0EAF6 / #241C30</div><div class="mono" style="font-size: 10.5px; color: #786F64; line-height: 16px;">border #D6C7E4 / #3D3150</div></div>
+    </div>
+  </div>
+  <div class="mono" style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #1F1B16; padding-bottom: 10px; border-bottom: 1px solid #1F1B16;">Sensitive<span style="font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #786F64; margin-left: 12px;">the only token group whose presence is a legal obligation, not a style choice</span></div>
+  <div style="display: flex; flex-direction: column;">    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: end; padding-bottom: 8px; border-bottom: 1px solid #D2C8B8;">
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">ROLE TOKEN</div>
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">LIGHT</div>
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">DARK</div>
+      <div class="mono" style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; color: #786F64;">WHERE IT IS ALLOWED</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">sensitive.fg</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #6E4B2E; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#6E4B2E</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #D0A87C; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#D0A87C</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Label and lock icon on a gated surface.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0; border-bottom: 1px solid #E7E0D5;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">sensitive.bg</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #F6EFE8; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#F6EFE8</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #241D16; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#241D16</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">Child records, sensitive document class.</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 226px 176px 176px 1fr; gap: 20px; align-items: center; padding: 11px 0;">
+      <div class="mono" style="font-size: 12.5px; font-weight: 600; color: #1F1B16;">sensitive.border</div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #DCC6AE; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#DCC6AE</div></div>
+      <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 7px; background: #4A3A2A; border: 1px solid rgba(31,27,22,.14);"></div><div class="mono" style="font-size: 11.5px; color: #5C544A;">#4A3A2A</div></div>
+      <div style="font-size: 13px; line-height: 19px; color: #5C544A; text-wrap: pretty;">1px. Present whenever the gate is present.</div>
+    </div>
+  </div>
+  <div style="display: flex; gap: 16px; padding: 20px 22px; border-radius: 12px;
+    background: #FFFFFF; border: 1px solid #E7E0D5;">
+    <div style="width: 3px; flex-shrink: 0; border-radius: 999px; background: #B15E39;"></div>
+    <div style="display: flex; flex-direction: column; gap: 7px;">
+      <div style="font-size: 14px; font-weight: 600;">Contrast floor</div>
+      <div style="font-size: 13px; line-height: 20px; color: #5C544A; max-width: 700px; text-wrap: pretty;">
+        text.primary and text.secondary clear 4.5:1 on canvas, raised and sunken in both themes.
+        text.tertiary is 4.5:1 on canvas and raised, and is not permitted on sunken.
+        Disabled labels hold 3:1. Status foregrounds are measured against their own tint, not against canvas.
+        text.onAction also clears 4.5:1 directly against every status foreground &mdash; the pairing an
+        avatar's initials need, since an avatar's background IS a status foreground colour, not its tint.
+        A pairing outside this table has not been checked and is not approved.
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

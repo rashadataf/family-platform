@@ -8,7 +8,9 @@
     "base.js",
     "typescript.js",
     "boundaries.js",
-    "index.js"
+    "index.js",
+    "design-system.js",
+    "rules"
   ],
   "dependencies": {
     "@eslint/js": "^9.39.1",

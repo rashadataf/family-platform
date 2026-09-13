@@ -19,11 +19,38 @@
 #   ignoreUntil = 2026-12-01
 #   reason = "No fix published upstream; reachable only from the CLI path."
 #
-# There are no entries, and that is the correct state.
-#
 # It is also not the state this repository was in when the gate was first run:
 # osv-scanner found five advisories, four of them HIGH, in `multer` and
 # `deepmerge-ts`. Neither was suppressed. Both were pinned past the advisory
 # with pnpm `overrides` in pnpm-workspace.yaml, because the newest upstream
 # release of each parent still required the vulnerable version — a suppression
 # accepts risk, an override removes it, and the override was available.
+#
+# The two entries below are the first genuine suppressions (spec 007): no
+# override is available for either, because no fix has been published at any
+# version, including the newest.
+
+[[IgnoredVulns]]
+id = "GHSA-5p2g-fcmc-qvqq"
+ignoreUntil = 2026-12-15
+reason = """
+image-size (through 2.0.2, the newest release — no fix published at any
+version) hangs the Node.js event loop on a crafted JXL/HEIF buffer with a
+zero-valued size field. Pulled in by metro <- @react-native/metro-config <-
+apps/mobile's Expo toolchain (spec 007, ADR-016): it runs only inside the
+Metro bundler on a developer's own machine or in CI while building the
+mobile app, parsing image assets that developer supplies. Never reachable
+from the API or worker runtime images (T003 excludes apps/mobile's install
+from both), and never fed an externally-supplied buffer in this repository's
+own CI or deploy path. Re-check on the next Expo SDK bump.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-w3rx-r6r6-pgpr"
+ignoreUntil = 2026-12-15
+reason = """
+Same root cause and same package as GHSA-5p2g-fcmc-qvqq, this time in
+image-size's ICNS parser (zero-valued entry length, infinite loop). Same
+dependency path, same unreachable-in-this-repository attack surface, same
+absence of any fixed release. See that entry for the full reasoning.
+"""

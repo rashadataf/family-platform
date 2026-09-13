@@ -26,6 +26,11 @@ RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/api/package.json                 apps/api/
 COPY apps/worker/package.json              apps/worker/
+# apps/mobile's manifest is copied even though the install below EXCLUDES it:
+# pnpm validates the lockfile against the workspace it discovers, and this
+# keeps that validation complete rather than relying on pnpm tolerating an
+# absent importer. It costs one kilobyte and no dependency resolution.
+COPY apps/mobile/package.json                apps/mobile/
 COPY packages/persistence/package.json     packages/persistence/
 COPY packages/kernel/package.json          packages/kernel/
 COPY packages/core/package.json            packages/core/
@@ -35,11 +40,27 @@ COPY packages/config-eslint/package.json   packages/config-eslint/
 COPY packages/config-prettier/package.json packages/config-prettier/
 COPY packages/config-typescript/package.json packages/config-typescript/
 COPY packages/testing/package.json          packages/testing/
+COPY packages/ui/package.json               packages/ui/
 
 COPY packages/persistence/prisma/ packages/persistence/prisma/
 
 RUN corepack install
-RUN pnpm install --frozen-lockfile
+# Scoped, not workspace-wide. `apps/mobile` is an Expo application (ADR-016)
+# that no image here ever runs, and an unscoped install resolves and downloads
+# React Native and the Expo toolchain on every image build — hundreds of
+# megabytes, on a gate that runs for every pull request (research R2).
+#
+# This is an EXCLUSION rather than an inclusion list, and the difference was
+# measured, not assumed. Filtering positively to `@fp/api...`/`@fp/worker...`
+# also drops the workspace ROOT — and with it turbo, which the build stage
+# runs — along with packages/testing and packages/ui, breaking
+# `docker compose run --rm api pnpm test`, the containerized path ADR-014
+# promises. Excluding by name keeps every backend package, including ones
+# added later, and costs one line per client application.
+#
+# A negative filter matching nothing is not an error in pnpm, so this line is
+# correct both before and after apps/mobile exists.
+RUN pnpm install --frozen-lockfile --filter='!@fp/mobile'
 
 COPY packages/persistence/src/ packages/persistence/src/
 
