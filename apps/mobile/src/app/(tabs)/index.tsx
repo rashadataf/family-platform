@@ -1,17 +1,18 @@
 /**
  * Today (artboard 11), assembled from `@fp/ui` alone, with static sample
- * content — no network call (FR-027). This phase (US1) delivers the
- * schedule and tasks sections; the reminders section belongs to `Reminder`
- * (US3, T044), which does not exist yet — that is the one genuine
- * cross-story coupling this spec's tasks.md names, not an oversight here.
+ * content — no network call (FR-027). T044 completes the screen US1 left
+ * partial: the reminders section below uses the `Reminder` pattern from
+ * US3, which is the one genuine cross-story coupling this spec's
+ * tasks.md names, not an oversight.
  *
  * T032 proves the point of everything built so far: every value on this
  * screen resolves through a token or a primitive prop, and there is
  * nowhere on this page a literal design value could hide.
  */
 import { ScrollView, View } from 'react-native';
-import { Card, EventRow, Header, TaskRow, space, useTheme } from '@fp/ui';
+import { Card, EventRow, Header, Reminder, TaskRow, space, useTheme } from '@fp/ui';
 import { useState } from 'react';
+import { PlaceholderIcon } from '../../components/placeholder-icon.js';
 
 const SCHEDULE = [
   {
@@ -52,9 +53,31 @@ const INITIAL_TASKS = [
   },
 ];
 
+const REMINDERS = [
+  {
+    id: 'passport',
+    tone: 'caution' as const,
+    title: "Ella's passport expires in 9 months",
+    subtitle: '12 June 2027 · renewals take about 10 weeks',
+    ruleId: 'passport-expiry',
+    ruleVersion: '3',
+    sourceReference: 'document 8f2c',
+  },
+  {
+    id: 'mot',
+    tone: 'info' as const,
+    title: 'MOT due in 4 weeks',
+    subtitle: 'Vehicle KX21 ORP · 9 October',
+    ruleId: 'mot-expiry',
+    ruleVersion: '1',
+    sourceReference: 'document 3a91',
+  },
+];
+
 export default function TodayScreen() {
   const { colours } = useTheme();
   const [tasks, setTasks] = useState(INITIAL_TASKS);
+  const [reminders, setReminders] = useState(REMINDERS);
 
   return (
     <View style={{ flex: 1, backgroundColor: colours['surface.canvas'] }}>
@@ -82,6 +105,28 @@ export default function TodayScreen() {
             />
           ))}
         </Card>
+        <View style={{ gap: space[3] }}>
+          {reminders.map((reminder) => (
+            <Reminder
+              key={reminder.id}
+              icon={<PlaceholderIcon glyph="!" />}
+              tone={reminder.tone}
+              title={reminder.title}
+              subtitle={reminder.subtitle}
+              ruleId={reminder.ruleId}
+              ruleVersion={reminder.ruleVersion}
+              sourceReference={reminder.sourceReference}
+              primaryActionLabel="Renew now"
+              onPrimaryAction={() => {
+                setReminders((current) => current.filter((r) => r.id !== reminder.id));
+              }}
+              secondaryActionLabel="Snooze"
+              onSecondaryAction={() => {
+                setReminders((current) => current.filter((r) => r.id !== reminder.id));
+              }}
+            />
+          ))}
+        </View>
       </ScrollView>
     </View>
   );

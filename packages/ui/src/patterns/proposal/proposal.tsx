@@ -14,6 +14,7 @@ import { radius, space, typography } from '../../tokens/index.js';
 import { useTheme } from '../../theme/index.js';
 import { typeStepToTextStyle } from '../../internal/type-style.js';
 import { Button } from '../../primitives/button/button.js';
+import { assertConfidenceInRange, assertNonEmpty } from '../guards.js';
 
 export interface ProposalProps {
   readonly title: string;
@@ -36,14 +37,8 @@ export function Proposal({
   onEdit,
   onDismiss,
 }: ProposalProps) {
-  if (sourceReference.trim() === '') {
-    throw new Error(
-      'Proposal requires a non-empty sourceReference — TypeScript cannot see an empty string.',
-    );
-  }
-  if (!(confidence >= 0 && confidence <= 1)) {
-    throw new Error(`Proposal requires confidence in [0, 1]; got ${String(confidence)}.`);
-  }
+  assertNonEmpty(sourceReference, 'sourceReference', 'Proposal');
+  assertConfidenceInRange(confidence, 'Proposal');
 
   const { colours } = useTheme();
   const labelStyle = typeStepToTextStyle(typography.overline);

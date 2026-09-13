@@ -122,12 +122,12 @@ and T044 completes the screen.
 **Independent Test**: Construct each pattern with its required evidence missing and confirm each refuses. This is the phase worth reviewing most carefully.
 
 - [X] T039 [P] [US3] `Proposal` — refuses without a source reference and a confidence, renders visually distinct from a confirmed value, labelled as not saved, and **exposes no prop that commits the value** (FR-021, Principle VII) — in `packages/ui/src/patterns/proposal/`
-- [ ] T040 [P] [US3] `GatedSurface` — refuses without naming who may see the content and without the access-is-recorded notice (FR-022, Principle VI) — in `packages/ui/src/patterns/gated-surface/`
-- [ ] T041 [P] [US3] `Reminder` — refuses without rule id, rule version and source reference, and displays all three (FR-023, ARCHITECTURE §5.6) — in `packages/ui/src/patterns/reminder/`
-- [ ] T042 [P] [US3] `NotFound` — one component for missing and unreachable alike, taking **no prop that could distinguish them**, because a prop that could would eventually be passed (FR-024, Principle V) — in `packages/ui/src/patterns/not-found/`
-- [ ] T043 [P] [US3] Guard unit tests for all four, asserting refusal on each missing field, in `packages/ui/src/patterns/patterns.spec.ts`
-- [ ] T044 [US3] Add Today's reminders section using `Reminder`, completing the screen US1 left partial, in `apps/mobile/src/app/index.tsx`
-- [ ] T045 [US3] Assert by inspection that `Proposal`'s exported props contain no auto-accept, no default action and no confirmation-disabling flag (quickstart scenario 3, step 2)
+- [X] T040 [P] [US3] `GatedSurface` — refuses without naming who may see the content and without the access-is-recorded notice (FR-022, Principle VI) — in `packages/ui/src/patterns/gated-surface/`
+- [X] T041 [P] [US3] `Reminder` — refuses without rule id, rule version and source reference, and displays all three (FR-023, ARCHITECTURE §5.6) — in `packages/ui/src/patterns/reminder/`
+- [X] T042 [P] [US3] `NotFound` — one component for missing and unreachable alike, taking **no prop that could distinguish them**, because a prop that could would eventually be passed (FR-024, Principle V) — in `packages/ui/src/patterns/not-found/`
+- [X] T043 [P] [US3] Guard unit tests for all four, asserting refusal on each missing field, in `packages/ui/src/patterns/patterns.spec.ts`
+- [X] T044 [US3] Add Today's reminders section using `Reminder`, completing the screen US1 left partial, in `apps/mobile/src/app/index.tsx`
+- [X] T045 [US3] Assert by inspection that `Proposal`'s exported props contain no auto-accept, no default action and no confirmation-disabling flag (quickstart scenario 3, step 2)
 
 **Checkpoint**: A feature cannot ship a proposal that looks like a fact.
 
