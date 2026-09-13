@@ -34,4 +34,10 @@
 - All three ambiguities identified during drafting (ownership cardinality, sole-owner departure,
   guardianship eligibility) were resolved with the user before this checklist pass; see spec.md's
   Clarifications section.
-- All items pass. Ready for `/speckit-plan`.
+- All items pass.
+- **Amended 2026-09-13 during `/speckit-plan`.** The "All mandatory sections completed" item was
+  ticked on a spec that was missing the Personal Data, Deletion and Export section Constitution
+  Principle XI makes mandatory, and an explicit Out of Scope section. Both were written into
+  spec.md during the planning pass rather than left as a gate failure; the tick is now accurate
+  rather than optimistic. Recorded here because a checklist that quietly becomes true is worth less
+  than one that says when it did.

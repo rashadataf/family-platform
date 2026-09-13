@@ -163,6 +163,77 @@ The owner changes an existing member's role, transfers ownership, or removes a m
 - **SC-006**: At every point in time, zero child records exist with fewer than one active guardian.
 - **SC-007**: At every point in time, every family has exactly one owner.
 
+## Personal Data, Deletion, and Export *(mandatory — Constitution Principle XI)*
+
+1. **What personal data this feature stores, and why**:
+   - **Family name** — how the household identifies itself; the label every downstream context
+     shows above a shared calendar or document list.
+   - **Household profile: postcode, local authority identifier, composition** — the postcode and
+     local authority are what will let later contexts surface the right school term dates, council
+     services and local activities without asking again; composition is a structured description of
+     the household (counts by member kind) kept consistent with actual membership, not free text.
+   - **Family member display name** — the name the family uses for that person. Without it a
+     member record is an identifier no human can act on.
+   - **Family member date of birth** — recorded for child members. It is what makes a person a
+     child for the purposes of the guardianship rules in this feature, and what later contexts read
+     for school year and age-appropriate scheduling. Not collected for adult members.
+   - **Invitation email address** — the only way to reach a person who is not yet a member. Held
+     only while the invitation is live, then removed (point 5).
+   - **Guardianship relationships** — who may reach a child's record. This is the access control
+     itself, not metadata about it.
+   - Nothing else. No address beyond a postcode, no phone number, no school, no medical
+     information: those belong to features that do not exist yet, and Principle VI forbids
+     collecting a field before a specified feature requires it.
+
+2. **What happens when a family member's account is deleted**: their membership ends and a
+   `MemberRemoved` event is published. Their member record is retained as a tombstone with the
+   display name and date of birth removed, so that authorship references held by later contexts do
+   not dangle, and their guardianship relationships are deleted. Removal is refused outright if it
+   would leave a child with no guardian (FR-008) or the family with no owner (FR-018) — the account
+   holder must transfer or reassign first. The family's own data survives; a member leaving is not
+   a family being erased, and the two are never conflated.
+
+3. **What happens when a whole family is erased**: the family, every member record, every
+   invitation and every guardianship under it are permanently removed. Erasure begins with
+   `FamilyDeletionRequested`, which immediately revokes every member's access and voids every
+   pending invitation (FR-025); the removal itself follows the platform's standard grace period and
+   erasure handling. Each linked member's own account is untouched by this — deleting a family does
+   not delete the people in it, and the reverse is equally true.
+
+4. **How this data appears in a user's data export**: an export contains the families that person
+   is a member of, with the family name, their own role and capabilities, and when they joined;
+   their own display name and date of birth; the guardianship relationships they hold; and the
+   invitations they sent or accepted, with status and timestamps. It does **not** contain another
+   member's date of birth, any detail of a child they are not a guardian of, or any invitation
+   token — the guardianship rule that governs reading applies identically to exporting.
+
+5. **Retention period after which data is removed even without a deletion request**: a member's
+   record is retained for as long as the family is active — it is the family's own record of its
+   own people, and there is no interval after which a household should stop knowing who is in it.
+   An invitation that is accepted or revoked has its email address removed 90 days later, and the
+   record itself is deleted at the same point. An invitation that is neither accepted nor revoked
+   expires 14 days after it is sent and is deleted 90 days after that. Records of who accessed a
+   child's details are retained on the platform's separate audit retention schedule, because
+   erasing the record of an access would defeat the control that produced it.
+
+## Out of Scope
+
+- **Every other bounded context**: Calendar, Tasks, Document Vault, Reminders, Notifications, AI
+  Assistant, Billing and Entitlements, Audit and Compliance beyond the audit trail this feature's
+  own obligations require, and Reference and Locale. Capabilities naming those contexts
+  (`documents:read`, and so on) are issued by this feature because FR-015 requires the full
+  capability set to exist; nothing consumes them yet.
+- **Any user interface** beyond what is needed to exercise and verify the API.
+- **Promoting a child member to a linked account.** A teenager gaining their own login is a
+  deliberate, separately specified command with its own permission model, not a consequence of
+  anything here.
+- **Password reset, account recovery and anything else owned by Identity and Access** (spec 006).
+- **Validating a postcode or local authority identifier against real reference data.** Stored as
+  supplied; validation belongs to the deferred Reference and Locale context.
+- **The erasure orchestration itself.** This feature exposes the erasure operations a family and a
+  member require and publishes the deletion-requested event; the saga that calls them across every
+  context belongs to Audit and Compliance.
+
 ## Assumptions
 
 - A user account may hold a linked FamilyMember record in more than one Family simultaneously (for example, separated parents each running their own household); this context does not treat family membership as exclusive.
