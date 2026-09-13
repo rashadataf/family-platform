@@ -479,3 +479,35 @@ nothing before T038 exercised it. `expo export --platform ios` (or `android`) fo
 check is worth running once after any change to `apps/mobile`'s import graph or `metro.config.js`
 itself — it is fast, needs no simulator, and is the only check in this feature's gate set that would
 have caught this.
+
+---
+
+## T052. Gallery-to-canvas cross-check
+
+Walked artboards 05–09 against the gallery built for T050/T051, section by section:
+
+- **Buttons (05)**: every variant × size × disabled × loading state built; full-width and icon-only
+  built. **Not separately reachable as a static state**: `pressed` and `focus` — both are handled
+  internally by `Pressable`'s own touch/focus events, not exposed as props, so there is no prop that
+  could render them at rest. They are reachable in the gallery the same way they are anywhere else in
+  the app: press and hold, or tab-focus, a real rendered button. This is a property of how the
+  component is built, not a gap in what the gallery registers.
+- **Fields (06)**: default, helper text, error, disabled, left icon, and the search hidden-label
+  exception all built. "Other controls" (a multiline notes field, toggle/checkbox) was already
+  descoped when `Field` was built (field.tsx's own header comment) — not one of this spec's five
+  primitive families, so correctly absent from both the component set and the gallery.
+- **Surfaces (07)**: all four row types plus their skeletons, every `StatusPill` status, `EmptyState`,
+  `Toast`, and the avatar size scale were built directly. The avatar **stack** (−10px overlap, 2px
+  ring, "+N" overflow counter after three) was initially missed — a composition of `Avatar` instances
+  the gallery had not assembled, not a missing component. Added: three overlapping avatars plus a
+  fourth showing `initials="+2"` (a plain string, not validated to be a real name's initials), overlap
+  at `-space[2]` (−8) rather than the canvas's off-scale −10 (FR-009) — the same correction this
+  board's other off-scale values already received.
+- **Navigation (08)**: `Header` (compact, compact-with-back-and-action, large), both `SegmentedControl`
+  arities, `TabBar`, `Sheet`, and `Dialog` all built and reachable (the modals via an in-gallery
+  trigger button, consistent with them being real `Modal`-backed components rather than static
+  mockups).
+- **Patterns (09)**: all four built directly, `Reminder` across all four tones.
+
+No further gaps found. The one addition (avatar stack) is committed alongside the gallery itself
+rather than as a follow-up, since T052 exists precisely to catch this before calling the phase done.

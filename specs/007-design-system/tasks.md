@@ -154,9 +154,9 @@ and T044 completes the screen.
 
 **Independent Test**: Open the gallery beside the canvas and walk both, board by board.
 
-- [ ] T050 [US5] Gallery route, development builds only, in `apps/mobile/src/gallery/`
-- [ ] T051 [US5] Register every state drawn on artboards 05–09, labelled with the names the canvas uses (FR-028 as amended, SC-003)
-- [ ] T052 [US5] Cross-check the gallery against the canvas board by board and record any state drawn but not built
+- [X] T050 [US5] Gallery route, development builds only, in `apps/mobile/src/gallery/`
+- [X] T051 [US5] Register every state drawn on artboards 05–09, labelled with the names the canvas uses (FR-028 as amended, SC-003)
+- [X] T052 [US5] Cross-check the gallery against the canvas board by board and record any state drawn but not built
 
 **Checkpoint**: The canvas and the code can be compared by a person in a minute (SC-007).
 
