@@ -62,11 +62,11 @@ that do not exist yet.
       `Accepted`; set [ADR-003](../../adr/ADR-003-database-orm.md)'s status to `Amended by ADR-017`
       with a scope note naming its row-level-security section, per `adr/README.md`'s partial-
       replacement rule. Add both to `adr/README.md`'s index.
-- [ ] T002 [P] Create the context scaffolds `packages/core/src/family/index.ts` and
+- [X] T002 [P] Create the context scaffolds `packages/core/src/family/index.ts` and
       `packages/core/src/compliance/index.ts` (empty barrels for now) and re-export them from
       `packages/core/src/index.ts` as namespaces alongside `identity`, so consumers write
       `import { family } from '@fp/core'` and never reach into the file layout.
-- [ ] T003 Add a `family-repositories-are-private` rule to `.dependency-cruiser.cjs`, forbidding
+- [X] T003 Add a `family-repositories-are-private` rule to `.dependency-cruiser.cjs`, forbidding
       anything outside `packages/persistence/src/` from importing
       `packages/persistence/src/repositories/family/**`. FR-020 says no code outside this context
       may read family data directly; `persistence-client-is-private` already does the equivalent for

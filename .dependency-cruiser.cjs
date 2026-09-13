@@ -178,6 +178,15 @@ module.exports = {
       },
     },
     {
+      name: 'family-repositories-are-private',
+      severity: 'error',
+      comment:
+        "FR-020: the Family context is the only means by which any part of the platform determines a user's standing, and no code outside it may read family, member, invitation or guardianship data directly (ARCHITECTURE §5.2). packages/persistence exposes narrow factories for that data; the repository implementations behind them are private to the package, the same way client.ts is. A consumer that needs a user's standing calls FamilyContextPort.",
+      from: { pathNot: '^packages/persistence/' },
+      to: { path: '^packages/persistence/src/repositories/family/' },
+    },
+
+    {
       name: 'no-cross-app',
       severity: 'error',
       comment:
