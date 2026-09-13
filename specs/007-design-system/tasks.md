@@ -139,9 +139,9 @@ and T044 completes the screen.
 
 **Independent Test**: Render at each breakpoint and compare against artboard 04; import the tokens from plain Node.
 
-- [ ] T046 [US4] Breakpoint-aware layout container applying the columns, margins and gutters artboard 04 fixes, in `packages/ui/src/primitives/`
-- [ ] T047 [US4] Control heights by input type — 48 touch, 40 pointer — with nothing else varying by breakpoint
-- [ ] T048 [P] [US4] `scripts/verify-token-portability.ts`: import `@fp/ui/tokens` from plain Node with no React and no React Native, proving FR-006 at runtime as well as in the import graph
+- [X] T046 [US4] Breakpoint-aware layout container applying the columns, margins and gutters artboard 04 fixes, in `packages/ui/src/primitives/`
+- [X] T047 [US4] Control heights by input type — 48 touch, 40 pointer — with nothing else varying by breakpoint
+- [X] T048 [P] [US4] `scripts/verify-token-portability.ts`: import `@fp/ui/tokens` from plain Node with no React and no React Native, proving FR-006 at runtime as well as in the import graph
 - [ ] T049 [US4] Verify margins, columns and gutters against artboard 04 at each breakpoint on a phone and a tablet simulator
 
 **Checkpoint**: FR-006's portability claim is tested, not asserted.

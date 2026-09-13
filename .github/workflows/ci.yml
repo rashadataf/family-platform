@@ -134,6 +134,10 @@ jobs:
       # remembered to add it.
       - run: pnpm verify:contrast
       - run: pnpm verify:design-tokens
+      # Spec 007 FR-006, proved at runtime rather than only in the import
+      # graph: builds @fp/ui itself, so this needs no dependency on the
+      # separate `build` job.
+      - run: pnpm verify:token-portability
 
   # Closes TODO(SECURITY_SCAN_TOOLING), open since the constitution was
   # ratified. Two scanners, because they fail differently.
