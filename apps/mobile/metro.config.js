@@ -32,4 +32,21 @@ config.resolver.nodeModulesPaths = [
 // Metro must follow those links rather than treat them as opaque files.
 config.resolver.unstable_enableSymlinks = true;
 
+// Source in this repo imports its own TypeScript siblings with an explicit
+// `.js` extension (the NodeNext/ESM convention `tsc` expects, used
+// throughout packages/ui and carried into this app) — but that file never
+// exists on disk before a build; only `foo.tsx`/`foo.ts` does. Metro has no
+// built-in notion of this convention and fails to resolve it (found by
+// actually running `expo export`, not by typecheck or lint, neither of
+// which model Metro's resolver at all). Stripping a *relative* import's
+// trailing `.js` before Metro's own extension search runs lets it find the
+// real source file; a bare specifier (`@fp/ui`, `react-native`, ...) is left
+// untouched; so is a package's own built `dist/*.js`, which really is `.js`.
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.startsWith('.') && moduleName.endsWith('.js')) {
+    return context.resolveRequest(context, moduleName.slice(0, -'.js'.length), platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

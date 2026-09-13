@@ -104,12 +104,12 @@ and T044 completes the screen.
 
 **Independent Test**: Switch the device theme while the app is open; every surface follows, an open sheet stays open, and no screen contains a conditional on the theme.
 
-- [ ] T033 [US2] Resolve the palette from the OS colour scheme, following it by default (FR-004), in `packages/ui/src/theme/theme-provider.tsx`
-- [ ] T034 [US2] Device-local preference storage for `system` / `light` / `dark`, surviving a restart (FR-005), in `packages/ui/src/theme/theme-storage.ts`
-- [ ] T035 [US2] The override control in `apps/mobile/src/app/`
-- [ ] T036 [US2] Live switching with no restart, preserving an open sheet or dialog — the edge case a naive implementation drops
-- [ ] T037 [P] [US2] Unit test preference resolution: system follows the OS, an override wins, an absent stored value falls back to system, in `packages/ui/src/theme/theme.spec.ts`
-- [ ] T038 [US2] Run `pnpm verify:contrast` and confirm every documented pairing passes in both themes (FR-010, SC-002)
+- [X] T033 [US2] Resolve the palette from the OS colour scheme, following it by default (FR-004), in `packages/ui/src/theme/theme-provider.tsx`
+- [X] T034 [US2] Device-local preference storage for `system` / `light` / `dark`, surviving a restart (FR-005), in `packages/ui/src/theme/theme-storage.ts`
+- [X] T035 [US2] The override control in `apps/mobile/src/app/`
+- [X] T036 [US2] Live switching with no restart, preserving an open sheet or dialog — the edge case a naive implementation drops
+- [X] T037 [P] [US2] Unit test preference resolution: system follows the OS, an override wins, an absent stored value falls back to system, in `packages/ui/src/theme/theme.spec.ts`
+- [X] T038 [US2] Run `pnpm verify:contrast` and confirm every documented pairing passes in both themes (FR-010, SC-002)
 
 **Checkpoint**: Both themes correct, zero screens changed to achieve it (SC-004).
 

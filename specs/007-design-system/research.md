@@ -396,3 +396,86 @@ build first — which is every package with a dependent, i.e. every package that
 it as a fourth check to `verify-workspace-packages.ts` was considered and deferred: detecting "is this
 package imported by bare specifier anywhere" is real static analysis, not a text match against three
 fixed filenames, and this finding was caught by CI within one push regardless.
+
+---
+
+## R15. `@react-native-async-storage/async-storage`'s default export is untypeable under `NodeNext` (found during implementation)
+
+**Finding**: `import AsyncStorage from '@react-native-async-storage/async-storage'` typechecks in
+isolation under `moduleResolution: "node"` and `"bundler"`, but fails under `"NodeNext"` — this
+repo's setting (`@fp/config-typescript/base.json`) — with `AsyncStorage.getItem` reported as missing
+from a type of `typeof import(".../lib/typescript/index")`. The failure reproduces even importing the
+package's single simplest file directly (`.../lib/typescript/AsyncStorage.d.ts`, which is nothing more
+than `declare const AsyncStorage: AsyncStorageStatic; export default AsyncStorage;`), which rules out
+the multi-file re-export chain as the cause. The package has no `"type": "module"` and no `"exports"`
+map, so Node16/NodeNext classifies its `.d.ts` files as CommonJS-format; TypeScript's rules for
+resolving `export default` inside a CommonJS-format ambient module under NodeNext do not synthesise a
+usable default type the way `esModuleInterop` does under `node`/`bundler` resolution — verified by
+toggling only `moduleResolution` across three values on the same import and observing the failure
+appear solely under `NodeNext`.
+
+**Decision**: import the module namespace (`import * as AsyncStorageModule from '...'`), import
+`AsyncStorageStatic` as a type separately (unaffected — naming a type is not subject to the same
+default-value resolution path), and assert `AsyncStorageModule.default as unknown as
+AsyncStorageStatic` once, at the single point `theme-storage.ts` touches this package. The runtime
+value is correct regardless of what TypeScript infers for it — Metro's own bundling of the identical
+import proves that on every build — so this bridges a verified tool limitation rather than working
+around an assumption.
+
+**Rationale**: This is the one `as unknown as` cast in the codebase, and it is deliberately scoped to
+exactly the boundary where a third-party package's type declarations are incompatible with this
+project's module resolution setting — a different situation from casting away an invariant this
+project's own code is responsible for keeping (Principle II), which is what the codebase otherwise
+never does.
+
+**Alternatives considered**:
+
+- Changing `moduleResolution` in `@fp/config-typescript/base.json` — fixes this one import at the cost
+  of changing module resolution semantics for every package in the workspace, for a problem that is
+  local to one dependency.
+- `import AsyncStorage = require(...)` — the standard TypeScript escape for exactly this class of CJS
+  interop problem, but it is a CommonJS-only construct and `packages/ui` is an ESM package
+  (`"type": "module"`); TypeScript refuses it there.
+- Reporting the bug upstream and waiting — correct long-term, but blocks T034 today for a fix outside
+  this repo's control.
+
+---
+
+## R16. Metro never resolved this app's own `.js`-suffixed relative imports (found during implementation)
+
+**Finding**: Every check this feature runs before treating a task as done — `typecheck`, `lint`,
+`build`, `boundaries`, `format:check`, `vitest` — passed on `apps/mobile` throughout Phases 3 through
+5. None of them ever bundle the app: `tsc` resolves `./placeholder-icon.js` to `placeholder-icon.tsx`
+by design (that is what `moduleResolution: "NodeNext"` means), and nothing else in the gate set
+touches Metro's resolver at all. Running `npx expo export --platform ios` for T038 — the first time
+anything in this feature actually bundled the app rather than statically analysing its source — failed
+immediately: `Unable to resolve module ../../components/placeholder-icon.js`, on a call site
+(`(tabs)/_layout.tsx`) that had existed, unbundled and unnoticed, since T031.
+
+Metro has no built-in understanding of the TypeScript NodeNext convention of writing a relative
+import's extension as `.js` when the real file on disk is `.ts`/`.tsx` — it takes the extension
+literally, the same way it correctly does for a package's real, already-compiled `dist/*.js`. Every
+relative import in this app's own source uses that convention (it is `packages/ui`'s convention too,
+carried over for consistency), so this was not a one-file problem: it was the app never having been
+bundled successfully at all, at any point in this feature's implementation.
+
+**Decision**: added a `resolver.resolveRequest` override to `apps/mobile/metro.config.js` that strips
+a trailing `.js` from a *relative* import specifier (`moduleName.startsWith('.')`) before handing it
+back to Metro's own resolver, which then finds `.tsx`/`.ts` through its normal extension search. A bare
+specifier (`@fp/ui`, `react-native`, an npm package) is untouched, and so is a package's real compiled
+`.js` output reached through one — the rewrite only ever fires on this app's own relative,
+not-yet-built source. Verified by re-running the same `expo export` for both `ios` and `android`
+after the change; both now bundle.
+
+**Rationale**: The alternative — dropping `.js` from these two import sites — would have fixed today's
+two call sites and left the same trap for the next relative import anyone writes in `apps/mobile`,
+silently reintroducing an unbundleable app that every other gate would still call clean. The resolver
+fix is the one change that makes the convention this repo already committed to (`.js`-suffixed
+relative imports, matching `packages/ui`) actually work under Metro, rather than working only under
+`tsc`.
+
+**The general lesson**: none of this feature's required checks model Metro's module resolution, and
+nothing before T038 exercised it. `expo export --platform ios` (or `android`) for a quick bundle-only
+check is worth running once after any change to `apps/mobile`'s import graph or `metro.config.js`
+itself — it is fast, needs no simulator, and is the only check in this feature's gate set that would
+have caught this.

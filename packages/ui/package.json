@@ -18,12 +18,14 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
+    "@react-native-async-storage/async-storage": "*",
     "react": "^19.0.0",
     "react-native": "*"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
     "@fp/config-typescript": "workspace:*",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@types/node": "^24.0.0",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.1",
