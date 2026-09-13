@@ -28,3 +28,6 @@ export function createIdentityUnitOfWork(): identity.IdentityUnitOfWorkPort {
 export function createSessionRepository(): identity.SessionRepository {
   return new PrismaSessionRepository(prisma);
 }
+
+export { createFamilyUnitOfWork, createAuditLog } from './family-context.js';
+export { provisionDatabaseRoles } from './provision-roles.js';

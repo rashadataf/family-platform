@@ -142,31 +142,36 @@ in force before there is anything for it to catch.
       `MIGRATOR_DATABASE_URL` carries the owner's. Update `docker-compose.yml` (api, worker and
       migrate services), `docker-compose.staging.yml`, `.env.example`, and
       `apps/api/src/config/env.schema.ts`. A process that boots with the wrong one must fail at
-      boot, not at the first query (Principle II).
+      boot, not at the first query (Principle II). **Also, discovered during implementation:**
+      `packages/testing/src/database.ts` and the CI workflow both derive everything from
+      `DATABASE_URL`, so the integration harness must be taught the three roles too — it
+      creates the test database as the superuser, migrates as the owner, and runs the tests
+      as the application role, because running them as the owner would make every isolation
+      assertion pass by seeing everything rather than by being filtered.
 - [X] T014 Add the application role's credential to the `infrastructure/` vps-staging Pulumi stack,
       resolved at runtime from the secret store — never committed, never a build argument
       (Principle X).
 
 ### The scoped unit of work
 
-- [ ] T015 [P] Declare `FamilyUnitOfWork` and `FamilyUnitOfWorkPort` in
+- [X] T015 [P] Declare `FamilyUnitOfWork` and `FamilyUnitOfWorkPort` in
       `packages/core/src/family/application/ports/family-unit-of-work.port.ts`, mirroring
       identity's, with `families`, `members`, `invitations`, `guardianships`, `audit` and `outbox`
       added as the stories that need them land.
-- [ ] T016 Implement `withFamilyContext(familyId, work)` in
+- [X] T016 Implement `withFamilyContext(familyId, work)` in
       `packages/persistence/src/family-context.ts`: one `$transaction`, `SELECT set_config(
       'app.family_id', $1, true)` as its first statement, every family repository constructed
       against that transaction client. Delete the now-answered `TODO(ADR-003-rls)` in
       `packages/persistence/src/client.ts` and replace it with a pointer here. No repository method
       may take a family parameter — ARCHITECTURE §9 layer 4 is enforced by the absence of the
       argument, not by remembering to pass it.
-- [ ] T017 Integration test `packages/persistence/src/family-context.integration.spec.ts`:
+- [X] T017 Integration test `packages/persistence/src/family-context.integration.spec.ts`:
       connected as the application role with no context set, each family-scoped table returns zero
       rows while rows plainly exist; inside `withFamilyContext` only that family's rows appear; and
       connected as the **owner** role, `FORCE ROW LEVEL SECURITY` still filters. Without this last
       assertion [research.md §1](research.md)'s failure mode is invisible — the policy exists, CI is
       green, and every row is readable.
-- [ ] T018 Integration test in `packages/persistence/src/family-context.integration.spec.ts`:
+- [X] T018 Integration test in `packages/persistence/src/family-context.integration.spec.ts`:
       `set_config(..., true)` does not survive its
       transaction. Open a scoped transaction, commit, then query on the same pooled connection with
       no context and assert zero rows. Losing the third argument would leak one family's scope into
@@ -175,17 +180,17 @@ in force before there is anything for it to catch.
 
 ### The audit sink (minimum of Audit and Compliance)
 
-- [ ] T019 [P] Create `packages/core/src/compliance/domain/audit-entry.ts` (the entry shape:
+- [X] T019 [P] Create `packages/core/src/compliance/domain/audit-entry.ts` (the entry shape:
       actor, subject, action, purpose, result, reason, correlation id) and
       `packages/core/src/compliance/application/ports/audit-log.port.ts` declaring
       `AuditLogPort.append(entry)`. Owned by Compliance from its first row, so it never has to be
       moved later — moving it would be "changing which context owns a table" and would need its own
       ADR ([research.md §7](research.md)).
-- [ ] T020 [P] Implement `packages/persistence/src/repositories/compliance/audit-log.repository.ts`,
+- [X] T020 [P] Implement `packages/persistence/src/repositories/compliance/audit-log.repository.ts`,
       exported through one narrow factory. It must accept an optional transaction client, so a
       granted read is audited inside the same transaction it records while a denial — which has no
       transaction — is a single insert.
-- [ ] T021 Integration test
+- [X] T021 Integration test
       `packages/persistence/src/repositories/compliance/audit-log.integration.spec.ts`: the
       application role can `INSERT`, and `SELECT`, `UPDATE` and `DELETE` are all refused by the
       database. §5.12's "append-only, no update or delete grants" is a grant, not a convention, and

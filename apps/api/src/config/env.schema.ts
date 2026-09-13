@@ -42,7 +42,7 @@ export const envSchema = z.object({
       message:
         'DATABASE_URL must connect as `family_platform_app` (ADR-017). Connecting as the table ' +
         'owner or as a superuser bypasses row-level security, which is ARCHITECTURE.md §9 layer 5 ' +
-        'and Constitution Principle V. The owner\'s URL belongs in MIGRATOR_DATABASE_URL, which ' +
+        "and Constitution Principle V. The owner's URL belongs in MIGRATOR_DATABASE_URL, which " +
         'only the migrate task holds.',
     }),
   MAIL_HOST: z.string().min(1),

@@ -89,7 +89,14 @@ jobs:
           --health-timeout 3s
           --health-retries 30
     env:
-      DATABASE_URL: postgresql://postgres:localdev@127.0.0.1:5432/family_platform
+      # Three roles (ADR-017). The suite runs as the application role, because
+      # that is the only one row-level security applies to — running it as the
+      # owner would make every isolation assertion pass by seeing everything.
+      DATABASE_URL: postgresql://family_platform_app:appci@127.0.0.1:5432/family_platform
+      MIGRATOR_DATABASE_URL: postgresql://family_platform_owner:ownerci@127.0.0.1:5432/family_platform
+      BOOTSTRAP_DATABASE_URL: postgresql://postgres:localdev@127.0.0.1:5432/family_platform
+      DB_OWNER_PASSWORD: ownerci
+      DB_APP_PASSWORD: appci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
@@ -301,9 +308,16 @@ jobs:
           exit $fail
 
       - name: Apply migrations with the migrator image
+        # Same two steps the migrate service runs (ADR-017): provision the
+        # roles as the superuser, then migrate as the non-superuser owner. The
+        # image's own CMD does both, so this exercises the real entrypoint
+        # rather than a CI-only approximation of it.
         run: |
           docker run --rm --network host \
-            -e DATABASE_URL='postgresql://postgres:localdev@127.0.0.1:5432/family_platform' \
+            -e BOOTSTRAP_DATABASE_URL='postgresql://postgres:localdev@127.0.0.1:5432/family_platform' \
+            -e DATABASE_URL='postgresql://family_platform_owner:ownerci@127.0.0.1:5432/family_platform' \
+            -e DB_OWNER_PASSWORD='ownerci' \
+            -e DB_APP_PASSWORD='appci' \
             fp-api:migrator
 
       # The step that catches an incomplete prune (FR-016).
@@ -313,7 +327,7 @@ jobs:
           docker run -d --name api --network host --init \
             -e NODE_ENV=production -e PORT=3000 -e LOG_LEVEL=info \
             -e POSTGRES_PORT=5432 -e POSTGRES_DB=family_platform \
-            -e DATABASE_URL='postgresql://postgres:localdev@127.0.0.1:5432/family_platform' \
+            -e DATABASE_URL='postgresql://family_platform_app:appci@127.0.0.1:5432/family_platform' \
             -e MAIL_HOST=localhost -e MAIL_PORT=1025 \
             fp-api:runtime
           for i in $(seq 1 30); do

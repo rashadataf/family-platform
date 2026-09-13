@@ -89,10 +89,9 @@ const EXPECTED: Record<MemberRole, Record<Capability, boolean>> = {
 describe('capabilitiesFor', () => {
   it.each(MEMBER_ROLES)('matches data-model.md for %s, cell by cell', (role) => {
     for (const capability of CAPABILITIES) {
-      expect(
-        roleHasCapability(role, capability),
-        `${role} × ${capability}`,
-      ).toBe(EXPECTED[role][capability]);
+      expect(roleHasCapability(role, capability), `${role} × ${capability}`).toBe(
+        EXPECTED[role][capability],
+      );
     }
   });
 

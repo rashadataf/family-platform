@@ -126,7 +126,8 @@ describe('infrastructure resource wiring', () => {
     // DB_APP_PASSWORD, line by line. Order is the entire protocol between the
     // two sides — get it wrong and the application silently connects as the
     // owner, which works, and bypasses every row-level security policy.
-    expect(stdin.split('\n').slice(0, 3)).toEqual([
+    expect(stdin ?? '').not.toBe('');
+    expect((stdin ?? '').split('\n').slice(0, 3)).toEqual([
       stackConfig.postgresPassword,
       stackConfig.dbOwnerPassword,
       stackConfig.dbAppPassword,

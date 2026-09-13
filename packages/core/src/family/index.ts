@@ -16,3 +16,7 @@ export {
   type MemberKind,
   type MemberRole,
 } from './domain/capabilities.js';
+export {
+  type FamilyUnitOfWork,
+  type FamilyUnitOfWorkPort,
+} from './application/ports/family-unit-of-work.port.js';

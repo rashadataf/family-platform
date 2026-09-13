@@ -155,6 +155,8 @@ export interface RawStackConfig {
   resetData?: string;
   founderEmail?: string;
   founderPassword?: string;
+  dbOwnerPassword?: string;
+  dbAppPassword?: string;
 }
 
 /**

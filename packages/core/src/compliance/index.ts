@@ -7,4 +7,5 @@
 // audit log to this context, and moving a table between contexts later would
 // need its own ADR (spec 008 research.md §7).
 
-export {};
+export { type AuditEntry, type AuditResult, type AuditSubjectType } from './domain/audit-entry.js';
+export { type AuditLogPort } from './application/ports/audit-log.port.js';

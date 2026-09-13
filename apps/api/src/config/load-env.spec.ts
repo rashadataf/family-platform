@@ -93,7 +93,10 @@ describe('loadEnv', () => {
   });
 
   it.each([
-    ['the table owner', 'postgresql://family_platform_owner:ownerdev@localhost:5432/family_platform'],
+    [
+      'the table owner',
+      'postgresql://family_platform_owner:ownerdev@localhost:5432/family_platform',
+    ],
     ['a superuser', 'postgresql://postgres:localdev@localhost:5432/family_platform'],
   ])('refuses to boot when DATABASE_URL connects as %s (ADR-017)', (_who, url) => {
     // Both of these are valid URLs that would connect and serve traffic
