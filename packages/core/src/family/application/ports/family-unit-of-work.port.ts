@@ -3,6 +3,7 @@ import type { AuditLogPort } from '../../../compliance/application/ports/audit-l
 import type { FamilyMemberRepository } from './family-member.repository.js';
 import type { FamilyRepository } from './family.repository.js';
 import type { GuardianshipRepository } from './guardianship.repository.js';
+import type { InvitationRepository } from './invitation.repository.js';
 
 /**
  * One database transaction's worth of family repositories, all of them scoped
@@ -29,6 +30,7 @@ export interface FamilyUnitOfWork {
   families: FamilyRepository;
   members: FamilyMemberRepository;
   guardianships: GuardianshipRepository;
+  invitations: InvitationRepository;
   outbox: OutboxPort;
   audit: AuditLogPort;
 }

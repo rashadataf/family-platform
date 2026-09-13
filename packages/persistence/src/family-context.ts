@@ -5,6 +5,8 @@ import { PrismaAuditLogRepository } from './repositories/compliance/audit-log.re
 import { PrismaFamilyMemberRepository } from './repositories/family/family-member.repository.js';
 import { PrismaFamilyRepository } from './repositories/family/family.repository.js';
 import { PrismaGuardianshipRepository } from './repositories/family/guardianship.repository.js';
+import { PrismaInvitationTokenLookup } from './repositories/family/invitation-token-lookup.repository.js';
+import { PrismaInvitationRepository } from './repositories/family/invitation.repository.js';
 import { PrismaOutboxRepository } from './repositories/outbox.repository.js';
 
 /**
@@ -54,6 +56,7 @@ class PrismaFamilyUnitOfWork implements family.FamilyUnitOfWorkPort {
         families: new PrismaFamilyRepository(tx),
         members: new PrismaFamilyMemberRepository(tx),
         guardianships: new PrismaGuardianshipRepository(tx),
+        invitations: new PrismaInvitationRepository(tx),
         outbox: new PrismaOutboxRepository(tx),
         audit: new PrismaAuditLogRepository(tx),
       });
@@ -80,4 +83,12 @@ export function createFamilyUnitOfWork(): family.FamilyUnitOfWorkPort {
  */
 export function createAuditLog(): import('@fp/core').compliance.AuditLogPort {
   return new PrismaAuditLogRepository(prisma);
+}
+
+/**
+ * The one implementation of `InvitationTokenLookupPort` — the second and
+ * last unscoped read in the feature, alongside `createFamilyDirectory`'s own.
+ */
+export function createInvitationTokenLookup(): family.InvitationTokenLookupPort {
+  return new PrismaInvitationTokenLookup();
 }

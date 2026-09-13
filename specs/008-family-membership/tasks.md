@@ -443,53 +443,71 @@ accepts and becomes a linked adult member.
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Unit test `packages/core/src/family/domain/invitation.aggregate.spec.ts`:
+- [X] T057 [P] [US3] Unit test `packages/core/src/family/domain/invitation.aggregate.spec.ts`:
       status transitions, expiry against an injected clock, and `proposed_role` never `owner`.
-- [ ] T058 [P] [US3] Integration test `apps/api/src/family/invitation.integration.spec.ts`: invite
+- [X] T058 [P] [US3] Integration test `apps/api/src/family/invitation.integration.spec.ts`: invite
       `GRACE@example.com`, accept as the account registered at `grace@example.com`, confirm the
       case-insensitive match and the linked member.
-- [ ] T059 [P] [US3] Integration test in `apps/api/src/family/invitation.integration.spec.ts`:
+- [X] T059 [P] [US3] Integration test in `apps/api/src/family/invitation.integration.spec.ts`:
       invite an address with **no** account, then
       register and verify through spec 006's routes, then accept. The outcome must be identical to
       T058's (US3 Scenario 3).
-- [ ] T060 [P] [US3] Integration test in `apps/api/src/family/invitation.integration.spec.ts`,
+- [X] T060 [P] [US3] Integration test in `apps/api/src/family/invitation.integration.spec.ts`,
       the four negatives: a second acceptance
       returns the same membership rather than a duplicate; another account presenting the token gets
       `403 family/invitation_email_mismatch` **and creates nothing**; a redundant invitation gets
       `409 family/already_member`; a revoked or expired token gets
-      `422 family/invitation_invalid`.
+      `422 family/invitation_invalid`. All nine cases in this file share ONE owner/family, created
+      once in `beforeAll` — registering an owner-and-counterpart pair per case would have exceeded
+      identity's own per-source registration throttle (10/60s) well inside how fast a real test run
+      completes; discovered by hitting it.
 
 ### Implementation for User Story 3
 
-- [ ] T061 [US3] Implement the `Invitation` aggregate in
+- [X] T061 [US3] Implement the `Invitation` aggregate in
       `packages/core/src/family/domain/invitation.aggregate.ts` — token hashed, never stored raw,
       the same handling spec 006 gives verification tokens.
-- [ ] T062 [US3] Implement `invitation.repository.ts`, plus the token-keyed lookup exported as one
+- [X] T062 [US3] Implement `invitation.repository.ts`, plus the token-keyed lookup exported as one
       narrow factory outside `withFamilyContext`. This is the second and last unscoped read in the
       feature; [data-model.md](data-model.md) explains why acceptance cannot be family-scoped, and
       that explanation belongs in the file.
-- [ ] T063 [US3] Implement `createInvitation` in
+- [X] T063 [US3] Implement `createInvitation` in
       `packages/core/src/family/application/commands/create-invitation.command.ts`, reusing
       `MailerPort` from `@fp/kernel`. The email carries a link and no family detail beyond its
-      name.
-- [ ] T064 [US3] Implement `acceptInvitation` in
+      name. FR-013's "already belongs to a member" half needed a genuine cross-context read
+      (family has no email column to check directly) — resolved by a new, narrow identity query
+      (`identity.resolveUserIdByEmail`), called once from the composition root
+      (`family.controller.ts`) and passed into the command as a plain, already-resolved `UserId
+      | null` — `packages/core/family` still imports nothing from `packages/core/identity`.
+- [X] T064 [US3] Implement `acceptInvitation` in
       `packages/core/src/family/application/commands/accept-invitation.command.ts`: resolve by token, verify the authenticated account's
       email matches, then open `withFamilyContext` for the family the invitation names and create
-      the linked member plus a `MemberAdded` row.
-- [ ] T065 [P] [US3] Implement `revokeInvitation` and `listInvitations` in
+      the linked member plus a `MemberAdded` row. The email-match check needed the caller's OWN
+      email, which `identityContext` (a session credential) does not carry — a second small
+      identity query, `identity.resolveEmailByUserId`, the mirror of T063's. `AcceptInvitationRequest`
+      carries no display name (contract: "token only"), so the linked member's name is derived from
+      the account's own email local part.
+- [X] T065 [P] [US3] Implement `revokeInvitation` and `listInvitations` in
       `packages/core/src/family/application/`.
-- [ ] T066 [US3] Add, to `packages/contracts/src/v1/family.contract.ts` and
+- [X] T066 [US3] Add, to `packages/contracts/src/v1/family.contract.ts` and
       `apps/api/src/family/family.controller.ts`: `POST /v1/families/:familyId/invitations`, `GET …/invitations`,
       `DELETE …/invitations/:invitationId` and `POST /v1/invitations/accept` to the contract and
       controller. The accept route takes a token and no `:familyId` — a caller cannot name the
       family, only present evidence.
-- [ ] T067 [P] [US3] Implement `apps/worker/src/sweeps/expire-invitations.sweep.ts` (FR-012), with
+- [X] T067 [P] [US3] Implement `apps/worker/src/sweeps/expire-invitations.sweep.ts` (FR-012), with
       an integration test. Acceptance must also check expiry against the clock, so a token that
-      expired a minute ago is dead before the sweep runs.
-- [ ] T068 [US3] Apply, in `apps/api/src/family/family.module.ts` via the existing
+      expired a minute ago is dead before the sweep runs. Needed one more RLS policy pair
+      (`20260913190000_invitation_sweep_policy`, `app.is_sweep`-gated, additive like
+      `invitation_by_token`) since the sweep — like `apps/api` — runs as the NOBYPASSRLS
+      application role and would otherwise see only one family's invitations at a time. Caught by
+      this task's own integration test: an UPDATE whose WHERE clause reads `status`/`expires_at`
+      needs the row to ALSO pass a SELECT-or-ALL policy, so the SELECT-side policy grants on
+      `app.is_sweep` alone rather than repeating the narrower condition.
+- [X] T068 [US3] Apply, in `apps/api/src/family/family.module.ts` via the existing
       `apps/api/src/common/rate-limit.guard.ts`, the rate limits from [contracts/family-api.md](contracts/family-api.md) —
       10 invitations per family per hour is the feature's outbound-abuse surface and the strictest
-      limit here.
+      limit here. New `PerFamilyThrottlerGuard` (tracks by the `:familyId` path param, not account
+      or source — `PerAccountThrottlerGuard`'s sibling), applied only to `createInvitation`.
 
 **Checkpoint**: quickstart Scenario 3 passes, both the has-an-account and the no-account-yet paths.
 
@@ -505,22 +523,30 @@ that no login path was created.
 
 ### Tests for User Story 4
 
-- [ ] T069 [P] [US4] Integration test `apps/api/src/family/extended-member.integration.spec.ts`:
+- [X] T069 [P] [US4] Integration test `apps/api/src/family/extended-member.integration.spec.ts`:
       the created member has no linked account, and resolves the extended capability set —
-      containing `documents:write` but **not** `documents:write:sensitive`.
-- [ ] T070 [P] [US4] Integration test in `apps/api/src/family/extended-member.integration.spec.ts`:
-      promoting that unlinked member to `owner`
-      returns `422 family/owner_ineligible` (US4 Scenario 2), and granting them guardianship
-      returns `422 family/guardian_ineligible` (FR-006).
+      containing `documents:write` but **not** `documents:write:sensitive`. (Capability resolution
+      itself is asserted cell-by-cell in `capabilities.spec.ts`; this test confirms an extended
+      member added through the real route lands with `role: 'extended'`, which is what that map
+      keys on.)
+- [X] T070 [P] [US4] Integration test in `apps/api/src/family/extended-member.integration.spec.ts`:
+      granting the extended member guardianship returns `422 family/guardian_ineligible` (FR-006).
+      The other half of this task's original wording — promoting an unlinked member to `owner`
+      returning `422 family/owner_ineligible` — needs `transferOwnership` (US5, T079), which does
+      not exist yet; deferred to that phase rather than blocking this one on a route it doesn't own.
+- [ ] T070b [US5] Once `transferOwnership` exists, add the owner-ineligible half of T070 above.
 
 ### Implementation for User Story 4
 
-- [ ] T071 [US4] Extend `add-member.command.ts` with the `extended` path — no guardianship
-      established, unlike the child path (FR-005 applies to children only).
-- [ ] T072 [US4] Extend `AddMemberRequest` in `packages/contracts/src/v1/family.contract.ts` and the
+- [X] T071 [US4] Extend `add-member.command.ts` with the `extended` path — no guardianship
+      established, unlike the child path (FR-005 applies to children only). Landed during T052
+      (US2): `FamilyMember.createUnlinked` already generalises over `child`/`extended`
+      (`kind: 'adult'` → `role: 'extended'`), so gating the extended path out in US2 and re-adding
+      it here would have been pure churn for no safety benefit.
+- [X] T072 [US4] Extend `AddMemberRequest` in `packages/contracts/src/v1/family.contract.ts` and the
       handler in `apps/api/src/family/family.controller.ts`. No new route:
       the wire type distinguishes the two, which is why `kind` is a discriminant rather than a
-      flag.
+      flag. Also landed during T052/T056 for the same reason.
 
 **Checkpoint**: quickstart Scenario 4 passes.
 

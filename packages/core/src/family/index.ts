@@ -61,6 +61,33 @@ export {
 } from './application/commands/end-guardianship.command.js';
 export { readMember, type MemberDetail } from './application/queries/read-member.query.js';
 export { listMembers, type MemberSummary } from './application/queries/list-members.query.js';
+export {
+  createInvitation,
+  type CreateInvitationInput,
+  type CreateInvitationDeps,
+} from './application/commands/create-invitation.command.js';
+export {
+  acceptInvitation,
+  type AcceptInvitationInput,
+  type AcceptInvitationDeps,
+} from './application/commands/accept-invitation.command.js';
+export {
+  revokeInvitation,
+  type RevokeInvitationInput,
+} from './application/commands/revoke-invitation.command.js';
+export {
+  listInvitations,
+  type InvitationSummary,
+} from './application/queries/list-invitations.query.js';
+export {
+  Invitation,
+  INVITATION_STATUSES,
+  type InvitationProps,
+  type InvitationStatus,
+  type InvitableRole,
+} from './domain/invitation.aggregate.js';
+export { type InvitationRepository } from './application/ports/invitation.repository.js';
+export { type InvitationTokenLookupPort } from './application/ports/invitation-token.port.js';
 export { Family, type FamilyProps } from './domain/family.aggregate.js';
 export { FamilyMember, type FamilyMemberProps } from './domain/family-member.aggregate.js';
 export {

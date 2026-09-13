@@ -93,3 +93,5 @@ export {
   type ListSessionsInput,
   type SessionListItem,
 } from './application/queries/list-sessions.query.js';
+export { resolveUserIdByEmail } from './application/queries/resolve-user-id-by-email.query.js';
+export { resolveEmailByUserId } from './application/queries/resolve-email-by-user-id.query.js';

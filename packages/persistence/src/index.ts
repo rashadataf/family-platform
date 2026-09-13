@@ -13,6 +13,7 @@ export {
   deleteStaleSessionsBefore,
   deleteUnverifiedRegistrationsBefore,
 } from './repositories/identity/retention.js';
+export { expireOverdueInvitations } from './repositories/family/invitation-sweep.js';
 
 /**
  * The one place a composition root reaches for identity's unit of work. The
@@ -32,7 +33,11 @@ export function createSessionRepository(): identity.SessionRepository {
   return new PrismaSessionRepository(prisma);
 }
 
-export { createFamilyUnitOfWork, createAuditLog } from './family-context.js';
+export {
+  createFamilyUnitOfWork,
+  createAuditLog,
+  createInvitationTokenLookup,
+} from './family-context.js';
 export { provisionDatabaseRoles } from './provision-roles.js';
 
 /**

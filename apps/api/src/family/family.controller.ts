@@ -1,24 +1,31 @@
 import { randomUUID } from 'node:crypto';
 import { Controller, Inject, Logger, NotFoundException, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { AppRoute, ServerInferResponses } from '@ts-rest/core';
 import { TsRestHandler, tsRestHandler, type TsRestRequestShape } from '@ts-rest/nest';
 import { familyContract } from '@fp/contracts';
-import { family } from '@fp/core';
+import { family, identity } from '@fp/core';
 import {
   asFamilyId,
   asFamilyMemberId,
   asGuardianshipId,
+  asInvitationId,
   type Clock,
   type IdempotencyPort,
+  type MailerPort,
+  type TokenGeneratorPort,
 } from '@fp/kernel';
 import { hashIdempotentRequest, readIdempotencyKey } from '../common/idempotency.js';
+import { IDENTITY_UNIT_OF_WORK, MAILER, TOKEN_GENERATOR } from '../identity/identity.tokens.js';
 import type { RequestWithIdentityContext } from '../identity/session.guard.js';
 import { SessionGuard } from '../identity/session.guard.js';
 import { CapabilityGuard, RequiresCapability } from './capability.guard.js';
 import { FamilyMembershipGuard, type RequestWithFamilyContext } from './family-membership.guard.js';
+import { PerFamilyThrottlerGuard } from './per-family-throttler.guard.js';
 import {
   FAMILY_CLOCK,
   FAMILY_DIRECTORY,
+  FAMILY_INVITATION_TOKEN_LOOKUP,
   FAMILY_UNIT_OF_WORK,
   IDEMPOTENCY_STORE,
 } from './family.tokens.js';
@@ -77,6 +84,12 @@ export class FamilyController {
     @Inject(FAMILY_UNIT_OF_WORK) private readonly unitOfWork: family.FamilyUnitOfWorkPort,
     @Inject(FAMILY_DIRECTORY) private readonly directory: family.FamilyDirectoryPort,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotencyStore: IdempotencyPort,
+    @Inject(FAMILY_INVITATION_TOKEN_LOOKUP)
+    private readonly invitationTokenLookup: family.InvitationTokenLookupPort,
+    @Inject(IDENTITY_UNIT_OF_WORK)
+    private readonly identityUnitOfWork: identity.IdentityUnitOfWorkPort,
+    @Inject(MAILER) private readonly mailer: MailerPort,
+    @Inject(TOKEN_GENERATOR) private readonly tokenGenerator: TokenGeneratorPort,
   ) {}
 
   /**
@@ -466,6 +479,213 @@ export class FamilyController {
       }
 
       return { status: 200 as const, body: {} };
+    });
+  }
+
+  /**
+   * FR-011, FR-013. Honours `Idempotency-Key` the same way `addMember` does,
+   * scoped by family (contracts/family-api.md lists this among the routes
+   * that must).
+   *
+   * Rate-limited per family, not per source or account (contracts/family-
+   * api.md's rate-limiting table): 10 invitations per family per hour, the
+   * strictest limit in this feature, since sending one means an email
+   * leaves the platform.
+   */
+  @UseGuards(SessionGuard, PerFamilyThrottlerGuard, FamilyMembershipGuard, CapabilityGuard)
+  @Throttle({ default: { limit: 10, ttl: 3_600_000 } })
+  @RequiresCapability('members:manage')
+  @TsRestHandler(familyContract.createInvitation)
+  createInvitation(
+    @Req() req: RequestWithFamilyContextAndIdempotencyKey,
+  ): RouteHandler<typeof familyContract.createInvitation> {
+    return tsRestHandler(familyContract.createInvitation, async ({ params, body }) => {
+      if (!req.familyContext || !req.identityContext) {
+        throw new Error('Guards did not populate familyContext/identityContext.');
+      }
+      const userId = req.identityContext.userId;
+      const familyId = asFamilyId(params.familyId);
+      const idempotencyKey = readIdempotencyKey(req.headers);
+      const scopedKey = idempotencyKey !== null ? `${familyId}:${idempotencyKey}` : null;
+      const requestHash =
+        scopedKey !== null ? hashIdempotentRequest('createInvitation', body) : null;
+
+      if (scopedKey !== null && requestHash !== null) {
+        const existing = await this.idempotencyStore.findByKey(userId, scopedKey);
+        if (existing !== null) {
+          if (existing.requestHash !== requestHash) {
+            this.logger.warn(`Idempotency-Key ${scopedKey} reused with a different request`);
+          }
+          return {
+            status: existing.responseStatus,
+            body: existing.responseBody,
+          } as ServerInferResponses<typeof familyContract.createInvitation>;
+        }
+      }
+
+      // The one cross-context read this flow needs (FR-013) — resolved here,
+      // in the composition root, never inside `packages/core/family` itself.
+      const existingUserId = await identity.resolveUserIdByEmail(
+        { email: body.email },
+        { unitOfWork: this.identityUnitOfWork },
+      );
+
+      const correlationId = randomUUID();
+      const result = await family.createInvitation(
+        {
+          familyId,
+          invitationId: asInvitationId(randomUUID()),
+          invitedByMemberId: req.familyContext.memberId,
+          email: body.email,
+          proposedRole: body.proposedRole,
+          existingUserId,
+          correlationId,
+        },
+        {
+          unitOfWork: this.unitOfWork,
+          tokenGenerator: this.tokenGenerator,
+          mailer: this.mailer,
+          clock: this.clock,
+        },
+      );
+
+      if (!result.ok) {
+        this.logger.log(
+          `Invitation creation rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+        );
+        if (result.error.kind === 'AlreadyMember') {
+          return { status: 409 as const, body: { type: 'family/already_member' as const } };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      const response = {
+        status: 201 as const,
+        body: { invitationId: result.value.invitationId },
+      };
+
+      if (scopedKey !== null && requestHash !== null) {
+        await this.idempotencyStore.save({
+          userId,
+          key: scopedKey,
+          requestHash,
+          responseStatus: response.status,
+          responseBody: response.body,
+        });
+      }
+
+      return response;
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:manage')
+  @TsRestHandler(familyContract.listInvitations)
+  listInvitations(): RouteHandler<typeof familyContract.listInvitations> {
+    return tsRestHandler(familyContract.listInvitations, async ({ params }) => {
+      const invitations = await family.listInvitations(
+        { familyId: asFamilyId(params.familyId) },
+        { unitOfWork: this.unitOfWork },
+      );
+
+      return {
+        status: 200 as const,
+        body: invitations.map((invitation) => ({
+          id: invitation.id,
+          email: invitation.email,
+          proposedRole: invitation.proposedRole,
+          status: invitation.status,
+          expiresAt: invitation.expiresAt.toISOString(),
+          createdAt: invitation.createdAt.toISOString(),
+        })),
+      };
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:manage')
+  @TsRestHandler(familyContract.revokeInvitation)
+  revokeInvitation(): RouteHandler<typeof familyContract.revokeInvitation> {
+    return tsRestHandler(familyContract.revokeInvitation, async ({ params }) => {
+      const result = await family.revokeInvitation(
+        {
+          familyId: asFamilyId(params.familyId),
+          invitationId: asInvitationId(params.invitationId),
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        if (result.error.kind === 'InvitationInvalid') {
+          return { status: 422 as const, body: { type: 'family/invitation_invalid' as const } };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 200 as const, body: {} };
+    });
+  }
+
+  /**
+   * Authenticated but deliberately NOT family-scoped: the caller has no
+   * standing in the family yet — that is the whole point (US3,
+   * contracts/family-api.md's "Authenticated, no family context" table).
+   * `SessionGuard` alone, never `FamilyMembershipGuard`/`CapabilityGuard`.
+   */
+  @UseGuards(SessionGuard)
+  @TsRestHandler(familyContract.acceptInvitation)
+  acceptInvitation(
+    @Req() req: RequestWithIdentityContext,
+  ): RouteHandler<typeof familyContract.acceptInvitation> {
+    return tsRestHandler(familyContract.acceptInvitation, async ({ body }) => {
+      if (!req.identityContext) {
+        throw new Error('SessionGuard did not populate identityContext.');
+      }
+      const callerUserId = req.identityContext.userId;
+      const callerEmail = await identity.resolveEmailByUserId(
+        { userId: callerUserId },
+        { unitOfWork: this.identityUnitOfWork },
+      );
+      if (callerEmail === null) {
+        // Unreachable when the module is wired correctly: SessionGuard has
+        // already proven this session belongs to a real account.
+        throw new Error('Authenticated session has no resolvable account email.');
+      }
+
+      const correlationId = randomUUID();
+      const result = await family.acceptInvitation(
+        {
+          token: body.token,
+          callerUserId,
+          callerEmail,
+          newMemberId: asFamilyMemberId(randomUUID()),
+          correlationId,
+        },
+        {
+          tokenLookup: this.invitationTokenLookup,
+          tokenGenerator: this.tokenGenerator,
+          unitOfWork: this.unitOfWork,
+          clock: this.clock,
+        },
+      );
+
+      if (!result.ok) {
+        this.logger.log(
+          `Invitation acceptance rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+        );
+        if (result.error.kind === 'InvitationEmailMismatch') {
+          return {
+            status: 403 as const,
+            body: { type: 'family/invitation_email_mismatch' as const },
+          };
+        }
+        return { status: 422 as const, body: { type: 'family/invitation_invalid' as const } };
+      }
+
+      return {
+        status: 200 as const,
+        body: { familyId: result.value.familyId, memberId: result.value.memberId },
+      };
     });
   }
 }

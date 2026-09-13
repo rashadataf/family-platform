@@ -189,6 +189,40 @@ export const grantGuardianshipRequestSchema = z.object({
   guardianMemberId: z.string().uuid(),
 });
 
+export const createInvitationRequestSchema = z.object({
+  email: z.string().trim().max(320),
+  proposedRole: assignableRoleSchema,
+});
+
+export const invitationSummarySchema = z.object({
+  id: z.string().uuid(),
+  email: z.string(),
+  proposedRole: assignableRoleSchema,
+  status: z.enum(['pending', 'accepted', 'revoked', 'expired']),
+  expiresAt: z.string(),
+  createdAt: z.string(),
+});
+
+/** `AcceptInvitationRequest`: token only. The family is not a parameter (contracts/family-api.md). */
+export const acceptInvitationRequestSchema = z.object({
+  token: z.string().trim().min(1),
+});
+
+/** One type for unknown, revoked, and expired — distinguishing them tells a forwarded-email recipient more than they should learn. */
+export const invitationInvalidSchema = problemSchema.extend({
+  type: z.literal('family/invitation_invalid'),
+});
+
+/** FR-011: says the email does not match, never *which* email was invited. */
+export const invitationEmailMismatchSchema = problemSchema.extend({
+  type: z.literal('family/invitation_email_mismatch'),
+});
+
+/** FR-013: this email already belongs to a member of this family, or already has a pending invitation. */
+export const alreadyMemberSchema = problemSchema.extend({
+  type: z.literal('family/already_member'),
+});
+
 const c = initContract();
 
 export const familyContract = c.router(
@@ -299,6 +333,56 @@ export const familyContract = c.router(
       },
       summary:
         'End a guardianship, refused if it would leave the child with none (requires guardianship:manage, FR-008)',
+    },
+
+    listInvitations: {
+      method: 'GET',
+      path: '/families/:familyId/invitations',
+      pathParams: z.object({ familyId: z.string().uuid() }),
+      responses: {
+        200: z.array(invitationSummarySchema),
+        403: capabilityRequiredSchema,
+      },
+      summary: "The family's own invitations (requires members:manage)",
+    },
+
+    createInvitation: {
+      method: 'POST',
+      path: '/families/:familyId/invitations',
+      pathParams: z.object({ familyId: z.string().uuid() }),
+      body: createInvitationRequestSchema,
+      responses: {
+        201: z.object({ invitationId: z.string().uuid() }),
+        403: capabilityRequiredSchema,
+        409: alreadyMemberSchema,
+      },
+      summary:
+        'Invite an adult, extended, or viewer member by email (requires members:manage, FR-011, FR-013)',
+    },
+
+    revokeInvitation: {
+      method: 'DELETE',
+      path: '/families/:familyId/invitations/:invitationId',
+      pathParams: z.object({ familyId: z.string().uuid(), invitationId: z.string().uuid() }),
+      responses: {
+        200: z.object({}),
+        403: capabilityRequiredSchema,
+        422: invitationInvalidSchema,
+      },
+      summary: 'Revoke a pending invitation (requires members:manage)',
+    },
+
+    acceptInvitation: {
+      method: 'POST',
+      path: '/invitations/accept',
+      body: acceptInvitationRequestSchema,
+      responses: {
+        200: z.object({ familyId: z.string().uuid(), memberId: z.string().uuid() }),
+        403: invitationEmailMismatchSchema,
+        422: invitationInvalidSchema,
+      },
+      summary:
+        'Accept an invitation by token — no :familyId, since a caller with only a token cannot name one (US3, FR-011)',
     },
   },
   {

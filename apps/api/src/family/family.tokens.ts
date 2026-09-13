@@ -22,3 +22,10 @@ export const FAMILY_DIRECTORY = Symbol('FAMILY_DIRECTORY');
 
 /** ADR-006, Principle IX: the store behind `POST /v1/families`'s `Idempotency-Key` handling. */
 export const IDEMPOTENCY_STORE = Symbol('IDEMPOTENCY_STORE');
+
+/**
+ * The second and last unscoped read (FR-011, "which invitation does this
+ * token belong to"), kept separate from `FAMILY_UNIT_OF_WORK` for the same
+ * reason `FAMILY_DIRECTORY` is: it runs outside `withFamilyContext`.
+ */
+export const FAMILY_INVITATION_TOKEN_LOOKUP = Symbol('FAMILY_INVITATION_TOKEN_LOOKUP');

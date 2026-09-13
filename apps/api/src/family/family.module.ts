@@ -5,6 +5,7 @@ import {
   createFamilyDirectory,
   createFamilyUnitOfWork,
   createIdempotencyStore,
+  createInvitationTokenLookup,
 } from '@fp/persistence';
 import { IdentityModule } from '../identity/identity.module.js';
 import { CapabilityGuard } from './capability.guard.js';
@@ -14,6 +15,7 @@ import {
   AUDIT_LOG,
   FAMILY_CLOCK,
   FAMILY_DIRECTORY,
+  FAMILY_INVITATION_TOKEN_LOOKUP,
   FAMILY_UNIT_OF_WORK,
   IDEMPOTENCY_STORE,
 } from './family.tokens.js';
@@ -36,6 +38,7 @@ import {
     { provide: AUDIT_LOG, useFactory: () => createAuditLog() },
     { provide: FAMILY_DIRECTORY, useFactory: () => createFamilyDirectory() },
     { provide: IDEMPOTENCY_STORE, useFactory: () => createIdempotencyStore() },
+    { provide: FAMILY_INVITATION_TOKEN_LOOKUP, useFactory: () => createInvitationTokenLookup() },
     FamilyMembershipGuard,
     CapabilityGuard,
   ],

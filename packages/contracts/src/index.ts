@@ -30,4 +30,10 @@ export {
   guardianIneligibleSchema,
   lastGuardianSchema,
   grantGuardianshipRequestSchema,
+  createInvitationRequestSchema,
+  invitationSummarySchema,
+  acceptInvitationRequestSchema,
+  invitationInvalidSchema,
+  invitationEmailMismatchSchema,
+  alreadyMemberSchema,
 } from './v1/family.contract.js';

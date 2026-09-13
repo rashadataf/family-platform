@@ -1,8 +1,9 @@
-import type { FamilyId, FamilyMemberId, OutboxEventToAppend } from '@fp/kernel';
+import type { FamilyId, FamilyMemberId, InvitationId, OutboxEventToAppend } from '@fp/kernel';
 import type { AuditEntry } from '../../compliance/domain/audit-entry.js';
 import type { Family } from '../domain/family.aggregate.js';
 import type { FamilyMember } from '../domain/family-member.aggregate.js';
 import type { Guardianship } from '../domain/guardianship.js';
+import type { Invitation } from '../domain/invitation.aggregate.js';
 import type { MemberStanding } from './ports/family-member.repository.js';
 import type { FamilyUnitOfWork, FamilyUnitOfWorkPort } from './ports/family-unit-of-work.port.js';
 
@@ -26,9 +27,11 @@ export interface FakeFamilyState {
   standing: MemberStanding | null;
   members: FamilyMember[];
   guardianships: Guardianship[];
+  invitations: Invitation[];
   savedFamilies: Family[];
   savedMembers: FamilyMember[];
   savedGuardianships: Guardianship[];
+  savedInvitations: Invitation[];
   events: OutboxEventToAppend[];
   auditEntries: AuditEntry[];
   scopedTo: FamilyId[];
@@ -40,9 +43,11 @@ export function emptyFamilyState(overrides: Partial<FakeFamilyState> = {}): Fake
     standing: null,
     members: [],
     guardianships: [],
+    invitations: [],
     savedFamilies: [],
     savedMembers: [],
     savedGuardianships: [],
+    savedInvitations: [],
     events: [],
     auditEntries: [],
     scopedTo: [],
@@ -100,6 +105,20 @@ export function fakeFamilyUnitOfWork(state: FakeFamilyState): FamilyUnitOfWorkPo
               state.guardianships
                 .filter((g) => g.guardianMemberId === guardianMemberId && g.isActive)
                 .map((g) => g.childMemberId),
+            ),
+        },
+        invitations: {
+          save: (invitation: Invitation) => {
+            state.savedInvitations.push(invitation);
+            return Promise.resolve();
+          },
+          findById: (invitationId: InvitationId) =>
+            Promise.resolve(state.invitations.find((i) => i.id === invitationId) ?? null),
+          listAll: () => Promise.resolve(state.invitations),
+          findPendingByEmail: (email: string) =>
+            Promise.resolve(
+              state.invitations.find((i) => i.status === 'pending' && i.email.value === email) ??
+                null,
             ),
         },
         outbox: {
