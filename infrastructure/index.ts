@@ -17,6 +17,8 @@ const stackConfig = loadStackConfig({
   vpsSshPort: cfg.get('vpsSshPort'),
   vpsSshPrivateKey: cfg.get('vpsSshPrivateKey'),
   postgresPassword: cfg.get('postgresPassword'),
+  dbOwnerPassword: cfg.get('dbOwnerPassword'),
+  dbAppPassword: cfg.get('dbAppPassword'),
   apiPublishedPort: cfg.get('apiPublishedPort'),
   stagingNetworkName: cfg.get('stagingNetworkName'),
   resetData: cfg.get('resetData'),

@@ -111,39 +111,39 @@ in force before there is anything for it to catch.
 
 ### Schema, and making row-level security real (ADR-017)
 
-- [ ] T008 Add the `family`, `familyMember`, `invitation` and `guardianship` models plus the
+- [X] T008 Add the `family`, `familyMember`, `invitation` and `guardianship` models plus the
       `member_kind`, `member_role` and `invitation_status` enums to
       `packages/persistence/prisma/schema.prisma`, per [data-model.md](data-model.md). UUIDv7 via
       `@default(uuid(7))` ([research.md §9](research.md)). `family_member.user_id` carries **no**
       foreign key — cross-context references are to published stable ids only.
-- [ ] T009 Add the `auditLog` model and the `audit_result` enum to
+- [X] T009 Add the `auditLog` model and the `audit_result` enum to
       `packages/persistence/prisma/schema.prisma`, in its own
       commented block marking it **owned by Audit and Compliance, deliberately not family-scoped**
       ([research.md §7](research.md)) so the next reader does not "fix" it.
-- [ ] T010 Generate the migration as `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`,
+- [X] T010 Generate the migration as `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`,
       then hand-write into it the creation of the
       `family_platform_app` login role with `NOBYPASSRLS`, and its grants: full DML on the four
       family-scoped tables, `INSERT` **only** on `audit_log`. Prisma cannot express roles or grants,
       so this is raw SQL in the generated migration directory, which ADR-003 permits and reviews.
-- [ ] T011 Hand-write into `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`
+- [X] T011 Hand-write into `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`
       the `ALTER TABLE … ENABLE ROW LEVEL SECURITY` **and**
       `FORCE ROW LEVEL SECURITY` for `family`, `family_member`, `invitation` and `guardianship`,
       plus one policy each: `USING (family_id = current_setting('app.family_id', true)::uuid)` —
       and `id = …` for `family` itself, whose own primary key is the family id. The second argument
       `true` is what makes an unset context return `NULL` and the policy fail closed
       ([research.md §2](research.md)).
-- [ ] T012 Hand-write the constraints Prisma's schema language cannot express, into
+- [X] T012 Hand-write the constraints Prisma's schema language cannot express, into
       `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`: the partial unique indexes (`family_one_owner`, one membership per user per
       family, one pending invitation per family and email, one active guardianship per pair) and the
       three `CHECK` constraints on `family_member` from [data-model.md](data-model.md). These are
       not belt-and-braces — `family_one_owner` is the whole of SC-007's guarantee, and the checks
       are what stop a raw query creating a child with a login path.
-- [ ] T013 Split the connection strings: `DATABASE_URL` becomes the application role's, a new
+- [X] T013 Split the connection strings: `DATABASE_URL` becomes the application role's, a new
       `MIGRATOR_DATABASE_URL` carries the owner's. Update `docker-compose.yml` (api, worker and
       migrate services), `docker-compose.staging.yml`, `.env.example`, and
       `apps/api/src/config/env.schema.ts`. A process that boots with the wrong one must fail at
       boot, not at the first query (Principle II).
-- [ ] T014 Add the application role's credential to the `infrastructure/` vps-staging Pulumi stack,
+- [X] T014 Add the application role's credential to the `infrastructure/` vps-staging Pulumi stack,
       resolved at runtime from the secret store — never committed, never a build argument
       (Principle X).
 

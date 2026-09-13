@@ -131,7 +131,22 @@ COPY packages/persistence/src/ packages/persistence/src/
 # ---------------------------------------------------------------------------
 FROM deps AS migrator
 
-CMD ["pnpm", "--filter", "@fp/persistence", "exec", "prisma", "migrate", "deploy"]
+# Two steps, in this order, and the order is the decision (ADR-017):
+#
+#   1. provision-roles  — as the cluster superuser. Creates
+#      `family_platform_owner` and `family_platform_app`, sets their passwords
+#      from the environment, and hands ownership of existing objects to the
+#      owner. The only superuser connection in the system.
+#   2. migrate deploy   — as `family_platform_owner`, a NON-superuser. Every
+#      table it creates is therefore owned by a role that `FORCE ROW LEVEL
+#      SECURITY` can constrain. Running this as the superuser instead would
+#      leave every policy in the schema enforced against the application and
+#      against nobody else.
+#
+# `&&` rather than two services: if provisioning fails the migration must not
+# run, and Compose's `service_completed_successfully` already gates the API on
+# this container's exit code.
+CMD ["sh", "-c", "pnpm --filter @fp/persistence run db:provision-roles && pnpm --filter @fp/persistence exec prisma migrate deploy"]
 
 # ---------------------------------------------------------------------------
 # development — a contributor's machine, via Compose. TARGET.

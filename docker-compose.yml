@@ -44,7 +44,15 @@ services:
       # Host is `postgres`, not `localhost`. The value in .env is correct for
       # the host-based flow and wrong inside this network; one .env cannot
       # serve both, and this override is the resolution (data-model.md §4).
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+      # Three roles (ADR-017). This service is the only place the superuser
+      # credential appears, and it uses it for exactly one step: creating the
+      # owner and application roles. Migrations themselves then run as the
+      # owner, which is NOT a superuser — that is what gives `FORCE ROW LEVEL
+      # SECURITY` something to constrain.
+      BOOTSTRAP_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DATABASE_URL: postgresql://family_platform_owner:${DB_OWNER_PASSWORD:-ownerdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:-ownerdev}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:-appdev}
       # Pass-through, not a value: `packages/persistence/prisma/seed.ts`'s
       # founder-account fixture reads these directly. Unset locally (a plain
       # `docker compose up` never sets them), so the seed script's own
@@ -90,7 +98,10 @@ services:
       # PORT below only chooses which host port maps to it, so changing PORT
       # in .env can never desynchronise the two.
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+      # The APPLICATION role, and nothing stronger (ADR-017). The owner's URL
+      # would work and would silently bypass every row-level security policy;
+      # apps/api's env schema refuses to boot on anything but this user.
+      DATABASE_URL: postgresql://family_platform_app:${DB_APP_PASSWORD:-appdev}@postgres:5432/${POSTGRES_DB:-family_platform}
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
     ports:
@@ -141,7 +152,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-localdev}@postgres:5432/${POSTGRES_DB:-family_platform}
+      # The APPLICATION role, and nothing stronger (ADR-017). The owner's URL
+      # would work and would silently bypass every row-level security policy;
+      # apps/api's env schema refuses to boot on anything but this user.
+      DATABASE_URL: postgresql://family_platform_app:${DB_APP_PASSWORD:-appdev}@postgres:5432/${POSTGRES_DB:-family_platform}
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
     volumes:

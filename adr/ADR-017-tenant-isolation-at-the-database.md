@@ -57,22 +57,38 @@ family-scoped table is placed under both `ENABLE` and `FORCE ROW LEVEL SECURITY`
 
 Three parts.
 
-### 1. Two roles, with different jobs
+### 1. Three roles, with different jobs
 
 | Role | Used by | Holds |
 |---|---|---|
-| `postgres` (owner) | The `migrate` service, `prisma migrate deploy`, the seed fixture | DDL. Never used by a running application process |
-| `family_platform_app` | `apps/api`, `apps/worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` on operational tables; `INSERT` **only** on `audit_log`. Created `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`, and not a member of the owner role |
+| The cluster superuser (`postgres` locally) | One bootstrap step, before migrations | Role creation and the one-time ownership reassignment. Never used by a migration or an application process after bootstrap |
+| `family_platform_owner` | The `migrate` service, `prisma migrate deploy`, the seed fixture | DDL, and ownership of every table. `NOSUPERUSER NOBYPASSRLS` |
+| `family_platform_app` | `apps/api`, `apps/worker` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` on operational tables; `INSERT` **only** on `audit_log`. `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`, and not a member of the owner role |
 
-A third migration role is **not** introduced. The owner role already exists, migrations already run
-as a separate container task with its own lifecycle
-([ADR-014](ADR-014-containerized-development.md)), and a third role would add a credential to
-manage for no isolation the two do not already provide. The property that matters is that no
-long-running application process holds DDL rights or RLS exemption, and two roles achieve it.
+**The owner must not be the cluster superuser, and this is the part that is easy to get wrong.**
+`FORCE ROW LEVEL SECURITY` removes the *table owner's* exemption. It does not remove a
+**superuser's**, which is unconditional and cannot be turned off per-table. Locally the container's
+`postgres` role is both the superuser and the owner of every table Prisma creates, so `FORCE` alone
+changes nothing there — verified empirically while implementing this ADR: with policies enabled and
+forced, the application role saw zero rows and `postgres` still saw every one.
 
-The connection strings separate accordingly: `DATABASE_URL` becomes the application role's, and a
-new `MIGRATOR_DATABASE_URL` carries the owner's. Both are parsed at process start, and a process
-that boots with the wrong one fails at boot rather than at its first query (Principle II).
+Leaving it there would reproduce this ADR's own subject one level down. Worse, it would make
+isolation differ silently *by environment*: a managed PostgreSQL hands you a master user that is
+**not** a superuser, so `FORCE` would bite in production and not in development, and the difference
+would first be noticed by a maintenance script behaving unexpectedly in the environment where that
+matters most.
+
+So the owner is its own non-superuser role, and the superuser's job shrinks to a single bootstrap
+step that runs before the first migration: create both roles, set their passwords from the
+environment, grant the owner `CREATE` on the schema, and reassign ownership of the objects that
+already exist to it. Everything after that — every migration, in every environment — runs as
+`family_platform_owner`, so every table it creates is owned by a role `FORCE` can actually
+constrain.
+
+The connection strings separate accordingly: `DATABASE_URL` is the application role's,
+`MIGRATOR_DATABASE_URL` the owner's, and `BOOTSTRAP_DATABASE_URL` the superuser's — the last used by
+one short-lived step and by nothing else. Each is parsed at process start, and a process that boots
+with the wrong one fails at boot rather than at its first query (Principle II).
 
 ### 2. `FORCE`, not merely `ENABLE`
 
@@ -83,11 +99,17 @@ ALTER TABLE family_member ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_member FORCE  ROW LEVEL SECURITY;
 ```
 
-`ENABLE` alone is what the application role needs, since it is not the owner. `FORCE` covers the one
-legitimate owner-connected path — migrations, the seed fixture, and any future maintenance script —
+`ENABLE` alone is what the application role needs, since it is not the owner. `FORCE` covers the
+legitimate owner-connected paths — migrations, the seed fixture, and any future maintenance script —
 so that a query run as the owner is filtered too unless it deliberately steps outside the policy.
 This is the layer that survives "a developer who bypasses the repository," and a developer with a
 `psql` prompt is usually connected as the owner.
+
+`FORCE` only means something because of part 1: it constrains the table's owner, and the owner is
+now a role without superuser rights. A superuser still sees everything, in every environment, and
+nothing in PostgreSQL can change that. Cluster superuser access is therefore a privileged
+operation in its own right, to be held by people rather than by services, and none of this feature's
+services hold it after bootstrap.
 
 ### 3. The tenant key binds per transaction, by function, not by statement
 
@@ -143,12 +165,19 @@ The decisive objection is not the missing layer, it is the false signal. Under t
 repository would contain policies, a CI check verifying them, and an architecture document
 describing them as load-bearing, while none of it was in force.
 
-### A third, dedicated migration role — rejected
+### Two roles, with the cluster superuser as the table owner — rejected
 
-More roles, more credentials, no additional isolation. The relevant property is that application
-processes hold neither DDL rights nor RLS exemption; separating the migrator from the owner does not
-advance it. Revisit if the owner role ever needs to be reachable by something other than the
-migration task.
+This was the first draft of this ADR, and implementing it disproved it. `FORCE ROW LEVEL SECURITY`
+lifts the owner's exemption but not a superuser's, so with the superuser as owner the third role's
+absence would have left `FORCE` decorative — the same failure this ADR exists to correct, moved one
+level down and made environment-dependent, since a managed PostgreSQL's master user is not a
+superuser. The extra credential is a real cost and it buys the difference between a control that
+works everywhere and one that works only where nobody looks.
+
+### A separate role for migrations, distinct from the owner — rejected
+
+Four roles. The migrator and the owner have the same job — DDL — and separating them would mean a
+migration could create a table it does not own, which is worse than the problem it solves.
 
 ### One database per family — rejected
 
@@ -194,9 +223,10 @@ when application code does not.
 
 ### Negative
 
-- **A second credential to provision, rotate and inject** in every environment: Compose, the staging
-  stack, CI, and Stage 1 later. Small, but it is real operational surface that did not exist
-  yesterday.
+- **Two credentials to provision, rotate and inject** in every environment: Compose, the staging
+  stack, CI, and Stage 1 later, plus a superuser credential that one bootstrap step needs and
+  nothing else may hold. That is real operational surface that did not exist yesterday, and it is
+  the main thing this decision costs.
 - **A new way to break the application in a way that looks like data loss.** A misconfigured role,
   or a query path that misses `withFamilyContext`, produces an empty result rather than an error.
   This is the safe direction to fail, but it is confusing in the moment, which is why the empty
@@ -212,6 +242,9 @@ when application code does not.
   rows by setting the context. RLS here defends against forgotten predicates and bypassed
   repositories, not against arbitrary code execution inside the API. Nothing in §9 claims otherwise,
   but it is worth writing down so nobody later assumes it does.
+- **It does not protect against a superuser**, and cannot. `FORCE` has no effect on one. This is a
+  reason to treat cluster superuser access as an operation performed by a named person during an
+  incident, not as a credential any service holds.
 
 ### Revisit this decision when
 

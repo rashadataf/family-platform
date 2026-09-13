@@ -31,6 +31,8 @@ const VALID_RAW: RawStackConfig = {
   vpsSshUser: 'deploy',
   vpsSshPrivateKey: WELL_FORMED_PEM,
   postgresPassword: 'a-real-secret-would-go-here',
+  dbOwnerPassword: 'another-real-secret-would-go-here',
+  dbAppPassword: 'a-third-real-secret-would-go-here',
 };
 
 /**
