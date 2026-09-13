@@ -647,16 +647,34 @@ stories; the requirements below are not covered by any of them.
       `family_member_owner_is_linked_adult` — a real constraint, not a test bug: erasing the sole
       owner is exactly as invalid as removing them (`removeMember` already refuses it), so the
       fixture erases an ordinary adult guardian instead.
-- [ ] T084 [P] Implement `apps/worker/src/sweeps/guardian-coverage.sweep.ts` and the
+- [X] T084 [P] Implement `apps/worker/src/sweeps/guardian-coverage.sweep.ts` and the
       `family_children_without_guardian` gauge, alerting on any value above zero. This is what makes
       SC-006 *measured* rather than merely asserted at the moment of each mutation
-      ([research.md §6](research.md)).
-- [ ] T085 [P] Implement, in `apps/api/src/family/` and `packages/platform/src/`, the remaining four
+      ([research.md §6](research.md)). A genuinely cross-family read, so it needed the same shape
+      of RLS policy the invitation-expiry sweep already introduced — two more `app.is_sweep`-gated
+      SELECT-only policies (`family_member_sweep_select`, `guardianship_sweep_select`,
+      `20260913210000_guardian_coverage_sweep_policy`), reusing the existing flag rather than
+      minting a new one per sweep. "Gauge" and "alert" are both a structured `console.warn` line:
+      this platform has no metrics or alerting pipeline anywhere yet — the same gap spec 006's own
+      tasks.md T059 note already accepts for identity — so a searchable log line is what those words
+      mean until one exists, not a fabricated integration with a library nothing else in the
+      codebase uses.
+- [X] T085 [P] Implement, in `apps/api/src/family/` and `packages/platform/src/`, the remaining four
       observability signals from
       [contracts/family-api.md](contracts/family-api.md): `family_context_resolve_duration`,
       `family_authorization_denied_total{reason}`, `family_rls_empty_result_total` (an alert, per
       ARCHITECTURE §9 — an empty result under RLS should be unreachable) and
-      `family_child_record_read_total{result}`.
+      `family_child_record_read_total{result}`. All four as structured log lines, for the same
+      reason T084's are — `family_authorization_denied_total` and `family_child_record_read_total`
+      were effectively already there: `FamilyMembershipGuard`/`CapabilityGuard` already log every
+      denial with its real reason (and write it to `audit_log`, a more durable signal than an
+      in-memory counter would be), and `readMember` already audits every child-record read,
+      granted or denied. What was missing: `family_context_resolve_duration`
+      (`FamilyMembershipGuard` now times `resolveFamilyContext` and logs the duration) and
+      `family_rls_empty_result_total` (a new `logRlsEmptyResult` helper on `FamilyController`,
+      called at the four spots where a query *inside* an already-guard-verified scope comes back
+      empty — `getFamily`, `updateFamily`, `createInvitation`, `requestFamilyDeletion` — never at
+      an ordinary "this id does not exist" 404, which is expected and not an anomaly).
 - [ ] T086 [P] Add `apps/api/src/family/no-personal-data-in-telemetry.integration.spec.ts`,
       mirroring spec 006's `no-secrets-in-logs.integration.spec.ts`: exercise every route and assert
       no `displayName`, `dateOfBirth`, `postcode` or email value appears in any log line, metric

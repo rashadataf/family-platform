@@ -15,6 +15,10 @@ export {
   deleteUnverifiedRegistrationsBefore,
 } from './repositories/identity/retention.js';
 export { expireOverdueInvitations } from './repositories/family/invitation-sweep.js';
+export {
+  findChildrenWithoutGuardian,
+  type UncoveredChild,
+} from './repositories/family/guardian-coverage.js';
 export { eraseForFamily, eraseForMember };
 
 /** Constitution Principle XI: the one implementation of `family.ErasurePort`. */

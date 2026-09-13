@@ -63,9 +63,19 @@ export class FamilyMembershipGuard implements CanActivate {
     }
     const familyId = asFamilyId(rawFamilyId);
 
+    // `family_context_resolve_duration` (contracts/family-api.md's
+    // observability signals) — this platform has no metrics pipeline yet
+    // (identity's own tasks.md T059 note records the same accepted gap), so
+    // a structured log line carrying the duration is what this signal means
+    // until one exists.
+    const startedAt = performance.now();
     const resolved = await family.resolveFamilyContext(
       { userId: identity.userId, familyId },
       { unitOfWork: this.unitOfWork },
+    );
+    const durationMs = performance.now() - startedAt;
+    this.logger.log(
+      `family_context_resolve_duration_ms=${durationMs.toFixed(1)} [correlationId=${correlationId}]`,
     );
 
     if (resolved === null) {

@@ -93,6 +93,21 @@ export class FamilyController {
   ) {}
 
   /**
+   * `family_rls_empty_result_total` (contracts/family-api.md's observability
+   * signals) — this platform has no metrics pipeline yet (the same accepted
+   * gap identity's own tasks.md T059 note records), so a structured, greppable
+   * log line is what "an alert on any value above zero" means until one
+   * exists. Called only where a query *inside* an already-guard-verified
+   * family scope comes back empty — never for an ordinary "this id does not
+   * exist" 404, which is expected and not an anomaly.
+   */
+  private logRlsEmptyResult(route: string, correlationId: string): void {
+    this.logger.error(
+      `family_rls_empty_result_total route=${route} [correlationId=${correlationId}]`,
+    );
+  }
+
+  /**
    * ADR-006, Principle IX. `POST /v1/families` is the route that genuinely
    * needs this: unlike registration, nothing about creating a family is
    * naturally deduplicated — a client retrying a flaky request would
@@ -219,6 +234,7 @@ export class FamilyController {
         // Unreachable when the module is wired correctly: FamilyMembershipGuard
         // has already proven this exact family readable to this exact caller,
         // inside the same row-level-security scope this lookup uses again.
+        this.logRlsEmptyResult('getFamily', randomUUID());
         throw new NotFoundException({ type: 'family/not_found' });
       }
 
@@ -253,6 +269,7 @@ export class FamilyController {
         // disagreed with the guard that already ran ahead of it — a defect
         // this request should never actually reach, not a case a client
         // needs a distinct response for.
+        this.logRlsEmptyResult('updateFamily', randomUUID());
         throw new NotFoundException({ type: 'family/not_found' });
       }
 
@@ -556,6 +573,7 @@ export class FamilyController {
         if (result.error.kind === 'AlreadyMember') {
           return { status: 409 as const, body: { type: 'family/already_member' as const } };
         }
+        this.logRlsEmptyResult('createInvitation', correlationId);
         throw new NotFoundException({ type: 'family/not_found' });
       }
 
@@ -796,16 +814,18 @@ export class FamilyController {
       if (!req.familyContext) {
         throw new Error('FamilyMembershipGuard did not populate familyContext.');
       }
+      const correlationId = randomUUID();
       const result = await family.requestFamilyDeletion(
         {
           familyId: asFamilyId(params.familyId),
           requestedByMemberId: req.familyContext.memberId,
-          correlationId: randomUUID(),
+          correlationId,
         },
         { unitOfWork: this.unitOfWork, clock: this.clock },
       );
 
       if (!result.ok) {
+        this.logRlsEmptyResult('requestFamilyDeletion', correlationId);
         throw new NotFoundException({ type: 'family/not_found' });
       }
 

@@ -5,6 +5,7 @@ import { runEraseDeletedAccountsSweep } from './sweeps/erase-deleted-accounts.sw
 import { runEraseStaleSessionsSweep } from './sweeps/erase-stale-sessions.sweep.js';
 import { runEraseUnverifiedSweep } from './sweeps/erase-unverified.sweep.js';
 import { runExpireInvitationsSweep } from './sweeps/expire-invitations.sweep.js';
+import { runGuardianCoverageSweep } from './sweeps/guardian-coverage.sweep.js';
 
 /**
  * Runs every retention sweep (FR-019, FR-020, spec.md's stale-session rule,
@@ -53,6 +54,9 @@ async function main(): Promise<void> {
 
   const expiredInvitations = await runExpireInvitationsSweep(clock);
   console.log(`expire-invitations: expired ${String(expiredInvitations.expiredCount)}`);
+
+  const guardianCoverage = await runGuardianCoverageSweep();
+  console.log(`guardian-coverage: uncovered ${String(guardianCoverage.uncoveredChildren.length)}`);
 
   await disconnectDatabase();
 }
