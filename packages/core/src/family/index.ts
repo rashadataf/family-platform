@@ -5,4 +5,14 @@
 //
 // Public surface re-exported here as it is built out story by story.
 
-export {};
+export {
+  CAPABILITIES,
+  MEMBER_KINDS,
+  MEMBER_ROLES,
+  capabilitiesFor,
+  isEligibleGuardian,
+  roleHasCapability,
+  type Capability,
+  type MemberKind,
+  type MemberRole,
+} from './domain/capabilities.js';

@@ -86,22 +86,22 @@ in force before there is anything for it to catch.
 
 ### Kernel and shared primitives
 
-- [ ] T004 [P] Add `FamilyId`, `FamilyMemberId`, `InvitationId`, `GuardianshipId` and their `as*`
+- [X] T004 [P] Add `FamilyId`, `FamilyMemberId`, `InvitationId`, `GuardianshipId` and their `as*`
       constructors to `packages/kernel/src/branded-id.ts`, and export them from
       `packages/kernel/src/index.ts`.
-- [ ] T005 [P] Move `EmailAddress` from `packages/core/src/identity/domain/email-address.vo.ts` to
+- [X] T005 [P] Move `EmailAddress` from `packages/core/src/identity/domain/email-address.vo.ts` to
       `packages/kernel/src/email-address.vo.ts`, re-export it from
       `packages/core/src/identity/index.js` so spec 006's public surface is unchanged, and move
       `email-address.vo.spec.ts` alongside it. [research.md §8](research.md): invitation acceptance
       and account lookup must normalise through one implementation, because a divergence between two
       is a case-sensitivity leak in the invitation path.
-- [ ] T006 [P] Add the family error kinds to `packages/kernel/src/errors.ts`'s `DomainError` union:
+- [X] T006 [P] Add the family error kinds to `packages/kernel/src/errors.ts`'s `DomainError` union:
       `CapabilityRequired`, `GuardianshipRequired`, `GuardianIneligible`, `LastGuardian`,
       `OwnerRequired`, `OwnerIneligible`, `AlreadyMember`, `InvitationInvalid`,
       `InvitationEmailMismatch`. One per error type in
       [contracts/family-api.md](contracts/family-api.md), so the controller's mapping is exhaustive
       by the compiler rather than by review.
-- [ ] T007 [P] Implement the role-to-capability map in
+- [X] T007 [P] Implement the role-to-capability map in
       `packages/core/src/family/domain/capabilities.ts` — the `Capability` union, the `MemberRole`
       union, and a pure `capabilitiesFor(role)` — exactly as tabulated in
       [data-model.md](data-model.md). With

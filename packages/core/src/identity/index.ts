@@ -2,7 +2,10 @@
 // Public surface re-exported here as it is built out story by story.
 
 export { Device, type DeviceProps } from './domain/device.js';
-export { EmailAddress } from './domain/email-address.vo.js';
+// Re-exported from @fp/kernel, where it moved when Family and Membership
+// (spec 008) came to need the same normalisation rule. Identity's public
+// surface is unchanged: `identity.EmailAddress` still resolves.
+export { EmailAddress } from '@fp/kernel';
 export {
   EmailVerification,
   type EmailVerificationProps,

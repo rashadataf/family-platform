@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  EmailAddress,
   ok,
   type Clock,
   type DomainError,
@@ -7,7 +8,6 @@ import {
   type Result,
   type TokenGeneratorPort,
 } from '@fp/kernel';
-import { EmailAddress } from '../../domain/email-address.vo.js';
 import { EmailVerification } from '../../domain/email-verification.entity.js';
 import type { IdentityUnitOfWorkPort } from '../ports/identity-unit-of-work.port.js';
 

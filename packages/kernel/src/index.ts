@@ -3,11 +3,20 @@ export {
   asUserId,
   asSessionId,
   asDeviceId,
+  asFamilyId,
+  asFamilyMemberId,
+  asInvitationId,
+  asGuardianshipId,
   type Branded,
   type UserId,
   type SessionId,
   type DeviceId,
+  type FamilyId,
+  type FamilyMemberId,
+  type InvitationId,
+  type GuardianshipId,
 } from './branded-id.js';
+export { EmailAddress } from './email-address.vo.js';
 export { type DomainError } from './errors.js';
 export { type Clock } from './clock.port.js';
 export { type PasswordHasherPort } from './password-hasher.port.js';

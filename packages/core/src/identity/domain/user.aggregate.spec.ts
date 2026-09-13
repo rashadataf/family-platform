@@ -1,6 +1,6 @@
 import { asUserId } from '@fp/kernel';
 import { describe, expect, it } from 'vitest';
-import { EmailAddress } from './email-address.vo.js';
+import { EmailAddress } from '@fp/kernel';
 import { User } from './user.aggregate.js';
 
 const NOW = new Date('2026-01-01T00:00:00Z');

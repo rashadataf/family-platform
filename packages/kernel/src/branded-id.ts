@@ -23,3 +23,32 @@ export function asSessionId(value: string): SessionId {
 export function asDeviceId(value: string): DeviceId {
   return value as DeviceId;
 }
+
+/**
+ * Family and Membership (spec 008). `FamilyId` is the tenant key: it is the
+ * value bound to `app.family_id` for a transaction (ADR-017) and the value
+ * every family-scoped table carries. Branding it is what stops a
+ * `FamilyMemberId` being passed where the scope is expected — the one
+ * substitution in this system that would silently widen a query's blast
+ * radius rather than narrow it.
+ */
+export type FamilyId = Branded<string, 'FamilyId'>;
+export type FamilyMemberId = Branded<string, 'FamilyMemberId'>;
+export type InvitationId = Branded<string, 'InvitationId'>;
+export type GuardianshipId = Branded<string, 'GuardianshipId'>;
+
+export function asFamilyId(value: string): FamilyId {
+  return value as FamilyId;
+}
+
+export function asFamilyMemberId(value: string): FamilyMemberId {
+  return value as FamilyMemberId;
+}
+
+export function asInvitationId(value: string): InvitationId {
+  return value as InvitationId;
+}
+
+export function asGuardianshipId(value: string): GuardianshipId {
+  return value as GuardianshipId;
+}
