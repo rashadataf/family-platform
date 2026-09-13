@@ -1,5 +1,7 @@
 import type { FamilyId, OutboxPort } from '@fp/kernel';
 import type { AuditLogPort } from '../../../compliance/application/ports/audit-log.port.js';
+import type { FamilyMemberRepository } from './family-member.repository.js';
+import type { FamilyRepository } from './family.repository.js';
 
 /**
  * One database transaction's worth of family repositories, all of them scoped
@@ -23,6 +25,8 @@ export interface FamilyUnitOfWork {
    * NOT so a repository call can take it as an argument.
    */
   readonly familyId: FamilyId;
+  families: FamilyRepository;
+  members: FamilyMemberRepository;
   outbox: OutboxPort;
   audit: AuditLogPort;
 }

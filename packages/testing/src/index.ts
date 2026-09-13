@@ -8,3 +8,10 @@
  */
 export { prepareTestDatabase, resolveTestDatabase, type TestDatabase } from './database.js';
 export { withDatabase, type TransactionClient } from './transaction.js';
+export {
+  scopeTo,
+  seedChild,
+  seedFamily,
+  seedMember,
+  type SeededFamily,
+} from './family-factories.js';

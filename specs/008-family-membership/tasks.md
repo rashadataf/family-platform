@@ -198,15 +198,15 @@ in force before there is anything for it to catch.
 
 ### Ports and events
 
-- [ ] T022 [P] Declare the open host service in
+- [X] T022 [P] Declare the open host service in
       `packages/core/src/family/application/ports/family-context.port.ts`: the `FamilyContext` DTO
       (`memberId`, `role`, `capabilities[]`) and `FamilyContextPort.resolve`. This file is the
       entirety of what another bounded context may ever import from `core/family` — no domain type
       appears in its signature (ARCHITECTURE §7.1).
-- [ ] T023 [P] Declare `ErasurePort.eraseForFamily(familyId)` and `eraseForMember(memberId)` in
+- [X] T023 [P] Declare `ErasurePort.eraseForFamily(familyId)` and `eraseForMember(memberId)` in
       `packages/core/src/family/application/ports/erasure.port.ts`. Declared now, implemented in
       T092 — Principle XI: "a new context is not complete without them."
-- [ ] T024 [P] Implement the six versioned event builders in
+- [X] T024 [P] Implement the six versioned event builders in
       `packages/core/src/family/domain/events.ts` (`family.FamilyCreated.v1` and the rest), with
       `events.spec.ts` asserting each payload against [data-model.md](data-model.md) and — the
       assertion that matters — that no payload contains a name, a date of birth or an email
@@ -214,33 +214,36 @@ in force before there is anything for it to catch.
 
 ### Layers 2 and 3
 
-- [ ] T025 Implement the standing lookup in
+- [X] T025 Implement the standing lookup in
       `packages/persistence/src/repositories/family/membership.repository.ts`, exported as a single
-      narrow factory `createMembershipRepository()` and constructed against the base client,
-      **outside** `withFamilyContext`. [research.md §3](research.md) is the argument for why this
+      narrow factory `createMembershipRepository()`. **Refined during implementation:** it turns out this need
+      NOT be an unscoped read at all — the caller has already named the family, so the
+      lookup runs inside `withFamilyContext(requestedFamilyId)` and the policies apply to
+      it like any other query. Stricter than planned; the repository is
+      `family-member.repository.ts`, built by the unit of work. [research.md §3](research.md) is the argument for why this
       one read has to be unscoped and why it cannot leak; put that reasoning in the file's doc
       comment, not only in the spec.
-- [ ] T026 Implement `resolveFamilyContext` in
+- [X] T026 Implement `resolveFamilyContext` in
       `packages/core/src/family/application/queries/resolve-family-context.query.ts` — the standing
       lookup composed with `capabilitiesFor` — returning `null` for no membership, a removed
       membership, a family pending deletion, or a family that does not exist. With
       `resolve-family-context.query.spec.ts` asserting all four collapse to the same `null`.
-- [ ] T027 Implement `FamilyMembershipGuard` in `apps/api/src/family/family-membership.guard.ts`:
+- [X] T027 Implement `FamilyMembershipGuard` in `apps/api/src/family/family-membership.guard.ts`:
       resolve, attach `request.familyContext` on success, and on `null` throw `404
       family/not_found` **and** write an audit entry recording the real reason. Never 403 — a 403
       confirms the family exists and is an enumeration oracle (Principle V, FR-021).
-- [ ] T028 Implement `CapabilityGuard` in `apps/api/src/family/capability.guard.ts`, driven by a
+- [X] T028 Implement `CapabilityGuard` in `apps/api/src/family/capability.guard.ts`, driven by a
       `@RequiresCapability('members:manage')` decorator, checking membership in
       `familyContext.capabilities`. The string `'owner'` must appear in no authorization decision
       anywhere in `apps/api` — FR-015, and a lint-visible grep in T094.
-- [ ] T029 Create `packages/contracts/src/v1/family.contract.ts` with the `/v1` router skeleton and
+- [X] T029 Create `packages/contracts/src/v1/family.contract.ts` with the `/v1` router skeleton and
       the shared shapes (`MemberRole`, `Capability`, `FamilyContextResponse`, the problem-format
       error types from [contracts/family-api.md](contracts/family-api.md)), exported from
       `packages/contracts/src/index.ts`. Routes are added by the story that owns them.
-- [ ] T030 Create `apps/api/src/family/family.module.ts` and `family.tokens.ts`, wiring the clock,
+- [X] T030 Create `apps/api/src/family/family.module.ts` and `family.tokens.ts`, wiring the clock,
       the membership repository, the audit log, `withFamilyContext` and both guards, mirroring
       `identity.module.ts`.
-- [ ] T031 Add family factories to `packages/testing` (a family with an owner, an adult, a child
+- [X] T031 Add family factories to `packages/testing` (a family with an owner, an adult, a child
       with a guardian, and an extended member) and an `expectNotFoundAcrossFamilies(routes)` helper
       that drives the parameterised cross-family sweep T087 runs.
 

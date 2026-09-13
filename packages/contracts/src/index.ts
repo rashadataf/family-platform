@@ -7,3 +7,14 @@ export {
   weakPasswordSchema,
   verificationInvalidSchema,
 } from './v1/identity.contract.js';
+export {
+  familyContract,
+  memberRoleSchema,
+  capabilitySchema,
+  assignableRoleSchema,
+  directMemberKindSchema,
+  familyContextSchema,
+  familyNotFoundSchema,
+  capabilityRequiredSchema,
+  guardianshipRequiredSchema,
+} from './v1/family.contract.js';

@@ -2,6 +2,8 @@ import type { family } from '@fp/core';
 import type { FamilyId } from '@fp/kernel';
 import { prisma } from './client.js';
 import { PrismaAuditLogRepository } from './repositories/compliance/audit-log.repository.js';
+import { PrismaFamilyMemberRepository } from './repositories/family/family-member.repository.js';
+import { PrismaFamilyRepository } from './repositories/family/family.repository.js';
 import { PrismaOutboxRepository } from './repositories/outbox.repository.js';
 
 /**
@@ -48,6 +50,8 @@ class PrismaFamilyUnitOfWork implements family.FamilyUnitOfWorkPort {
 
       return work({
         familyId,
+        families: new PrismaFamilyRepository(tx),
+        members: new PrismaFamilyMemberRepository(tx),
         outbox: new PrismaOutboxRepository(tx),
         audit: new PrismaAuditLogRepository(tx),
       });

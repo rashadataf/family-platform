@@ -20,3 +20,23 @@ export {
   type FamilyUnitOfWork,
   type FamilyUnitOfWorkPort,
 } from './application/ports/family-unit-of-work.port.js';
+export {
+  type FamilyContext,
+  type FamilyContextPort,
+} from './application/ports/family-context.port.js';
+export { type ErasurePort } from './application/ports/erasure.port.js';
+export {
+  FAMILY_EVENT_TYPES,
+  familyCreatedEvent,
+  familyDeletionRequestedEvent,
+  guardianshipEstablishedEvent,
+  memberAddedEvent,
+  memberRemovedEvent,
+  memberRoleChangedEvent,
+} from './domain/events.js';
+export {
+  type FamilyMemberRepository,
+  type MemberStanding,
+} from './application/ports/family-member.repository.js';
+export { type FamilyRecord, type FamilyRepository } from './application/ports/family.repository.js';
+export { resolveFamilyContext } from './application/queries/resolve-family-context.query.js';
