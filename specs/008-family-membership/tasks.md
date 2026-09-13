@@ -54,7 +54,7 @@ Paths follow plan.md's Project Structure exactly:
 governs exists — the same fail-closed discipline `.dependency-cruiser.cjs` already uses for packages
 that do not exist yet.
 
-- [ ] T001 **BLOCKING** Write `adr/ADR-017-tenant-isolation-at-the-database.md` and merge it before
+- [X] T001 **BLOCKING** Write `adr/ADR-017-tenant-isolation-at-the-database.md` and merge it before
       any other task starts. Input is [research.md §1](research.md). It must decide: the role names
       and their grant sets; whether migrations keep running as the table owner or gain a third role;
       how the application role's password reaches the container at Stage 0 and at Stage 1

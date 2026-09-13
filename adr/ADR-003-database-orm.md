@@ -1,8 +1,21 @@
 # ADR-003: PostgreSQL with Prisma, and the query-builder escape hatch
 
-- **Status:** Accepted
+- **Status:** Amended by ADR-017
 - **Date:** 2026-09-08
 - **Deciders:** Principal Engineer
+
+> **Scope of the amendment.** [ADR-017](ADR-017-tenant-isolation-at-the-database.md) replaces the
+> row-level-security sentence in the Decision section below — "applied by a Prisma client extension
+> that opens a transaction and issues `SET LOCAL app.family_id` before any query in a request
+> executes" — and only that sentence. It keeps the decision that row-level security is enabled on
+> every family-scoped table and that the tenant key binds per transaction; it changes the mechanism
+> to an explicit `withFamilyContext` helper using `set_config(..., true)`, and it adds what this
+> ADR did not address: the application connects as a non-owner role, and every family-scoped table
+> is placed under `FORCE ROW LEVEL SECURITY`. Everything else here — PostgreSQL 16, Prisma as the
+> sole data-access library confined to `packages/persistence`, the Kysely escape hatch and its
+> trigger, and the migration rules — **remains in full effect and is unamended**. This ADR is
+> deliberately *not* marked `Superseded`, because Prisma is still this project's data-access
+> library.
 
 ## Context
 
