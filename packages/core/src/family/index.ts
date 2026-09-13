@@ -92,6 +92,10 @@ export {
   type TransferOwnershipInput,
 } from './application/commands/transfer-ownership.command.js';
 export {
+  requestFamilyDeletion,
+  type RequestFamilyDeletionInput,
+} from './application/commands/request-family-deletion.command.js';
+export {
   Invitation,
   INVITATION_STATUSES,
   type InvitationProps,

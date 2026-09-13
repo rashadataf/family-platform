@@ -93,4 +93,15 @@ export class Family {
   updateProfile(profile: HouseholdProfile, now: Date): void {
     this.props = { ...this.props, profile, updatedAt: now };
   }
+
+  /**
+   * FR-023, FR-025, Principle XI. Write-once and idempotent: a second
+   * request against an already-requested family changes nothing — the
+   * command layer's own retry (or a client's) must not reset the clock on
+   * the retention window this starts.
+   */
+  requestDeletion(now: Date): void {
+    if (this.props.deletionRequestedAt !== null) return;
+    this.props = { ...this.props, deletionRequestedAt: now, updatedAt: now };
+  }
 }

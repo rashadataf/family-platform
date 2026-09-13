@@ -81,6 +81,26 @@ describe('Family profile and rename', () => {
   });
 });
 
+describe('Family#requestDeletion (FR-023, FR-025)', () => {
+  it('sets deletionRequestedAt', () => {
+    const family = unwrap(Family.create({ id, name: 'Lovelace', now }));
+
+    family.requestDeletion(now);
+
+    expect(family.deletionRequestedAt).toEqual(now);
+  });
+
+  it('is idempotent — a second request does not move the clock', () => {
+    const family = unwrap(Family.create({ id, name: 'Lovelace', now }));
+    family.requestDeletion(now);
+
+    const later = new Date(now.getTime() + 60_000);
+    family.requestDeletion(later);
+
+    expect(family.deletionRequestedAt).toEqual(now);
+  });
+});
+
 describe('HouseholdProfile', () => {
   it('normalises a postcode without validating that it exists', () => {
     // Validation against real reference data belongs to Reference and Locale.

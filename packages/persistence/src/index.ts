@@ -5,6 +5,7 @@ import { PrismaIdentityUnitOfWork } from './repositories/identity/identity-unit-
 import { PrismaSessionRepository } from './repositories/identity/session.repository.js';
 import { PrismaFamilyDirectory } from './repositories/family/family-directory.repository.js';
 import { PrismaIdempotencyRepository } from './repositories/idempotency-key.repository.js';
+import { eraseForFamily, eraseForMember } from './repositories/family/erasure.js';
 
 export { checkDatabaseHealth } from './health.js';
 export { disconnectDatabase } from './lifecycle.js';
@@ -14,6 +15,12 @@ export {
   deleteUnverifiedRegistrationsBefore,
 } from './repositories/identity/retention.js';
 export { expireOverdueInvitations } from './repositories/family/invitation-sweep.js';
+export { eraseForFamily, eraseForMember };
+
+/** Constitution Principle XI: the one implementation of `family.ErasurePort`. */
+export function createErasurePort(): family.ErasurePort {
+  return { eraseForFamily, eraseForMember };
+}
 
 /**
  * The one place a composition root reaches for identity's unit of work. The

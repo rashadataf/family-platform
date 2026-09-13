@@ -615,7 +615,7 @@ stories; the requirements below are not covered by any of them.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T081 Implement `requestFamilyDeletion` in
+- [X] T081 Implement `requestFamilyDeletion` in
       `packages/core/src/family/application/commands/request-family-deletion.command.ts`
       (FR-023, FR-025) — sets `deletion_requested_at`, voids
       every pending invitation in the same transaction (§7.2: same context, so no queue), publishes
@@ -623,16 +623,30 @@ stories; the requirements below are not covered by any of them.
       `resolveFamilyContext` return `null` for the family. Add `DELETE /v1/families/:familyId`
       behind `family:delete`. **No user story covers this**, which is why it is here rather than
       lost — it is required by FR-023 and FR-025 and by Principle XI's insistence that deletion is
-      designed, not retrofitted.
-- [ ] T082 Integration test `apps/api/src/family/family-deletion.integration.spec.ts`: quickstart
+      designed, not retrofitted. Returns `202`, not `200` (quickstart.md Scenario 8 is explicit):
+      the request is accepted, nothing is erased yet. `Family.requestDeletion` is write-once and
+      idempotent, matching identity's `requestAccountDeletion` — though a retry is actually
+      unreachable through the API once standing is revoked, since `FamilyMembershipGuard` 404s any
+      further request against this family, including a second delete.
+- [X] T082 Integration test `apps/api/src/family/family-deletion.integration.spec.ts`: quickstart
       Scenario 8 — 202, pending invitation now unacceptable, every family-scoped route 404 for
       every member, outbox row present, and the rows themselves still there because erasure is the
       saga's job.
-- [ ] T083 Implement `ErasurePort.eraseForFamily` and `eraseForMember` in
+- [X] T083 Implement `ErasurePort.eraseForFamily` and `eraseForMember` in
       `packages/persistence/src/repositories/family/erasure.ts`, with an integration test asserting
       that after `eraseForMember` no personal field survives on the tombstone and no guardianship
       row references the member, and that after `eraseForFamily` no row in any of the four tables
       references the family (Principle XI's end-to-end assertion, scoped to this context).
+      `eraseForFamily` is one `DELETE FROM family` — every other row cascades with it
+      (`onDelete: Cascade`). `eraseForMember` took only a member id with no `:familyId` to scope a
+      transaction to first — the same shape of problem the invitation-expiry sweep already solved,
+      solved the same way: one more narrow, `app.is_erasure`-gated policy
+      (`20260913200000_erasure_policy`) grants just enough visibility to discover the row's
+      `family_id`, and the write that follows goes through the ordinary scope once that's known.
+      The test's first draft tried erasing an OWNER directly and hit
+      `family_member_owner_is_linked_adult` — a real constraint, not a test bug: erasing the sole
+      owner is exactly as invalid as removing them (`removeMember` already refuses it), so the
+      fixture erases an ordinary adult guardian instead.
 - [ ] T084 [P] Implement `apps/worker/src/sweeps/guardian-coverage.sweep.ts` and the
       `family_children_without_guardian` gauge, alerting on any value above zero. This is what makes
       SC-006 *measured* rather than merely asserted at the moment of each mutation

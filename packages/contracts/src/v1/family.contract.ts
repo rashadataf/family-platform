@@ -443,6 +443,21 @@ export const familyContract = c.router(
       summary:
         'Demote the current owner and promote another linked adult, in one transaction (requires members:manage, FR-018)',
     },
+
+    requestFamilyDeletion: {
+      method: 'DELETE',
+      path: '/families/:familyId',
+      pathParams: z.object({ familyId: z.string().uuid() }),
+      responses: {
+        // 202, not 200: the request is accepted, but nothing is erased yet
+        // (quickstart.md Scenario 8) — the verb and the status both stay
+        // honest about that distinction (Principle XI).
+        202: z.object({}),
+        403: capabilityRequiredSchema,
+      },
+      summary:
+        'Request deletion — voids pending invitations and revokes access immediately; erasure follows later (requires family:delete, FR-023, FR-025)',
+    },
   },
   {
     pathPrefix: '/v1',

@@ -785,4 +785,31 @@ export class FamilyController {
       return { status: 200 as const, body: {} };
     });
   }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('family:delete')
+  @TsRestHandler(familyContract.requestFamilyDeletion)
+  requestFamilyDeletion(
+    @Req() req: RequestWithFamilyContext,
+  ): RouteHandler<typeof familyContract.requestFamilyDeletion> {
+    return tsRestHandler(familyContract.requestFamilyDeletion, async ({ params }) => {
+      if (!req.familyContext) {
+        throw new Error('FamilyMembershipGuard did not populate familyContext.');
+      }
+      const result = await family.requestFamilyDeletion(
+        {
+          familyId: asFamilyId(params.familyId),
+          requestedByMemberId: req.familyContext.memberId,
+          correlationId: randomUUID(),
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 202 as const, body: {} };
+    });
+  }
 }
