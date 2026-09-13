@@ -1,6 +1,9 @@
 import { asFamilyId, asFamilyMemberId, asUserId } from '@fp/kernel';
 import { describe, expect, it } from 'vitest';
-import type { FamilyUnitOfWork, FamilyUnitOfWorkPort } from '../ports/family-unit-of-work.port.js';
+import { Family } from '../../domain/family.aggregate.js';
+import { HouseholdProfile } from '../../domain/household-profile.vo.js';
+import { emptyFamilyState, fakeFamilyUnitOfWork } from '../family-unit-of-work.fake.js';
+import type { FamilyUnitOfWorkPort } from '../ports/family-unit-of-work.port.js';
 import { resolveFamilyContext } from './resolve-family-context.query.js';
 
 const familyId = asFamilyId('11111111-1111-7111-8111-111111111111');
@@ -11,24 +14,22 @@ function unitOfWork(overrides: {
   family?: { deletionRequestedAt: Date | null } | null;
   standing?: { memberId: typeof memberId; role: 'owner' | 'adult' | 'extended' | 'viewer' } | null;
 }): FamilyUnitOfWorkPort {
-  const uow: FamilyUnitOfWork = {
-    familyId,
-    families: {
-      findCurrent: () =>
+  return fakeFamilyUnitOfWork(
+    emptyFamilyState({
+      family:
         overrides.family == null
-          ? Promise.resolve(null)
-          : Promise.resolve({
+          ? null
+          : Family.reconstitute({
               id: familyId,
               name: 'Lovelace',
+              profile: HouseholdProfile.empty,
+              createdAt: new Date('2026-01-01T00:00:00Z'),
+              updatedAt: new Date('2026-01-01T00:00:00Z'),
               deletionRequestedAt: overrides.family.deletionRequestedAt,
             }),
-    },
-    members: { findStandingByUserId: () => Promise.resolve(overrides.standing ?? null) },
-    outbox: { append: () => Promise.resolve() },
-    audit: { append: () => Promise.resolve() },
-  };
-
-  return { withFamilyContext: async (_id, work) => work(uow) };
+      standing: overrides.standing ?? null,
+    }),
+  );
 }
 
 describe('resolveFamilyContext', () => {
@@ -101,30 +102,17 @@ describe('resolveFamilyContext', () => {
     expect(after).toBeNull();
   });
 
-  it('resolves inside a transaction scoped to the requested family', async () => {
+  it('resolves inside a transaction scoped to the requested family', () => {
     // The scope is what makes this safe to run before authorization: the
     // policies apply to the lookup like any other query, so a caller naming
     // someone else's family gets a transaction scoped to it and no rows back.
-    let scopedTo: string | undefined;
+    const state = emptyFamilyState();
 
-    await resolveFamilyContext(
+    return resolveFamilyContext(
       { userId, familyId },
-      {
-        unitOfWork: {
-          withFamilyContext: async (id, work) => {
-            scopedTo = id;
-            return work({
-              familyId: id,
-              families: { findCurrent: () => Promise.resolve(null) },
-              members: { findStandingByUserId: () => Promise.resolve(null) },
-              outbox: { append: () => Promise.resolve() },
-              audit: { append: () => Promise.resolve() },
-            });
-          },
-        },
-      },
-    );
-
-    expect(scopedTo).toBe(familyId);
+      { unitOfWork: fakeFamilyUnitOfWork(state) },
+    ).then(() => {
+      expect(state.scopedTo).toEqual([familyId]);
+    });
   });
 });

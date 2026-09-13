@@ -262,52 +262,80 @@ as its owner and the owner capabilities resolved, with no other feature required
 
 ### Tests for User Story 1
 
-- [ ] T032 [P] [US1] Unit test `packages/core/src/family/domain/family.aggregate.spec.ts`: name
+- [X] T032 [P] [US1] Unit test `packages/core/src/family/domain/family.aggregate.spec.ts`: name
       required, trimmed and length-bounded; household profile optional and independently updatable.
-- [ ] T033 [P] [US1] Unit test `packages/core/src/family/domain/family-member.aggregate.spec.ts`:
+- [X] T033 [P] [US1] Unit test `packages/core/src/family/domain/family-member.aggregate.spec.ts`:
       the three `kind` × `role` invariants from [data-model.md](data-model.md), each asserted in
       both directions.
-- [ ] T034 [P] [US1] Integration test `apps/api/src/family/create-family.integration.spec.ts`:
-      `POST /v1/families` returns 201, creates exactly one owner member linked to the caller, writes
-      a `family.FamilyCreated.v1` outbox row **in the same transaction**, and rejects a missing name
-      with `422 family/name_required`.
-- [ ] T035 [P] [US1] Integration test `apps/api/src/family/list-families.integration.spec.ts`:
+- [X] T034 [P] [US1] Integration test `apps/api/src/family/create-family.integration.spec.ts`:
+      `POST /v1/families` returns 201, creates exactly one owner member linked to the caller, and
+      rejects a missing name with `422 family/name_required`. Also covers ADR-006's
+      `Idempotency-Key` replay (see T043's note). The "same transaction" half of this task's
+      original wording is instead a unit test on `createFamily` itself
+      (`create-family.command.spec.ts`, against the fake unit of work) — `apps/api` cannot reach
+      the outbox table directly (`persistence-client-is-private`), so asserting a raw row from
+      here was never possible; the command test asserts the same fact at the layer that can see it.
+- [X] T035 [P] [US1] Integration test `apps/api/src/family/list-families.integration.spec.ts`:
       `GET /v1/families` returns only the caller's memberships with capabilities present and role
       names not load-bearing; a user in two families sees both and not a third (FR-024).
-- [ ] T036 [P] [US1] Integration test `apps/api/src/family/read-family.integration.spec.ts`:
+- [X] T036 [P] [US1] Integration test `apps/api/src/family/read-family.integration.spec.ts`:
       `GET /v1/families/:familyId` succeeds for a member, returns `404` for a member of another
-      family, and `PATCH` requires `family:manage`.
+      family, and `PATCH` requires `family:manage`. The last case needed a second member holding a
+      non-owner role, which no US1 route can create yet — `packages/testing`'s `seedMember` supplies
+      it, via a new committing counterpart to `withRollback` (`withCommit`/`withDatabaseCommitted`)
+      that a fixture needs when it must be visible to the separately-connected app under test, not
+      just to the test's own transaction.
 
 ### Implementation for User Story 1
 
-- [ ] T037 [US1] Implement the `Family` aggregate in
+- [X] T037 [US1] Implement the `Family` aggregate in
       `packages/core/src/family/domain/family.aggregate.ts` and the `HouseholdProfile` value object
       in `household-profile.vo.ts` — postcode normalised, local authority held as an identifier
       never a name (the UK-first-not-UK-welded constraint).
-- [ ] T038 [US1] Implement the `FamilyMember` aggregate in
+- [X] T038 [US1] Implement the `FamilyMember` aggregate in
       `packages/core/src/family/domain/family-member.aggregate.ts`, carrying `kind` and `role` as
       separate discriminants ([research.md §5](research.md)) with the invariants enforced in the
       constructor, not only by the database.
-- [ ] T039 [US1] Implement `family.repository.ts` and `family-member.repository.ts` in
+- [X] T039 [US1] Implement `family.repository.ts` and `family-member.repository.ts` in
       `packages/persistence/src/repositories/family/`, constructed from the transaction
-      `withFamilyContext` opens. No method takes a family id.
-- [ ] T040 [US1] Implement `createFamily` in
+      `withFamilyContext` opens. No method takes a family id. `FamilyRepository.findCurrent()`
+      returns the full `Family` aggregate rather than a flattened record (matching
+      `FamilyMemberRepository.findById`'s own shape) — needed to fix `updateFamily`, which had been
+      rebuilding the profile from only the PATCH body and silently wiping fields the caller never
+      named.
+- [X] T040 [US1] Implement `createFamily` in
       `packages/core/src/family/application/commands/create-family.command.ts`: family, owner
       member and outbox row in one transaction. This is the one command that cannot run inside
       `withFamilyContext` for its own family, because the family does not exist until it commits —
       document that in the file, and set the context immediately after insert so the rest of the
       transaction is scoped.
-- [ ] T041 [P] [US1] Implement `listFamilies` in
+- [X] T041 [P] [US1] Implement `listFamilies` in
       `packages/core/src/family/application/queries/list-families.query.ts`, returning
       `FamilyContextResponse[]` — capabilities, not roles, are what the client branches on.
-- [ ] T042 [P] [US1] Implement `getFamily` and `updateFamily` (name and household profile, FR-002)
-      in `packages/core/src/family/application/`.
-- [ ] T043 [US1] Add the four routes to `packages/contracts/src/v1/family.contract.ts`:
+- [X] T042 [P] [US1] Implement `getFamily` and `updateFamily` (name and household profile, FR-002)
+      in `packages/core/src/family/application/`. `getFamily` is its own
+      `queries/get-family.query.ts` rather than inlined in the controller, matching every other
+      handler's shape.
+- [X] T043 [US1] Add the four routes to `packages/contracts/src/v1/family.contract.ts`:
       `POST /v1/families`, `GET /v1/families`, `GET /v1/families/:familyId`,
-      `PATCH /v1/families/:familyId`, with `Idempotency-Key` honoured on the first.
-- [ ] T044 [US1] Implement `apps/api/src/family/family.controller.ts` binding those four routes,
+      `PATCH /v1/families/:familyId`, with `Idempotency-Key` honoured on the first. Two deviations
+      from the original wording: (1) `createFamilyRequestSchema` gained `ownerDisplayName` — the
+      spec never says where the owner's own FamilyMember display name comes from, and it cannot be
+      derived from Identity (a `User` carries no name, only an email, and reaching into Identity for
+      one would cross the boundary FR-019/FR-020 exist to hold), so the caller supplies it once,
+      here. (2) `familyNameSchema` dropped `.min(1)`: with it, an empty name was rejected by ts-rest
+      as a generic body-validation `400` before ever reaching `Family.create`, which is what
+      actually produces the `422 family/name_required` with US1 Scenario 3's actionable reason —
+      the wire-level minimum was silently defeating the requirement it was meant to give a fast path
+      to. `Idempotency-Key` handling is genuinely new infrastructure (`IdempotencyPort` in
+      `packages/kernel`, `PrismaIdempotencyRepository` + the `idempotency_key` table in
+      `packages/persistence`, `apps/api/src/common/idempotency.ts`) — unlike registration, nothing
+      about creating a family is naturally deduplicated, so this could not be deferred to a "natural
+      idempotency" note the way spec 006 does.
+- [X] T044 [US1] Implement `apps/api/src/family/family.controller.ts` binding those four routes,
       with `FamilyMembershipGuard` and `CapabilityGuard` applied to the two that carry a
-      `:familyId` and to neither of the two that do not.
+      `:familyId` and to neither of the two that do not. Registered `FamilyModule` into
+      `apps/api/src/app.module.ts`, which had never actually wired it in.
 
 **Checkpoint**: quickstart Scenario 1 passes. A family exists, it has exactly one owner, and that
 owner's capabilities resolve.

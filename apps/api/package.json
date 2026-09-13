@@ -32,6 +32,7 @@
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
     "@fp/config-typescript": "workspace:*",
+    "@fp/testing": "workspace:*",
     "@nestjs/testing": "^11.2.3",
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.2.1",

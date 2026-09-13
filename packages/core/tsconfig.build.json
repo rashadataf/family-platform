@@ -3,5 +3,6 @@
   "compilerOptions": {
     "noEmit": false
   },
-  "exclude": ["**/*.spec.ts"]
+  "//": "`*.fake.ts` holds in-memory port doubles used only by unit tests. Excluded for the same reason `*.spec.ts` is: it must never reach a package consumer's build output.",
+  "exclude": ["**/*.spec.ts", "**/*.fake.ts"]
 }

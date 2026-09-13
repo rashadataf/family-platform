@@ -17,4 +17,10 @@ export {
   familyNotFoundSchema,
   capabilityRequiredSchema,
   guardianshipRequiredSchema,
+  householdCompositionSchema,
+  familyNameSchema,
+  createFamilyRequestSchema,
+  updateFamilyRequestSchema,
+  familySchema,
+  nameRequiredSchema,
 } from './v1/family.contract.js';

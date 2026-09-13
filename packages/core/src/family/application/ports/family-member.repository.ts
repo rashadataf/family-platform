@@ -1,5 +1,6 @@
 import type { FamilyMemberId, UserId } from '@fp/kernel';
 import type { MemberRole } from '../../domain/capabilities.js';
+import type { FamilyMember } from '../../domain/family-member.aggregate.js';
 
 /** What resolving a user's standing needs, and nothing more. */
 export interface MemberStanding {
@@ -14,6 +15,14 @@ export interface MemberStanding {
  * there is no way to forget the scope.
  */
 export interface FamilyMemberRepository {
+  save(member: FamilyMember): Promise<void>;
+
+  /** Every member of the scoped family that has not been removed. */
+  listActive(): Promise<readonly FamilyMember[]>;
+
+  /** One member of the scoped family. `null` for a member of any other family. */
+  findById(memberId: FamilyMemberId): Promise<FamilyMember | null>;
+
   /**
    * The caller's standing in the family this unit of work is scoped to, or
    * `null`. A removed member (tombstoned) resolves to `null`: FR-017 requires

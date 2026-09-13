@@ -23,3 +23,4 @@ export { type PasswordHasherPort } from './password-hasher.port.js';
 export { type TokenGeneratorPort } from './token-generator.port.js';
 export { type MailerPort } from './mailer.port.js';
 export { type OutboxPort, type OutboxEventToAppend, type JsonValue } from './outbox.port.js';
+export { type IdempotencyPort, type IdempotencyRecord } from './idempotency.port.js';

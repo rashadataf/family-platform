@@ -7,7 +7,7 @@
  * none of the family-scoping the first one will carry.
  */
 export { prepareTestDatabase, resolveTestDatabase, type TestDatabase } from './database.js';
-export { withDatabase, type TransactionClient } from './transaction.js';
+export { withDatabase, withDatabaseCommitted, type TransactionClient } from './transaction.js';
 export {
   scopeTo,
   seedChild,

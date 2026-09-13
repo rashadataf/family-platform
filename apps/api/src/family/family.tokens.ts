@@ -12,3 +12,13 @@
 export const FAMILY_UNIT_OF_WORK = Symbol('FAMILY_UNIT_OF_WORK');
 export const AUDIT_LOG = Symbol('AUDIT_LOG');
 export const FAMILY_CLOCK = Symbol('FAMILY_CLOCK');
+
+/**
+ * The one cross-family read (FR-024, "which families am I in?"), kept
+ * separate from `FAMILY_UNIT_OF_WORK` because it is scoped by user, not by
+ * family — see `FamilyDirectoryPort`'s own doc comment.
+ */
+export const FAMILY_DIRECTORY = Symbol('FAMILY_DIRECTORY');
+
+/** ADR-006, Principle IX: the store behind `POST /v1/families`'s `Idempotency-Key` handling. */
+export const IDEMPOTENCY_STORE = Symbol('IDEMPOTENCY_STORE');
