@@ -8,6 +8,7 @@ import { radius, space } from '../../tokens/index.js';
 import { useTheme } from '../../theme/index.js';
 import { elevation } from '../../tokens/index.js';
 import { elevationToShadowStyle } from '../../internal/elevation-style.js';
+import { useReducedMotion } from '../../internal/use-reduced-motion.js';
 
 export interface SheetProps {
   readonly visible: boolean;
@@ -18,9 +19,15 @@ export interface SheetProps {
 export function Sheet({ visible, onDismiss, children }: SheetProps) {
   const { colours } = useTheme();
   const shadow = elevationToShadowStyle('3', elevation['3']);
+  const reducedMotion = useReducedMotion();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={reducedMotion ? 'none' : 'slide'}
+      onRequestClose={onDismiss}
+    >
       <View
         style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colours['surface.scrim'] }}
       >

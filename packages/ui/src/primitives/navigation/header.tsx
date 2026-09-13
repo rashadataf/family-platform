@@ -130,7 +130,9 @@ export function Header(props: HeaderProps) {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: 56,
+        // A floor, not a fixed height (research R8): the title must be
+        // free to grow this bar at the largest OS text size.
+        minHeight: 56,
         paddingHorizontal: space[3],
         backgroundColor: colours['surface.raised'],
         borderBottomWidth: 1,

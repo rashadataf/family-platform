@@ -49,7 +49,9 @@ export function SegmentedControl({ options, selectedIndex, onChange }: Segmented
               flexGrow: 1,
               alignItems: 'center',
               justifyContent: 'center',
-              height: 36,
+              // A floor, not a fixed height (research R8): the option
+              // label must be free to grow this control at large text sizes.
+              minHeight: 36,
               borderRadius: radius.sm,
               backgroundColor: selected ? colours['surface.raised'] : 'transparent',
             }}

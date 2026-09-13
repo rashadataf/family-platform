@@ -11,6 +11,7 @@ import { useTheme } from '../../theme/index.js';
 import { elevation } from '../../tokens/index.js';
 import { elevationToShadowStyle } from '../../internal/elevation-style.js';
 import { typeStepToTextStyle } from '../../internal/type-style.js';
+import { useReducedMotion } from '../../internal/use-reduced-motion.js';
 import { typography } from '../../tokens/index.js';
 import { Button } from '../button/button.js';
 
@@ -37,9 +38,15 @@ export function Dialog({
   const shadow = elevationToShadowStyle('3', elevation['3']);
   const titleStyle = typeStepToTextStyle(typography['title.lg']);
   const descriptionStyle = typeStepToTextStyle(typography['body.sm']);
+  const reducedMotion = useReducedMotion();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={reducedMotion ? 'none' : 'fade'}
+      onRequestClose={onCancel}
+    >
       <View
         style={{
           flex: 1,

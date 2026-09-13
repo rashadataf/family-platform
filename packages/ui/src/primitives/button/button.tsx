@@ -251,7 +251,10 @@ export function Button(props: ButtonProps) {
         setFocused(false);
       }}
       style={{
-        height: spec.height,
+        // A floor, not a fixed height (research R8): at the largest OS text
+        // size, the label must be free to grow the control rather than clip
+        // inside it.
+        minHeight: spec.height,
         width: squareSide,
         alignSelf: fullWidth ? 'stretch' : 'flex-start',
         flexDirection: 'row',

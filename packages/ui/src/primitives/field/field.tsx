@@ -159,7 +159,9 @@ const styles = StyleSheet.create({
   control: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
+    // A floor, not a fixed height (research R8): at the largest OS text
+    // size, the typed value must be free to grow the control.
+    minHeight: 48,
     borderWidth: 1,
     gap: space[3],
   },
