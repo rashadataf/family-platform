@@ -218,6 +218,37 @@ export class FamilyMember {
   }
 
   /**
+   * FR-018, US4 Scenario 2. The one sanctioned way a role ever becomes
+   * `owner` or ever leaves it — `changeRole` above refuses both
+   * transitions deliberately, so `transferOwnership` (the command that
+   * calls these two methods on the outgoing and incoming owner, in the same
+   * transaction) does not go through it.
+   */
+  promoteToOwner(now: Date): Result<FamilyMember, DomainError> {
+    if (this.props.kind !== 'adult' || this.props.userId === null) {
+      return err({
+        kind: 'OwnerIneligible',
+        reason:
+          'Ownership can only go to a linked adult member — an unlinked or child record cannot be reached if something goes wrong.',
+      });
+    }
+    this.props = { ...this.props, role: 'owner', updatedAt: now };
+    return ok(this);
+  }
+
+  /** The other half of a transfer — demotes the OUTGOING owner to `adult`. */
+  demoteFromOwnership(now: Date): Result<FamilyMember, DomainError> {
+    if (this.props.role !== 'owner') {
+      return err({
+        kind: 'OwnerRequired',
+        reason: 'Only the current owner can be demoted by a transfer.',
+      });
+    }
+    this.props = { ...this.props, role: 'adult', updatedAt: now };
+    return ok(this);
+  }
+
+  /**
    * FR-017 and Principle XI. A tombstone, not a delete: the personal fields go
    * and the row stays, so authorship references held by contexts that do not
    * exist yet have something to point at. `removedAt` is what makes the

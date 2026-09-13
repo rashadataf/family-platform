@@ -688,4 +688,101 @@ export class FamilyController {
       };
     });
   }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:manage')
+  @TsRestHandler(familyContract.changeMemberRole)
+  changeMemberRole(): RouteHandler<typeof familyContract.changeMemberRole> {
+    return tsRestHandler(familyContract.changeMemberRole, async ({ params, body }) => {
+      const correlationId = randomUUID();
+      const result = await family.changeMemberRole(
+        {
+          familyId: asFamilyId(params.familyId),
+          memberId: asFamilyMemberId(params.memberId),
+          newRole: body.role,
+          correlationId,
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        this.logger.log(
+          `Role change rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+        );
+        if (result.error.kind === 'LastGuardian') {
+          return { status: 409 as const, body: { type: 'family/last_guardian' as const } };
+        }
+        if (result.error.kind === 'OwnerRequired') {
+          return { status: 409 as const, body: { type: 'family/owner_required' as const } };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 200 as const, body: {} };
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:manage')
+  @TsRestHandler(familyContract.removeMember)
+  removeMember(): RouteHandler<typeof familyContract.removeMember> {
+    return tsRestHandler(familyContract.removeMember, async ({ params }) => {
+      const correlationId = randomUUID();
+      const result = await family.removeMember(
+        {
+          familyId: asFamilyId(params.familyId),
+          memberId: asFamilyMemberId(params.memberId),
+          correlationId,
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        this.logger.log(
+          `Member removal rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+        );
+        if (result.error.kind === 'LastGuardian') {
+          return { status: 409 as const, body: { type: 'family/last_guardian' as const } };
+        }
+        if (result.error.kind === 'OwnerRequired') {
+          return { status: 409 as const, body: { type: 'family/owner_required' as const } };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 200 as const, body: {} };
+    });
+  }
+
+  @UseGuards(SessionGuard, FamilyMembershipGuard, CapabilityGuard)
+  @RequiresCapability('members:manage')
+  @TsRestHandler(familyContract.transferOwnership)
+  transferOwnership(): RouteHandler<typeof familyContract.transferOwnership> {
+    return tsRestHandler(familyContract.transferOwnership, async ({ params, body }) => {
+      const correlationId = randomUUID();
+      const result = await family.transferOwnership(
+        {
+          familyId: asFamilyId(params.familyId),
+          toMemberId: asFamilyMemberId(body.toMemberId),
+          correlationId,
+        },
+        { unitOfWork: this.unitOfWork, clock: this.clock },
+      );
+
+      if (!result.ok) {
+        this.logger.log(
+          `Ownership transfer rejected: ${result.error.kind} [correlationId=${correlationId}]`,
+        );
+        if (result.error.kind === 'OwnerIneligible') {
+          return {
+            status: 422 as const,
+            body: { type: 'family/owner_ineligible' as const, reason: result.error.reason },
+          };
+        }
+        throw new NotFoundException({ type: 'family/not_found' });
+      }
+
+      return { status: 200 as const, body: {} };
+    });
+  }
 }

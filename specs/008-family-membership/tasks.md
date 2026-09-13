@@ -534,7 +534,10 @@ that no login path was created.
       The other half of this task's original wording — promoting an unlinked member to `owner`
       returning `422 family/owner_ineligible` — needs `transferOwnership` (US5, T079), which does
       not exist yet; deferred to that phase rather than blocking this one on a route it doesn't own.
-- [ ] T070b [US5] Once `transferOwnership` exists, add the owner-ineligible half of T070 above.
+- [X] T070b [US5] Once `transferOwnership` exists, add the owner-ineligible half of T070 above.
+      Landed as `ownership-transfer.integration.spec.ts`'s "refuses to transfer ownership to an
+      unlinked member" case rather than back in `extended-member.integration.spec.ts` — it needs
+      the transfer route, which is that file's own subject.
 
 ### Implementation for User Story 4
 
@@ -562,34 +565,46 @@ standing reflects the change on the next request.
 
 ### Tests for User Story 5
 
-- [ ] T073 [P] [US5] Integration test `apps/api/src/family/role-management.integration.spec.ts`: a
+- [X] T073 [P] [US5] Integration test `apps/api/src/family/role-management.integration.spec.ts`: a
       demotion to `viewer` is visible in the very next request's capability set — no cache, no
       delay (FR-016, SC-005).
-- [ ] T074 [P] [US5] Integration test in `apps/api/src/family/role-management.integration.spec.ts`:
+- [X] T074 [P] [US5] Integration test in `apps/api/src/family/role-management.integration.spec.ts`:
       the sole owner cannot leave, be removed, or
-      be demoted — `409 family/owner_required` in all three cases (FR-018).
-- [ ] T075 [P] [US5] Integration test `apps/api/src/family/ownership-transfer.integration.spec.ts`:
+      be demoted — `409 family/owner_required` in all three cases (FR-018). ("Leave" has no route
+      of its own — the spec never adds one — so it is the same check `removeMember` already makes,
+      whoever the caller is; not a third test.)
+- [X] T075 [P] [US5] Integration test `apps/api/src/family/ownership-transfer.integration.spec.ts`:
       after transfer exactly one owner exists, the previous owner is `adult`, and the child's
       guardianship is untouched (spec.md Edge Cases). Plus a concurrent-promotion test proving
-      `family_one_owner` rejects the second rather than interleaving.
-- [ ] T076 [P] [US5] Integration test `apps/api/src/family/last-guardian.integration.spec.ts`:
+      `family_one_owner` rejects the second rather than interleaving. Caught a real ordering bug
+      while writing it: `transferOwnership` was promoting the new owner BEFORE demoting the old
+      one, which collides with the still-current owner's own row on the very first write —
+      `family_one_owner` is a plain (non-deferred) index, checked per statement, and a moment with
+      zero owners is fine where a moment with two never is. Fixed by demoting first.
+- [X] T076 [P] [US5] Integration test `apps/api/src/family/last-guardian.integration.spec.ts`:
       removing a child's only guardian, and demoting them to `viewer`, both return
       `409 family/last_guardian` (FR-008, SC-006).
 
 ### Implementation for User Story 5
 
-- [ ] T077 [US5] Implement `changeMemberRole` in
+- [X] T077 [US5] Implement `changeMemberRole` in
       `packages/core/src/family/application/commands/change-member-role.command.ts` —
       `MemberRoleChanged` row, and the guardian-coverage
-      assertion before the write.
-- [ ] T078 [US5] Implement `removeMember` in
+      assertion before the write. FR-006 reread closely here: a role change that drops eligibility
+      doesn't just block future grants, it means this member may no longer HOLD a guardianship at
+      all — so losing eligibility ends their active guardianships in the SAME transaction, refused
+      outright (this route carries no replacement parameter) if that would leave any child
+      uncovered.
+- [X] T078 [US5] Implement `removeMember` in
       `packages/core/src/family/application/commands/remove-member.command.ts` — tombstone (`removed_at` set, personal fields nulled),
       guardianships ended, `MemberRemoved` row carrying `hadUserId` as a boolean and not the id
       ([data-model.md](data-model.md)).
-- [ ] T079 [US5] Implement `transferOwnership` in
+- [X] T079 [US5] Implement `transferOwnership` in
       `packages/core/src/family/application/commands/transfer-ownership.command.ts` — demotion and promotion in one transaction, never
-      two calls, so the partial unique index can never see two owners.
-- [ ] T080 [US5] Add, to `packages/contracts/src/v1/family.contract.ts` and
+      two calls, so the partial unique index can never see two owners. Added two `FamilyMember`
+      methods this needed that `changeRole` deliberately refuses: `promoteToOwner`/
+      `demoteFromOwnership` — the two sanctioned owner transitions, used only by this command.
+- [X] T080 [US5] Add, to `packages/contracts/src/v1/family.contract.ts` and
       `apps/api/src/family/family.controller.ts`: `PATCH …/members/:memberId/role`, `DELETE …/members/:memberId` and
       `POST …/ownership-transfer` to the contract and controller, all behind `members:manage`.
 

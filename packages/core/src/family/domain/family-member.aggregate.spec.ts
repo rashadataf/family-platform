@@ -160,6 +160,72 @@ describe('FamilyMember.changeRole', () => {
   });
 });
 
+describe('FamilyMember#promoteToOwner / #demoteFromOwnership (FR-018)', () => {
+  it('promotes a linked adult member to owner', () => {
+    const member = unwrap(
+      FamilyMember.createFromInvitation({
+        id,
+        familyId,
+        userId: asUserId('66666666-6666-7666-8666-666666666666'),
+        role: 'adult',
+        displayName: 'Grace',
+        now,
+      }),
+    );
+
+    const result = member.promoteToOwner(now);
+
+    expect(isOk(result)).toBe(true);
+    expect(member.role).toBe('owner');
+  });
+
+  it('refuses to promote an unlinked member', () => {
+    const extended = unwrap(
+      FamilyMember.createUnlinked({ id, familyId, kind: 'adult', displayName: 'Grandma', now }),
+    );
+
+    const result = extended.promoteToOwner(now);
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) expect(result.error.kind).toBe('OwnerIneligible');
+  });
+
+  it('demotes the current owner to adult', () => {
+    const owner = unwrap(
+      FamilyMember.createOwner({
+        id,
+        familyId,
+        userId: asUserId('77777777-7777-7777-8777-777777777777'),
+        displayName: 'Ada',
+        now,
+      }),
+    );
+
+    const result = owner.demoteFromOwnership(now);
+
+    expect(isOk(result)).toBe(true);
+    expect(owner.role).toBe('adult');
+  });
+
+  it('refuses to demote a member who is not the owner', () => {
+    const adult = unwrap(
+      FamilyMember.createFromInvitation({
+        id,
+        familyId,
+        userId: asUserId('88888888-8888-7888-8888-888888888888'),
+        role: 'adult',
+        displayName: 'Grace',
+        now,
+      }),
+    );
+
+    const result = adult.demoteFromOwnership(now);
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) expect(result.error.kind).toBe('OwnerRequired');
+  });
+});
+
 describe('FamilyMember.remove', () => {
   it('leaves a tombstone with no personal data on it (Principle XI)', () => {
     const member = unwrap(

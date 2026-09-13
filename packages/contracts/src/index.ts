@@ -36,4 +36,8 @@ export {
   invitationInvalidSchema,
   invitationEmailMismatchSchema,
   alreadyMemberSchema,
+  ownerRequiredSchema,
+  ownerIneligibleSchema,
+  changeMemberRoleRequestSchema,
+  transferOwnershipRequestSchema,
 } from './v1/family.contract.js';

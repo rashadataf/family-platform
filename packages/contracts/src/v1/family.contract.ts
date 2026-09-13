@@ -223,6 +223,25 @@ export const alreadyMemberSchema = problemSchema.extend({
   type: z.literal('family/already_member'),
 });
 
+/** FR-018, SC-007: the sole owner tried to leave, be removed, or be demoted without a transfer. */
+export const ownerRequiredSchema = problemSchema.extend({
+  type: z.literal('family/owner_required'),
+});
+
+/** US4 Scenario 2: ownership transfer to a member who is not a linked adult. */
+export const ownerIneligibleSchema = problemSchema.extend({
+  type: z.literal('family/owner_ineligible'),
+  reason: z.string(),
+});
+
+export const changeMemberRoleRequestSchema = z.object({
+  role: assignableRoleSchema,
+});
+
+export const transferOwnershipRequestSchema = z.object({
+  toMemberId: z.string().uuid(),
+});
+
 const c = initContract();
 
 export const familyContract = c.router(
@@ -383,6 +402,46 @@ export const familyContract = c.router(
       },
       summary:
         'Accept an invitation by token — no :familyId, since a caller with only a token cannot name one (US3, FR-011)',
+    },
+
+    changeMemberRole: {
+      method: 'PATCH',
+      path: '/families/:familyId/members/:memberId/role',
+      pathParams: z.object({ familyId: z.string().uuid(), memberId: z.string().uuid() }),
+      body: changeMemberRoleRequestSchema,
+      responses: {
+        200: z.object({}),
+        403: capabilityRequiredSchema,
+        409: z.discriminatedUnion('type', [lastGuardianSchema, ownerRequiredSchema]),
+      },
+      summary: "Change a member's role — never to or from owner (requires members:manage, FR-016)",
+    },
+
+    removeMember: {
+      method: 'DELETE',
+      path: '/families/:familyId/members/:memberId',
+      pathParams: z.object({ familyId: z.string().uuid(), memberId: z.string().uuid() }),
+      responses: {
+        200: z.object({}),
+        403: capabilityRequiredSchema,
+        409: z.discriminatedUnion('type', [lastGuardianSchema, ownerRequiredSchema]),
+      },
+      summary:
+        'Remove a member — the sole owner cannot be removed (requires members:manage, FR-018)',
+    },
+
+    transferOwnership: {
+      method: 'POST',
+      path: '/families/:familyId/ownership-transfer',
+      pathParams: z.object({ familyId: z.string().uuid() }),
+      body: transferOwnershipRequestSchema,
+      responses: {
+        200: z.object({}),
+        403: capabilityRequiredSchema,
+        422: ownerIneligibleSchema,
+      },
+      summary:
+        'Demote the current owner and promote another linked adult, in one transaction (requires members:manage, FR-018)',
     },
   },
   {

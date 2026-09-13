@@ -80,6 +80,18 @@ export {
   type InvitationSummary,
 } from './application/queries/list-invitations.query.js';
 export {
+  changeMemberRole,
+  type ChangeMemberRoleInput,
+} from './application/commands/change-member-role.command.js';
+export {
+  removeMember,
+  type RemoveMemberInput,
+} from './application/commands/remove-member.command.js';
+export {
+  transferOwnership,
+  type TransferOwnershipInput,
+} from './application/commands/transfer-ownership.command.js';
+export {
   Invitation,
   INVITATION_STATUSES,
   type InvitationProps,
