@@ -708,10 +708,20 @@ stories; the requirements below are not covered by any of them.
       confirmed by sending an empty `{}` body on every POST/PATCH/DELETE case and still getting the
       guard's 404, never a 422. Verified both "member of a different family" and "family does not
       exist at all" produce byte-identical bodies for all 14 routes.
-- [ ] T088 Verify, in `apps/api/src/family/idempotency.integration.spec.ts`, that `Idempotency-Key`
+- [X] T088 Verify, in `apps/api/src/family/idempotency.integration.spec.ts`, that `Idempotency-Key`
       is honoured on `POST /v1/families`, `POST …/members`,
       `POST …/invitations` and `POST /v1/invitations/accept`, with a test replaying each (Principle
       IX — a duplicated child record is a defect a user cannot clean up themselves).
+      **Note:** the first three replay the same `Idempotency-Key` header twice with an identical
+      body and assert the second response is byte-identical to the first *and* that only one row
+      exists afterwards (one family via `GET /v1/families`, one child via the member roster, one
+      invitation via the invitation list; the invitation case also asserts only one email left the
+      fake mailer). `POST /v1/invitations/accept` needed no header at all — per
+      contracts/family-api.md and `accept-invitation.command.ts`'s own `status === 'accepted'`
+      branch, it is idempotent by construction: replaying the same already-accepted token returns
+      the same `{familyId, memberId}` rather than erring or creating a second member, so the test
+      replays the token directly and asserts the roster still has exactly two rows (owner + the one
+      invitee), never three.
 - [ ] T089 Add `packages/core/src/family/family-owns-the-relationship.spec.ts`, the mirror of
       identity's existing `no-family-references.spec.ts`: assert `core/identity` still contains no
       family, role or capability identifier after T005's `EmailAddress` move (FR-022,
