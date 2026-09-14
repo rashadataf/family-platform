@@ -17,12 +17,19 @@ export class FakeMailer implements MailerPort {
 
   /** Pulls the raw token out of `registerUser`'s "Verification token: <token>" body (research.md §4). */
   latestVerificationToken(): string {
+    return this.latestToken('Verification token');
+  }
+
+  /** The same extraction, for `createInvitation`'s "Invitation token: <token>" body (spec 008, research.md §8). */
+  latestInvitationToken(): string {
+    return this.latestToken('Invitation token');
+  }
+
+  private latestToken(label: string): string {
     const message = this.sent.at(-1);
-    const match = /Verification token: (\S+)/.exec(message?.text ?? '');
+    const match = new RegExp(`${label}: (\\S+)`).exec(message?.text ?? '');
     if (!match?.[1]) {
-      throw new Error(
-        `No verification token found in the last sent message: ${JSON.stringify(message)}`,
-      );
+      throw new Error(`No ${label} found in the last sent message: ${JSON.stringify(message)}`);
     }
     return match[1];
   }

@@ -19,10 +19,32 @@ describe('the integration harness', () => {
   });
 
   it('targets a separate database, never the development one', () => {
-    const resolved = resolveTestDatabase('postgresql://postgres:pw@localhost:5432/family_platform');
+    const resolved = resolveTestDatabase(
+      'postgresql://family_platform_app:pw@localhost:5432/family_platform',
+      'postgresql://family_platform_owner:pw@localhost:5432/family_platform',
+      'postgresql://postgres:pw@localhost:5432/family_platform',
+    );
 
     expect(resolved.name).toBe('family_platform_test');
     expect(resolved.url).toContain('/family_platform_test');
+    expect(resolved.ownerUrl).toContain('/family_platform_test');
+    // CREATE DATABASE cannot run from inside the database it creates.
+    expect(resolved.maintenanceUrl).toContain('/postgres');
+  });
+
+  it('keeps the three roles in their own lanes (ADR-017)', () => {
+    const resolved = resolveTestDatabase(
+      'postgresql://family_platform_app:pw@localhost:5432/family_platform',
+      'postgresql://family_platform_owner:pw@localhost:5432/family_platform',
+      'postgresql://postgres:pw@localhost:5432/family_platform',
+    );
+
+    // If the suite ever ran as the owner or the superuser, every row-level
+    // security assertion in this repository would pass by seeing everything
+    // rather than by being filtered — and would look identical either way.
+    expect(new URL(resolved.url).username).toBe('family_platform_app');
+    expect(new URL(resolved.ownerUrl).username).toBe('family_platform_owner');
+    expect(new URL(resolved.maintenanceUrl).username).toBe('postgres');
   });
 
   it('is connected to the test database, not the development one', async () => {

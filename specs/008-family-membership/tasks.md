@@ -1,0 +1,876 @@
+---
+
+description: "Task list template for feature implementation"
+---
+
+# Tasks: Family and Membership
+
+**Input**: Design documents from `/specs/008-family-membership/`
+
+**Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),
+[data-model.md](data-model.md), [contracts/family-api.md](contracts/family-api.md),
+[quickstart.md](quickstart.md) — all present.
+
+> **⚠️ One gating item is NOT yet closed.** plan.md's Constitution Check gates this feature on
+> **ADR-017** (tenant isolation at the database), which is not written. It is T001 below, and it
+> blocks every other task in the list — not as ceremony, but because [research.md §1](research.md)
+> found that row-level security cannot work as the platform connects today, and T008 onwards create
+> the tables that depend on the answer. The constitution is explicit: "an agent that identifies a
+> needed ADR MUST stop and say so rather than implement around it."
+
+**Tests**: Included throughout, not optional. The constitution requires it directly — "integration
+tests MUST run against a real database, because row-level security and constraints are the thing
+being verified" and "authorization MUST have dedicated tests per route." This is the feature those
+two sentences were written about.
+
+**Organization**: Grouped by user story (spec.md's P1–P5), so each is independently implementable
+and testable. Foundational is unusually large for the same reason plan.md's Summary gives: the first
+family-scoped table is where ARCHITECTURE §9's layers 4 and 5 acquire something to attach to, and
+the tenant machinery built once here is inherited by every context that follows.
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: Can run in parallel (different files, no dependency on an incomplete task)
+- **[Story]**: US1–US5, mapped to spec.md's priorities (P1–P5)
+- Every task names an exact file path
+
+## Path Conventions
+
+Paths follow plan.md's Project Structure exactly:
+
+- `packages/kernel/src/` — branded ids, shared value objects, error taxonomy
+- `packages/core/src/family/{domain,application}/` — the bounded context
+- `packages/core/src/compliance/{domain,application}/` — the audit sink, minimum viable
+- `packages/contracts/src/v1/family.contract.ts` — the wire boundary (ADR-006)
+- `packages/persistence/{prisma,src/repositories/family,src/repositories/compliance}/`
+- `apps/api/src/family/` — controller, the two guards, DI wiring
+- `apps/worker/src/sweeps/` — invitation expiry and guardian coverage
+
+---
+
+## Phase 1: Setup (the gate, and the boundary rules that outlive it)
+
+**Purpose**: close the ADR gate, and put the boundary enforcement in place *before* the code it
+governs exists — the same fail-closed discipline `.dependency-cruiser.cjs` already uses for packages
+that do not exist yet.
+
+- [X] T001 **BLOCKING** Write `adr/ADR-017-tenant-isolation-at-the-database.md` and merge it before
+      any other task starts. Input is [research.md §1](research.md). It must decide: the role names
+      and their grant sets; whether migrations keep running as the table owner or gain a third role;
+      how the application role's password reaches the container at Stage 0 and at Stage 1
+      ([ADR-013](../../adr/ADR-013-staged-hosting-model.md)); and the revisit trigger. Status
+      `Accepted`; set [ADR-003](../../adr/ADR-003-database-orm.md)'s status to `Amended by ADR-017`
+      with a scope note naming its row-level-security section, per `adr/README.md`'s partial-
+      replacement rule. Add both to `adr/README.md`'s index.
+- [X] T002 [P] Create the context scaffolds `packages/core/src/family/index.ts` and
+      `packages/core/src/compliance/index.ts` (empty barrels for now) and re-export them from
+      `packages/core/src/index.ts` as namespaces alongside `identity`, so consumers write
+      `import { family } from '@fp/core'` and never reach into the file layout.
+- [X] T003 Add a `family-repositories-are-private` rule to `.dependency-cruiser.cjs`, forbidding
+      anything outside `packages/persistence/src/` from importing
+      `packages/persistence/src/repositories/family/**`. FR-020 says no code outside this context
+      may read family data directly; `persistence-client-is-private` already does the equivalent for
+      the Prisma client, and this is the same argument one level down. The package's narrow factory
+      exports remain the only door.
+
+**Checkpoint**: ADR-017 merged, the two context namespaces exist and build, and the boundary rule is
+in force before there is anything for it to catch.
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: the tenant machinery. Every user story depends on all of it.
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete.
+
+### Kernel and shared primitives
+
+- [X] T004 [P] Add `FamilyId`, `FamilyMemberId`, `InvitationId`, `GuardianshipId` and their `as*`
+      constructors to `packages/kernel/src/branded-id.ts`, and export them from
+      `packages/kernel/src/index.ts`.
+- [X] T005 [P] Move `EmailAddress` from `packages/core/src/identity/domain/email-address.vo.ts` to
+      `packages/kernel/src/email-address.vo.ts`, re-export it from
+      `packages/core/src/identity/index.js` so spec 006's public surface is unchanged, and move
+      `email-address.vo.spec.ts` alongside it. [research.md §8](research.md): invitation acceptance
+      and account lookup must normalise through one implementation, because a divergence between two
+      is a case-sensitivity leak in the invitation path.
+- [X] T006 [P] Add the family error kinds to `packages/kernel/src/errors.ts`'s `DomainError` union:
+      `CapabilityRequired`, `GuardianshipRequired`, `GuardianIneligible`, `LastGuardian`,
+      `OwnerRequired`, `OwnerIneligible`, `AlreadyMember`, `InvitationInvalid`,
+      `InvitationEmailMismatch`. One per error type in
+      [contracts/family-api.md](contracts/family-api.md), so the controller's mapping is exhaustive
+      by the compiler rather than by review.
+- [X] T007 [P] Implement the role-to-capability map in
+      `packages/core/src/family/domain/capabilities.ts` — the `Capability` union, the `MemberRole`
+      union, and a pure `capabilitiesFor(role)` — exactly as tabulated in
+      [data-model.md](data-model.md). With
+      `packages/core/src/family/domain/capabilities.spec.ts` asserting every cell of that table,
+      including that `viewer` holds no `*:write` capability and that only `owner` holds
+      `billing:manage`.
+
+### Schema, and making row-level security real (ADR-017)
+
+- [X] T008 Add the `family`, `familyMember`, `invitation` and `guardianship` models plus the
+      `member_kind`, `member_role` and `invitation_status` enums to
+      `packages/persistence/prisma/schema.prisma`, per [data-model.md](data-model.md). UUIDv7 via
+      `@default(uuid(7))` ([research.md §9](research.md)). `family_member.user_id` carries **no**
+      foreign key — cross-context references are to published stable ids only.
+- [X] T009 Add the `auditLog` model and the `audit_result` enum to
+      `packages/persistence/prisma/schema.prisma`, in its own
+      commented block marking it **owned by Audit and Compliance, deliberately not family-scoped**
+      ([research.md §7](research.md)) so the next reader does not "fix" it.
+- [X] T010 Generate the migration as `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`,
+      then hand-write into it the creation of the
+      `family_platform_app` login role with `NOBYPASSRLS`, and its grants: full DML on the four
+      family-scoped tables, `INSERT` **only** on `audit_log`. Prisma cannot express roles or grants,
+      so this is raw SQL in the generated migration directory, which ADR-003 permits and reviews.
+- [X] T011 Hand-write into `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`
+      the `ALTER TABLE … ENABLE ROW LEVEL SECURITY` **and**
+      `FORCE ROW LEVEL SECURITY` for `family`, `family_member`, `invitation` and `guardianship`,
+      plus one policy each: `USING (family_id = current_setting('app.family_id', true)::uuid)` —
+      and `id = …` for `family` itself, whose own primary key is the family id. The second argument
+      `true` is what makes an unset context return `NULL` and the policy fail closed
+      ([research.md §2](research.md)).
+- [X] T012 Hand-write the constraints Prisma's schema language cannot express, into
+      `packages/persistence/prisma/migrations/<timestamp>_family_and_membership/migration.sql`: the partial unique indexes (`family_one_owner`, one membership per user per
+      family, one pending invitation per family and email, one active guardianship per pair) and the
+      three `CHECK` constraints on `family_member` from [data-model.md](data-model.md). These are
+      not belt-and-braces — `family_one_owner` is the whole of SC-007's guarantee, and the checks
+      are what stop a raw query creating a child with a login path.
+- [X] T013 Split the connection strings: `DATABASE_URL` becomes the application role's, a new
+      `MIGRATOR_DATABASE_URL` carries the owner's. Update `docker-compose.yml` (api, worker and
+      migrate services), `docker-compose.staging.yml`, `.env.example`, and
+      `apps/api/src/config/env.schema.ts`. A process that boots with the wrong one must fail at
+      boot, not at the first query (Principle II). **Also, discovered during implementation:**
+      `packages/testing/src/database.ts` and the CI workflow both derive everything from
+      `DATABASE_URL`, so the integration harness must be taught the three roles too — it
+      creates the test database as the superuser, migrates as the owner, and runs the tests
+      as the application role, because running them as the owner would make every isolation
+      assertion pass by seeing everything rather than by being filtered.
+- [X] T014 Add the application role's credential to the `infrastructure/` vps-staging Pulumi stack,
+      resolved at runtime from the secret store — never committed, never a build argument
+      (Principle X).
+
+### The scoped unit of work
+
+- [X] T015 [P] Declare `FamilyUnitOfWork` and `FamilyUnitOfWorkPort` in
+      `packages/core/src/family/application/ports/family-unit-of-work.port.ts`, mirroring
+      identity's, with `families`, `members`, `invitations`, `guardianships`, `audit` and `outbox`
+      added as the stories that need them land.
+- [X] T016 Implement `withFamilyContext(familyId, work)` in
+      `packages/persistence/src/family-context.ts`: one `$transaction`, `SELECT set_config(
+      'app.family_id', $1, true)` as its first statement, every family repository constructed
+      against that transaction client. Delete the now-answered `TODO(ADR-003-rls)` in
+      `packages/persistence/src/client.ts` and replace it with a pointer here. No repository method
+      may take a family parameter — ARCHITECTURE §9 layer 4 is enforced by the absence of the
+      argument, not by remembering to pass it.
+- [X] T017 Integration test `packages/persistence/src/family-context.integration.spec.ts`:
+      connected as the application role with no context set, each family-scoped table returns zero
+      rows while rows plainly exist; inside `withFamilyContext` only that family's rows appear; and
+      connected as the **owner** role, `FORCE ROW LEVEL SECURITY` still filters. Without this last
+      assertion [research.md §1](research.md)'s failure mode is invisible — the policy exists, CI is
+      green, and every row is readable.
+- [X] T018 Integration test in `packages/persistence/src/family-context.integration.spec.ts`:
+      `set_config(..., true)` does not survive its
+      transaction. Open a scoped transaction, commit, then query on the same pooled connection with
+      no context and assert zero rows. Losing the third argument would leak one family's scope into
+      the next request on that connection, which is the single worst failure this mechanism can
+      have and the one a functional test would never notice.
+
+### The audit sink (minimum of Audit and Compliance)
+
+- [X] T019 [P] Create `packages/core/src/compliance/domain/audit-entry.ts` (the entry shape:
+      actor, subject, action, purpose, result, reason, correlation id) and
+      `packages/core/src/compliance/application/ports/audit-log.port.ts` declaring
+      `AuditLogPort.append(entry)`. Owned by Compliance from its first row, so it never has to be
+      moved later — moving it would be "changing which context owns a table" and would need its own
+      ADR ([research.md §7](research.md)).
+- [X] T020 [P] Implement `packages/persistence/src/repositories/compliance/audit-log.repository.ts`,
+      exported through one narrow factory. It must accept an optional transaction client, so a
+      granted read is audited inside the same transaction it records while a denial — which has no
+      transaction — is a single insert.
+- [X] T021 Integration test
+      `packages/persistence/src/repositories/compliance/audit-log.integration.spec.ts`: the
+      application role can `INSERT`, and `SELECT`, `UPDATE` and `DELETE` are all refused by the
+      database. §5.12's "append-only, no update or delete grants" is a grant, not a convention, and
+      this is what proves it.
+
+### Ports and events
+
+- [X] T022 [P] Declare the open host service in
+      `packages/core/src/family/application/ports/family-context.port.ts`: the `FamilyContext` DTO
+      (`memberId`, `role`, `capabilities[]`) and `FamilyContextPort.resolve`. This file is the
+      entirety of what another bounded context may ever import from `core/family` — no domain type
+      appears in its signature (ARCHITECTURE §7.1).
+- [X] T023 [P] Declare `ErasurePort.eraseForFamily(familyId)` and `eraseForMember(memberId)` in
+      `packages/core/src/family/application/ports/erasure.port.ts`. Declared now, implemented in
+      T092 — Principle XI: "a new context is not complete without them."
+- [X] T024 [P] Implement the six versioned event builders in
+      `packages/core/src/family/domain/events.ts` (`family.FamilyCreated.v1` and the rest), with
+      `events.spec.ts` asserting each payload against [data-model.md](data-model.md) and — the
+      assertion that matters — that no payload contains a name, a date of birth or an email
+      address.
+
+### Layers 2 and 3
+
+- [X] T025 Implement the standing lookup in
+      `packages/persistence/src/repositories/family/membership.repository.ts`, exported as a single
+      narrow factory `createMembershipRepository()`. **Refined during implementation:** it turns out this need
+      NOT be an unscoped read at all — the caller has already named the family, so the
+      lookup runs inside `withFamilyContext(requestedFamilyId)` and the policies apply to
+      it like any other query. Stricter than planned; the repository is
+      `family-member.repository.ts`, built by the unit of work. [research.md §3](research.md) is the argument for why this
+      one read has to be unscoped and why it cannot leak; put that reasoning in the file's doc
+      comment, not only in the spec.
+- [X] T026 Implement `resolveFamilyContext` in
+      `packages/core/src/family/application/queries/resolve-family-context.query.ts` — the standing
+      lookup composed with `capabilitiesFor` — returning `null` for no membership, a removed
+      membership, a family pending deletion, or a family that does not exist. With
+      `resolve-family-context.query.spec.ts` asserting all four collapse to the same `null`.
+- [X] T027 Implement `FamilyMembershipGuard` in `apps/api/src/family/family-membership.guard.ts`:
+      resolve, attach `request.familyContext` on success, and on `null` throw `404
+      family/not_found` **and** write an audit entry recording the real reason. Never 403 — a 403
+      confirms the family exists and is an enumeration oracle (Principle V, FR-021).
+- [X] T028 Implement `CapabilityGuard` in `apps/api/src/family/capability.guard.ts`, driven by a
+      `@RequiresCapability('members:manage')` decorator, checking membership in
+      `familyContext.capabilities`. The string `'owner'` must appear in no authorization decision
+      anywhere in `apps/api` — FR-015, and a lint-visible grep in T094.
+- [X] T029 Create `packages/contracts/src/v1/family.contract.ts` with the `/v1` router skeleton and
+      the shared shapes (`MemberRole`, `Capability`, `FamilyContextResponse`, the problem-format
+      error types from [contracts/family-api.md](contracts/family-api.md)), exported from
+      `packages/contracts/src/index.ts`. Routes are added by the story that owns them.
+- [X] T030 Create `apps/api/src/family/family.module.ts` and `family.tokens.ts`, wiring the clock,
+      the membership repository, the audit log, `withFamilyContext` and both guards, mirroring
+      `identity.module.ts`.
+- [X] T031 Add family factories to `packages/testing` (a family with an owner, an adult, a child
+      with a guardian, and an extended member) and an `expectNotFoundAcrossFamilies(routes)` helper
+      that drives the parameterised cross-family sweep T087 runs.
+
+**Checkpoint**: row-level security is provably in force, the audit sink accepts entries and refuses
+reads, and layers 2 and 3 exist. User story implementation can now begin.
+
+---
+
+## Phase 3: User Story 1 - Create a family and become its owner (Priority: P1) 🎯 MVP
+
+**Goal**: a registered person creates a family and is immediately its sole owner, holding the owner
+capability set.
+
+**Independent test**: create a family as a registered user; confirm a `Family` exists with that user
+as its owner and the owner capabilities resolved, with no other feature required.
+
+### Tests for User Story 1
+
+- [X] T032 [P] [US1] Unit test `packages/core/src/family/domain/family.aggregate.spec.ts`: name
+      required, trimmed and length-bounded; household profile optional and independently updatable.
+- [X] T033 [P] [US1] Unit test `packages/core/src/family/domain/family-member.aggregate.spec.ts`:
+      the three `kind` × `role` invariants from [data-model.md](data-model.md), each asserted in
+      both directions.
+- [X] T034 [P] [US1] Integration test `apps/api/src/family/create-family.integration.spec.ts`:
+      `POST /v1/families` returns 201, creates exactly one owner member linked to the caller, and
+      rejects a missing name with `422 family/name_required`. Also covers ADR-006's
+      `Idempotency-Key` replay (see T043's note). The "same transaction" half of this task's
+      original wording is a unit test on `createFamily` itself (`create-family.command.spec.ts`,
+      against the fake unit of work) rather than a row read back from `apps/api` — corrected by
+      T046's discovery that `outbox_event` (unlike `audit_log`) DOES carry a `SELECT` grant for the
+      application role, reachable from a test via `@fp/testing`'s `withDatabase`; T046 uses that
+      path directly, and this note is left here only because a straight re-read of `outbox_event`
+      still would not have shown the writes landed in the SAME transaction, which the command test
+      is what actually proves.
+- [X] T035 [P] [US1] Integration test `apps/api/src/family/list-families.integration.spec.ts`:
+      `GET /v1/families` returns only the caller's memberships with capabilities present and role
+      names not load-bearing; a user in two families sees both and not a third (FR-024).
+- [X] T036 [P] [US1] Integration test `apps/api/src/family/read-family.integration.spec.ts`:
+      `GET /v1/families/:familyId` succeeds for a member, returns `404` for a member of another
+      family, and `PATCH` requires `family:manage`. The last case needed a second member holding a
+      non-owner role, which no US1 route can create yet — `packages/testing`'s `seedMember` supplies
+      it, via a new committing counterpart to `withRollback` (`withCommit`/`withDatabaseCommitted`)
+      that a fixture needs when it must be visible to the separately-connected app under test, not
+      just to the test's own transaction.
+
+### Implementation for User Story 1
+
+- [X] T037 [US1] Implement the `Family` aggregate in
+      `packages/core/src/family/domain/family.aggregate.ts` and the `HouseholdProfile` value object
+      in `household-profile.vo.ts` — postcode normalised, local authority held as an identifier
+      never a name (the UK-first-not-UK-welded constraint).
+- [X] T038 [US1] Implement the `FamilyMember` aggregate in
+      `packages/core/src/family/domain/family-member.aggregate.ts`, carrying `kind` and `role` as
+      separate discriminants ([research.md §5](research.md)) with the invariants enforced in the
+      constructor, not only by the database.
+- [X] T039 [US1] Implement `family.repository.ts` and `family-member.repository.ts` in
+      `packages/persistence/src/repositories/family/`, constructed from the transaction
+      `withFamilyContext` opens. No method takes a family id. `FamilyRepository.findCurrent()`
+      returns the full `Family` aggregate rather than a flattened record (matching
+      `FamilyMemberRepository.findById`'s own shape) — needed to fix `updateFamily`, which had been
+      rebuilding the profile from only the PATCH body and silently wiping fields the caller never
+      named.
+- [X] T040 [US1] Implement `createFamily` in
+      `packages/core/src/family/application/commands/create-family.command.ts`: family, owner
+      member and outbox row in one transaction. This is the one command that cannot run inside
+      `withFamilyContext` for its own family, because the family does not exist until it commits —
+      document that in the file, and set the context immediately after insert so the rest of the
+      transaction is scoped.
+- [X] T041 [P] [US1] Implement `listFamilies` in
+      `packages/core/src/family/application/queries/list-families.query.ts`, returning
+      `FamilyContextResponse[]` — capabilities, not roles, are what the client branches on.
+- [X] T042 [P] [US1] Implement `getFamily` and `updateFamily` (name and household profile, FR-002)
+      in `packages/core/src/family/application/`. `getFamily` is its own
+      `queries/get-family.query.ts` rather than inlined in the controller, matching every other
+      handler's shape.
+- [X] T043 [US1] Add the four routes to `packages/contracts/src/v1/family.contract.ts`:
+      `POST /v1/families`, `GET /v1/families`, `GET /v1/families/:familyId`,
+      `PATCH /v1/families/:familyId`, with `Idempotency-Key` honoured on the first. Two deviations
+      from the original wording: (1) `createFamilyRequestSchema` gained `ownerDisplayName` — the
+      spec never says where the owner's own FamilyMember display name comes from, and it cannot be
+      derived from Identity (a `User` carries no name, only an email, and reaching into Identity for
+      one would cross the boundary FR-019/FR-020 exist to hold), so the caller supplies it once,
+      here. (2) `familyNameSchema` dropped `.min(1)`: with it, an empty name was rejected by ts-rest
+      as a generic body-validation `400` before ever reaching `Family.create`, which is what
+      actually produces the `422 family/name_required` with US1 Scenario 3's actionable reason —
+      the wire-level minimum was silently defeating the requirement it was meant to give a fast path
+      to. `Idempotency-Key` handling is genuinely new infrastructure (`IdempotencyPort` in
+      `packages/kernel`, `PrismaIdempotencyRepository` + the `idempotency_key` table in
+      `packages/persistence`, `apps/api/src/common/idempotency.ts`) — unlike registration, nothing
+      about creating a family is naturally deduplicated, so this could not be deferred to a "natural
+      idempotency" note the way spec 006 does.
+- [X] T044 [US1] Implement `apps/api/src/family/family.controller.ts` binding those four routes,
+      with `FamilyMembershipGuard` and `CapabilityGuard` applied to the two that carry a
+      `:familyId` and to neither of the two that do not. Registered `FamilyModule` into
+      `apps/api/src/app.module.ts`, which had never actually wired it in.
+
+**Checkpoint**: quickstart Scenario 1 passes. A family exists, it has exactly one owner, and that
+owner's capabilities resolve.
+
+---
+
+## Phase 4: User Story 2 - Add a child and become their guardian (Priority: P2)
+
+**Goal**: an owner or adult adds a child with no account and becomes their guardian in the same
+action; nobody without a guardianship relationship can read that child's details.
+
+**Independent test**: add a child as the owner; confirm no linked account, the adder is a guardian,
+and a second adult member with no guardianship cannot read the child's details.
+
+### Tests for User Story 2
+
+- [X] T045 [P] [US2] Unit test `packages/core/src/family/domain/guardianship.spec.ts`: eligibility
+      is `owner`/`adult` and `kind = adult` only (FR-006); the last-guardian rule refuses all three
+      routes to zero guardians (FR-008).
+- [X] T046 [P] [US2] Integration test `apps/api/src/family/add-child.integration.spec.ts`: the
+      created member has no `user_id`, no credential and no verification email; the adder is a
+      guardian; both `MemberAdded` and `GuardianshipEstablished` outbox rows are written for the
+      same aggregate (read back via `@fp/testing`'s `withDatabase` — `outbox_event`, unlike
+      `audit_log`, carries a `SELECT` grant for the application role, so this is a real read, not a
+      stand-in).
+- [X] T047 [P] [US2] Integration test `apps/api/src/family/child-access.integration.spec.ts` — the
+      test this whole feature exists for. **An `owner` who is not a guardian is denied; a `viewer`
+      who is a guardian is allowed.** Both directions, because either alone would still pass with
+      role-based logic and the point is that guardianship is not a capability. The viewer-guardian
+      state is reached by direct seeding (`seedChild`'s `guardianMemberId` param), not through
+      `POST …/guardians` — that route correctly refuses to GRANT a new guardianship to an
+      ineligible member (FR-006, its own test alongside this one), so the only way to observe an
+      already-existing one on a viewer is the state FR-008 describes as legitimate: a guardian's
+      role changing away from eligible (US5, not yet built) does not itself end their guardianship.
+- [X] T048 [P] [US2] Integration test in `apps/api/src/family/child-access.integration.spec.ts`:
+      `GET …/members` omits `dateOfBirth` for
+      every child the caller does not guard — the key absent, not null, so the response shape
+      carries no oracle.
+- [X] T049 [P] [US2] Integration test `apps/api/src/family/child-audit.integration.spec.ts`: a
+      granted read and a denied read each write exactly one `audit_log` row carrying actor, subject,
+      purpose and result. A missing denial row is a failure even when the API behaved correctly —
+      Principle VI logs reads, not only mutations. Reading `audit_log` back needed new
+      infrastructure: the application role holds no `SELECT` on it by design (ADR-017), so
+      `packages/testing` gained `readAuditLogRows` (a raw `pg` client against the OWNER connection —
+      the one path that can actually see these rows) and `resolvedTestDatabaseOwnerUrl()`. The
+      latter reads an env var (`TEST_DATABASE_OWNER_URL`) that `prepareTestDatabase()` now also
+      sets, rather than calling `prepareTestDatabase()` again from a test file — that function's own
+      cache is per-process, and `globalSetup` runs in a different process than the test files, so a
+      second call would re-derive the test database name from an ALREADY-suffixed `DATABASE_URL`
+      and double-suffix it (caught by running this exact mistake first).
+
+### Implementation for User Story 2
+
+- [X] T050 [US2] Implement the guardianship entity and eligibility policy in
+      `packages/core/src/family/domain/guardianship.ts`, and the `assertGuardianCoverage` rule the
+      three mutating paths share.
+- [X] T051 [US2] Implement `guardianship.repository.ts` in
+      `packages/persistence/src/repositories/family/`.
+- [X] T052 [US2] Implement `addMember` (child path) in
+      `packages/core/src/family/application/commands/add-member.command.ts`: member, guardianship
+      and both outbox rows in one transaction (FR-005). Implemented the `extended` path (FR-014,
+      originally T071/US4) in the same file: `FamilyMember.createUnlinked` already generalises over
+      both, so gating `extended` out here and re-adding it later would have been pure churn.
+- [X] T053 [US2] Implement `readMember` in
+      `packages/core/src/family/application/queries/read-member.query.ts`: the guardianship gate for
+      a child subject, and an audit append on **both** outcomes, inside the transaction on the
+      granted path.
+- [X] T054 [US2] Implement `listMembers` in
+      `packages/core/src/family/application/queries/list-members.query.ts` with per-row field
+      omission for unguarded children. Omission happens in the query, not the controller — a
+      serialization-layer filter is one refactor away from being forgotten.
+- [X] T055 [US2] Implement `grantGuardianship` and `endGuardianship` in
+      `packages/core/src/family/application/commands/`, both publishing
+      `GuardianshipEstablished` / enforcing FR-008 respectively. `grantGuardianship` treats an
+      already-active pair as success rather than a new error type, matching the unique partial
+      index's own semantics. `endGuardianship` has no replacement parameter (the route names none),
+      so it can only refuse outright when this is the last guardian — a caller wanting to swap the
+      sole guardian grants the replacement first, in a separate call.
+- [X] T056 [US2] Add, to `packages/contracts/src/v1/family.contract.ts` and
+      `apps/api/src/family/family.controller.ts`: `POST /v1/families/:familyId/members`, `GET …/members`,
+      `GET …/members/:memberId`, `POST …/members/:memberId/guardians` and
+      `DELETE …/guardians/:guardianMemberId` to the contract and the controller, with
+      `AddMemberRequest`'s `kind` union deliberately omitting `'adult'`. `addMember` also honours
+      `Idempotency-Key` (contracts/family-api.md's own requirement), scoped by family as well as by
+      caller (`${familyId}:${key}`) so the same key reused across two families never collides.
+      Dropped `displayName`'s `.min(1)` for the same reason `familyNameSchema` dropped its own in
+      T043 — it was pre-empting `FamilyMember.createUnlinked`'s own `422 family/name_required`
+      with a generic `400`.
+
+**Checkpoint**: quickstart Scenario 2 passes, audit rows included. The platform's core privacy
+promise is enforced and tested.
+
+---
+
+## Phase 5: User Story 3 - Invite another adult to join the family (Priority: P3)
+
+**Goal**: the owner invites an adult by email; the recipient, with or without an existing account,
+accepts and becomes a linked adult member.
+
+**Independent test**: send an invitation, accept it from that email, confirm a linked
+`FamilyMember` exists with the invited role.
+
+### Tests for User Story 3
+
+- [X] T057 [P] [US3] Unit test `packages/core/src/family/domain/invitation.aggregate.spec.ts`:
+      status transitions, expiry against an injected clock, and `proposed_role` never `owner`.
+- [X] T058 [P] [US3] Integration test `apps/api/src/family/invitation.integration.spec.ts`: invite
+      `GRACE@example.com`, accept as the account registered at `grace@example.com`, confirm the
+      case-insensitive match and the linked member.
+- [X] T059 [P] [US3] Integration test in `apps/api/src/family/invitation.integration.spec.ts`:
+      invite an address with **no** account, then
+      register and verify through spec 006's routes, then accept. The outcome must be identical to
+      T058's (US3 Scenario 3).
+- [X] T060 [P] [US3] Integration test in `apps/api/src/family/invitation.integration.spec.ts`,
+      the four negatives: a second acceptance
+      returns the same membership rather than a duplicate; another account presenting the token gets
+      `403 family/invitation_email_mismatch` **and creates nothing**; a redundant invitation gets
+      `409 family/already_member`; a revoked or expired token gets
+      `422 family/invitation_invalid`. All nine cases in this file share ONE owner/family, created
+      once in `beforeAll` — registering an owner-and-counterpart pair per case would have exceeded
+      identity's own per-source registration throttle (10/60s) well inside how fast a real test run
+      completes; discovered by hitting it.
+
+### Implementation for User Story 3
+
+- [X] T061 [US3] Implement the `Invitation` aggregate in
+      `packages/core/src/family/domain/invitation.aggregate.ts` — token hashed, never stored raw,
+      the same handling spec 006 gives verification tokens.
+- [X] T062 [US3] Implement `invitation.repository.ts`, plus the token-keyed lookup exported as one
+      narrow factory outside `withFamilyContext`. This is the second and last unscoped read in the
+      feature; [data-model.md](data-model.md) explains why acceptance cannot be family-scoped, and
+      that explanation belongs in the file.
+- [X] T063 [US3] Implement `createInvitation` in
+      `packages/core/src/family/application/commands/create-invitation.command.ts`, reusing
+      `MailerPort` from `@fp/kernel`. The email carries a link and no family detail beyond its
+      name. FR-013's "already belongs to a member" half needed a genuine cross-context read
+      (family has no email column to check directly) — resolved by a new, narrow identity query
+      (`identity.resolveUserIdByEmail`), called once from the composition root
+      (`family.controller.ts`) and passed into the command as a plain, already-resolved `UserId
+      | null` — `packages/core/family` still imports nothing from `packages/core/identity`.
+- [X] T064 [US3] Implement `acceptInvitation` in
+      `packages/core/src/family/application/commands/accept-invitation.command.ts`: resolve by token, verify the authenticated account's
+      email matches, then open `withFamilyContext` for the family the invitation names and create
+      the linked member plus a `MemberAdded` row. The email-match check needed the caller's OWN
+      email, which `identityContext` (a session credential) does not carry — a second small
+      identity query, `identity.resolveEmailByUserId`, the mirror of T063's. `AcceptInvitationRequest`
+      carries no display name (contract: "token only"), so the linked member's name is derived from
+      the account's own email local part.
+- [X] T065 [P] [US3] Implement `revokeInvitation` and `listInvitations` in
+      `packages/core/src/family/application/`.
+- [X] T066 [US3] Add, to `packages/contracts/src/v1/family.contract.ts` and
+      `apps/api/src/family/family.controller.ts`: `POST /v1/families/:familyId/invitations`, `GET …/invitations`,
+      `DELETE …/invitations/:invitationId` and `POST /v1/invitations/accept` to the contract and
+      controller. The accept route takes a token and no `:familyId` — a caller cannot name the
+      family, only present evidence.
+- [X] T067 [P] [US3] Implement `apps/worker/src/sweeps/expire-invitations.sweep.ts` (FR-012), with
+      an integration test. Acceptance must also check expiry against the clock, so a token that
+      expired a minute ago is dead before the sweep runs. Needed one more RLS policy pair
+      (`20260913190000_invitation_sweep_policy`, `app.is_sweep`-gated, additive like
+      `invitation_by_token`) since the sweep — like `apps/api` — runs as the NOBYPASSRLS
+      application role and would otherwise see only one family's invitations at a time. Caught by
+      this task's own integration test: an UPDATE whose WHERE clause reads `status`/`expires_at`
+      needs the row to ALSO pass a SELECT-or-ALL policy, so the SELECT-side policy grants on
+      `app.is_sweep` alone rather than repeating the narrower condition.
+- [X] T068 [US3] Apply, in `apps/api/src/family/family.module.ts` via the existing
+      `apps/api/src/common/rate-limit.guard.ts`, the rate limits from [contracts/family-api.md](contracts/family-api.md) —
+      10 invitations per family per hour is the feature's outbound-abuse surface and the strictest
+      limit here. New `PerFamilyThrottlerGuard` (tracks by the `:familyId` path param, not account
+      or source — `PerAccountThrottlerGuard`'s sibling), applied only to `createInvitation`.
+
+**Checkpoint**: quickstart Scenario 3 passes, both the has-an-account and the no-account-yet paths.
+
+---
+
+## Phase 6: User Story 4 - Add an extended family member without an account (Priority: P4)
+
+**Goal**: add an extended member directly, with no invitation and no login path, carrying the
+extended capability set.
+
+**Independent test**: add an extended member as the owner; confirm the extended capability set and
+that no login path was created.
+
+### Tests for User Story 4
+
+- [X] T069 [P] [US4] Integration test `apps/api/src/family/extended-member.integration.spec.ts`:
+      the created member has no linked account, and resolves the extended capability set —
+      containing `documents:write` but **not** `documents:write:sensitive`. (Capability resolution
+      itself is asserted cell-by-cell in `capabilities.spec.ts`; this test confirms an extended
+      member added through the real route lands with `role: 'extended'`, which is what that map
+      keys on.)
+- [X] T070 [P] [US4] Integration test in `apps/api/src/family/extended-member.integration.spec.ts`:
+      granting the extended member guardianship returns `422 family/guardian_ineligible` (FR-006).
+      The other half of this task's original wording — promoting an unlinked member to `owner`
+      returning `422 family/owner_ineligible` — needs `transferOwnership` (US5, T079), which does
+      not exist yet; deferred to that phase rather than blocking this one on a route it doesn't own.
+- [X] T070b [US5] Once `transferOwnership` exists, add the owner-ineligible half of T070 above.
+      Landed as `ownership-transfer.integration.spec.ts`'s "refuses to transfer ownership to an
+      unlinked member" case rather than back in `extended-member.integration.spec.ts` — it needs
+      the transfer route, which is that file's own subject.
+
+### Implementation for User Story 4
+
+- [X] T071 [US4] Extend `add-member.command.ts` with the `extended` path — no guardianship
+      established, unlike the child path (FR-005 applies to children only). Landed during T052
+      (US2): `FamilyMember.createUnlinked` already generalises over `child`/`extended`
+      (`kind: 'adult'` → `role: 'extended'`), so gating the extended path out in US2 and re-adding
+      it here would have been pure churn for no safety benefit.
+- [X] T072 [US4] Extend `AddMemberRequest` in `packages/contracts/src/v1/family.contract.ts` and the
+      handler in `apps/api/src/family/family.controller.ts`. No new route:
+      the wire type distinguishes the two, which is why `kind` is a discriminant rather than a
+      flag. Also landed during T052/T056 for the same reason.
+
+**Checkpoint**: quickstart Scenario 4 passes.
+
+---
+
+## Phase 7: User Story 5 - Manage roles and remove access (Priority: P5)
+
+**Goal**: the owner changes roles, transfers ownership and removes members, with every capability
+check reflecting the change immediately.
+
+**Independent test**: change one member's role and remove another; confirm both members' resolved
+standing reflects the change on the next request.
+
+### Tests for User Story 5
+
+- [X] T073 [P] [US5] Integration test `apps/api/src/family/role-management.integration.spec.ts`: a
+      demotion to `viewer` is visible in the very next request's capability set — no cache, no
+      delay (FR-016, SC-005).
+- [X] T074 [P] [US5] Integration test in `apps/api/src/family/role-management.integration.spec.ts`:
+      the sole owner cannot leave, be removed, or
+      be demoted — `409 family/owner_required` in all three cases (FR-018). ("Leave" has no route
+      of its own — the spec never adds one — so it is the same check `removeMember` already makes,
+      whoever the caller is; not a third test.)
+- [X] T075 [P] [US5] Integration test `apps/api/src/family/ownership-transfer.integration.spec.ts`:
+      after transfer exactly one owner exists, the previous owner is `adult`, and the child's
+      guardianship is untouched (spec.md Edge Cases). Plus a concurrent-promotion test proving
+      `family_one_owner` rejects the second rather than interleaving. Caught a real ordering bug
+      while writing it: `transferOwnership` was promoting the new owner BEFORE demoting the old
+      one, which collides with the still-current owner's own row on the very first write —
+      `family_one_owner` is a plain (non-deferred) index, checked per statement, and a moment with
+      zero owners is fine where a moment with two never is. Fixed by demoting first.
+- [X] T076 [P] [US5] Integration test `apps/api/src/family/last-guardian.integration.spec.ts`:
+      removing a child's only guardian, and demoting them to `viewer`, both return
+      `409 family/last_guardian` (FR-008, SC-006).
+
+### Implementation for User Story 5
+
+- [X] T077 [US5] Implement `changeMemberRole` in
+      `packages/core/src/family/application/commands/change-member-role.command.ts` —
+      `MemberRoleChanged` row, and the guardian-coverage
+      assertion before the write. FR-006 reread closely here: a role change that drops eligibility
+      doesn't just block future grants, it means this member may no longer HOLD a guardianship at
+      all — so losing eligibility ends their active guardianships in the SAME transaction, refused
+      outright (this route carries no replacement parameter) if that would leave any child
+      uncovered.
+- [X] T078 [US5] Implement `removeMember` in
+      `packages/core/src/family/application/commands/remove-member.command.ts` — tombstone (`removed_at` set, personal fields nulled),
+      guardianships ended, `MemberRemoved` row carrying `hadUserId` as a boolean and not the id
+      ([data-model.md](data-model.md)).
+- [X] T079 [US5] Implement `transferOwnership` in
+      `packages/core/src/family/application/commands/transfer-ownership.command.ts` — demotion and promotion in one transaction, never
+      two calls, so the partial unique index can never see two owners. Added two `FamilyMember`
+      methods this needed that `changeRole` deliberately refuses: `promoteToOwner`/
+      `demoteFromOwnership` — the two sanctioned owner transitions, used only by this command.
+- [X] T080 [US5] Add, to `packages/contracts/src/v1/family.contract.ts` and
+      `apps/api/src/family/family.controller.ts`: `PATCH …/members/:memberId/role`, `DELETE …/members/:memberId` and
+      `POST …/ownership-transfer` to the contract and controller, all behind `members:manage`.
+
+**Checkpoint**: all five user stories work independently. Feature-complete against spec.md's user
+stories; the requirements below are not covered by any of them.
+
+---
+
+## Phase 8: Polish & Cross-Cutting Concerns
+
+- [X] T081 Implement `requestFamilyDeletion` in
+      `packages/core/src/family/application/commands/request-family-deletion.command.ts`
+      (FR-023, FR-025) — sets `deletion_requested_at`, voids
+      every pending invitation in the same transaction (§7.2: same context, so no queue), publishes
+      `family.FamilyDeletionRequested.v1`, and revokes access immediately by making
+      `resolveFamilyContext` return `null` for the family. Add `DELETE /v1/families/:familyId`
+      behind `family:delete`. **No user story covers this**, which is why it is here rather than
+      lost — it is required by FR-023 and FR-025 and by Principle XI's insistence that deletion is
+      designed, not retrofitted. Returns `202`, not `200` (quickstart.md Scenario 8 is explicit):
+      the request is accepted, nothing is erased yet. `Family.requestDeletion` is write-once and
+      idempotent, matching identity's `requestAccountDeletion` — though a retry is actually
+      unreachable through the API once standing is revoked, since `FamilyMembershipGuard` 404s any
+      further request against this family, including a second delete.
+- [X] T082 Integration test `apps/api/src/family/family-deletion.integration.spec.ts`: quickstart
+      Scenario 8 — 202, pending invitation now unacceptable, every family-scoped route 404 for
+      every member, outbox row present, and the rows themselves still there because erasure is the
+      saga's job.
+- [X] T083 Implement `ErasurePort.eraseForFamily` and `eraseForMember` in
+      `packages/persistence/src/repositories/family/erasure.ts`, with an integration test asserting
+      that after `eraseForMember` no personal field survives on the tombstone and no guardianship
+      row references the member, and that after `eraseForFamily` no row in any of the four tables
+      references the family (Principle XI's end-to-end assertion, scoped to this context).
+      `eraseForFamily` is one `DELETE FROM family` — every other row cascades with it
+      (`onDelete: Cascade`). `eraseForMember` took only a member id with no `:familyId` to scope a
+      transaction to first — the same shape of problem the invitation-expiry sweep already solved,
+      solved the same way: one more narrow, `app.is_erasure`-gated policy
+      (`20260913200000_erasure_policy`) grants just enough visibility to discover the row's
+      `family_id`, and the write that follows goes through the ordinary scope once that's known.
+      The test's first draft tried erasing an OWNER directly and hit
+      `family_member_owner_is_linked_adult` — a real constraint, not a test bug: erasing the sole
+      owner is exactly as invalid as removing them (`removeMember` already refuses it), so the
+      fixture erases an ordinary adult guardian instead.
+- [X] T084 [P] Implement `apps/worker/src/sweeps/guardian-coverage.sweep.ts` and the
+      `family_children_without_guardian` gauge, alerting on any value above zero. This is what makes
+      SC-006 *measured* rather than merely asserted at the moment of each mutation
+      ([research.md §6](research.md)). A genuinely cross-family read, so it needed the same shape
+      of RLS policy the invitation-expiry sweep already introduced — two more `app.is_sweep`-gated
+      SELECT-only policies (`family_member_sweep_select`, `guardianship_sweep_select`,
+      `20260913210000_guardian_coverage_sweep_policy`), reusing the existing flag rather than
+      minting a new one per sweep. "Gauge" and "alert" are both a structured `console.warn` line:
+      this platform has no metrics or alerting pipeline anywhere yet — the same gap spec 006's own
+      tasks.md T059 note already accepts for identity — so a searchable log line is what those words
+      mean until one exists, not a fabricated integration with a library nothing else in the
+      codebase uses.
+- [X] T085 [P] Implement, in `apps/api/src/family/` and `packages/platform/src/`, the remaining four
+      observability signals from
+      [contracts/family-api.md](contracts/family-api.md): `family_context_resolve_duration`,
+      `family_authorization_denied_total{reason}`, `family_rls_empty_result_total` (an alert, per
+      ARCHITECTURE §9 — an empty result under RLS should be unreachable) and
+      `family_child_record_read_total{result}`. All four as structured log lines, for the same
+      reason T084's are — `family_authorization_denied_total` and `family_child_record_read_total`
+      were effectively already there: `FamilyMembershipGuard`/`CapabilityGuard` already log every
+      denial with its real reason (and write it to `audit_log`, a more durable signal than an
+      in-memory counter would be), and `readMember` already audits every child-record read,
+      granted or denied. What was missing: `family_context_resolve_duration`
+      (`FamilyMembershipGuard` now times `resolveFamilyContext` and logs the duration) and
+      `family_rls_empty_result_total` (a new `logRlsEmptyResult` helper on `FamilyController`,
+      called at the four spots where a query *inside* an already-guard-verified scope comes back
+      empty — `getFamily`, `updateFamily`, `createInvitation`, `requestFamilyDeletion` — never at
+      an ordinary "this id does not exist" 404, which is expected and not an anomaly).
+- [X] T086 [P] Add `apps/api/src/family/no-personal-data-in-telemetry.integration.spec.ts`,
+      mirroring spec 006's `no-secrets-in-logs.integration.spec.ts`: exercise every route and assert
+      no `displayName`, `dateOfBirth`, `postcode` or email value appears in any log line, metric
+      label, span attribute or outbox payload (Principle VI).
+      **Note:** used the same `CapturingLogger implements LoggerService` + `app.useLogger()`
+      interception point as spec 006's test. Exercised create-family (postcode), add-child
+      (displayName + dateOfBirth), a granted `readMember`, and `listMembers` — enough surface to hit
+      every logging call site this controller has (`logRlsEmptyResult`,
+      `family_context_resolve_duration`, the guard's access-denied warn, plus ordinary Nest request
+      logs), without re-running all 17 routes (T087 already owns the "every route" sweep, for a
+      different property). Asserted the raw values are absent from both `logger.messages.join('\n')`
+      and `JSON.stringify()` of every matching `outbox_event.payload` row (read via `withDatabase`,
+      which is a plain SELECT with no RLS on `outbox_event` — it is a shared, family-agnostic table).
+- [X] T087 Run the parameterised cross-family sweep from T031, in
+      `apps/api/src/family/cross-family-access.integration.spec.ts`, over **every** route in
+      [contracts/family-api.md](contracts/family-api.md)'s family-scoped table, asserting `404` with
+      an identical body to a genuinely missing family id, and assert the route list in the test
+      matches the router's own registered routes — so a route added later without a test fails by
+      being absent rather than passing by being unnoticed (SC-004).
+      **Note:** T031's own `expectNotFoundAcrossFamilies(routes)` helper was never actually added to
+      `packages/testing` (only the factories were) — built the equivalent directly in this spec file
+      instead, since deriving the route list needed to live next to the hand-copied expected list
+      it's checked against, and a shared helper would have had to import `@fp/contracts` for no
+      other caller. Every `@TsRestHandler(familyContract.X)` binding in `family.controller.ts` is 1:1
+      with a contract route, so `familyContract`'s own `{method, path}` pairs *are* "the router's own
+      registered routes" here — filtering to paths containing `:familyId` and comparing against a
+      hand-copied 14-row list (mirroring the contract doc's table) means a route silently dropped
+      from either side fails the comparison. Guards run before Nest pipes, and ts-rest's own
+      body/param validation happens inside `tsRestHandler`'s callback (invoked only once the guarded
+      method executes), so `FamilyMembershipGuard` returns 404 before any body is ever validated —
+      confirmed by sending an empty `{}` body on every POST/PATCH/DELETE case and still getting the
+      guard's 404, never a 422. Verified both "member of a different family" and "family does not
+      exist at all" produce byte-identical bodies for all 14 routes.
+- [X] T088 Verify, in `apps/api/src/family/idempotency.integration.spec.ts`, that `Idempotency-Key`
+      is honoured on `POST /v1/families`, `POST …/members`,
+      `POST …/invitations` and `POST /v1/invitations/accept`, with a test replaying each (Principle
+      IX — a duplicated child record is a defect a user cannot clean up themselves).
+      **Note:** the first three replay the same `Idempotency-Key` header twice with an identical
+      body and assert the second response is byte-identical to the first *and* that only one row
+      exists afterwards (one family via `GET /v1/families`, one child via the member roster, one
+      invitation via the invitation list; the invitation case also asserts only one email left the
+      fake mailer). `POST /v1/invitations/accept` needed no header at all — per
+      contracts/family-api.md and `accept-invitation.command.ts`'s own `status === 'accepted'`
+      branch, it is idempotent by construction: replaying the same already-accepted token returns
+      the same `{familyId, memberId}` rather than erring or creating a second member, so the test
+      replays the token directly and asserts the roster still has exactly two rows (owner + the one
+      invitee), never three.
+- [X] T089 Add `packages/core/src/family/family-owns-the-relationship.spec.ts`, the mirror of
+      identity's existing `no-family-references.spec.ts`: assert `core/identity` still contains no
+      family, role or capability identifier after T005's `EmailAddress` move (FR-022,
+      ARCHITECTURE §5.1).
+      **Note:** near-identical AST walk to identity's own test (same forbidden-word list, same
+      identifier-only scan so doc comments explaining the absence don't self-trigger it), scanning
+      `identity/{domain,application}` from `family`'s own directory via `join(import.meta.dirname,
+      '..', 'identity')` — checking the boundary from the side that grew this session (new
+      aggregates, and T005's `EmailAddress` relocation into `@fp/kernel`) rather than trusting
+      identity's copy alone to keep catching a reference this feature's own additions might tempt.
+- [X] T090 Assert the capability discipline mechanically: a test that no file under
+      `apps/api/src/` compares against a role string literal, walking the TypeScript AST rather than
+      grepping, the way `no-family-references.spec.ts` does — the same reason applies, since this
+      file and several doc comments legitimately mention the words while explaining them (FR-015).
+      **Note:** added `apps/api/src/family/checks-capabilities-not-roles.spec.ts`. Narrower than "any
+      string literal matching a role name": it only flags a `===`/`!==`/`==`/`!=` comparison or
+      `switch` discriminant where the *compared name itself* (an identifier or the last segment of a
+      property access) matches `/role/i` — `member.role === 'owner'` is caught,
+      `body.kind === 'extended'` (translating `AddMemberRequest.kind` to the domain's `kind` field in
+      `addMember`) is correctly left alone, and `role: member.role` in a response body (reading/
+      displaying a role, not deciding on one) is untouched. Confirmed empty today across all of
+      `apps/api/src/`, and confirmed the detector actually fires by hand-testing it against a
+      throwaway `member.role === 'owner'` snippet before relying on the real scan finding nothing.
+- [X] T091 [P] Update `docs/` with a runbook note for the two database roles and what to do when a
+      query returns unexpectedly empty (the RLS-empty alert's first response), and update
+      `README.md`'s environment table for `MIGRATOR_DATABASE_URL`.
+      **Note:** added "Database roles, and the RLS-empty alert's first response" to
+      `docs/local-development.md` (a table of the three roles/variables, then a four-step first
+      response for `family_rls_empty_result_total`). The `README.md` half of this task doesn't apply
+      as written: `README.md` has no per-variable environment table (only the CI-checks table under
+      "Continuous Integration") and `MIGRATOR_DATABASE_URL` is already fully documented in
+      `.env.example`'s own three-role comment block, predating this feature. Confirmed
+      `apps/api/src/config/env.schema.ts` — what `verify-env` checks `.env.example` against — never
+      references `MIGRATOR_DATABASE_URL` at all (it's read by the `migrate`/`db:seed` steps, not the
+      API process), so there is nothing there for this task to have drifted. Left `README.md`
+      unedited rather than inventing a table that doesn't otherwise exist in this repository's
+      documentation convention.
+- [X] T092 Run `pnpm verify` — typecheck, lint, boundaries, unit, integration, format, build — and
+      then the full [quickstart.md](quickstart.md), all eight scenarios, against a fresh
+      `docker compose up`. Scenario 7 is the one that cannot be inferred from a green pipeline.
+      **Note:** `pnpm verify` passed in full (typecheck, lint, boundaries — 357 modules/925
+      dependencies, 280 unit tests, 116 integration tests, format, every `verify:*` script, build).
+      `docker compose up` then found a real bug `pnpm verify` could not see: `CapabilityGuard`
+      injected `Reflector` by bare type (no `@Inject`), and the containerized dev server — `tsx
+      watch`, esbuild-based — does not reliably emit the `design:paramtypes` metadata that implicit
+      injection depends on, so the API failed to boot at all (`UndefinedDependencyException`),
+      reproducible on host `tsx` too, just never exercised there. `vitest`'s own transform happened
+      to emit a (differently-shaped, but present) metadata array, which is why every test suite —
+      280 unit and 116 integration tests, `bootstrapTestApp` included — passed while the real
+      container could not start. Fixed with an explicit `@Inject(Reflector)`, matching the
+      explicit-token convention every other injectable in this codebase already follows; re-verified
+      the container boots clean and all 17 routes map. Also found and fixed two quickstart.md bugs
+      surfaced only by actually running its curl examples: Scenario 1's `POST /v1/families` example
+      omitted the required `ownerDisplayName` field, and its "creating without a name" claim
+      conflated an absent field (`400`, schema validation) with an empty one (`422
+      family/name_required`, the domain's own actionable error) — corrected to use `name:""`
+      explicitly. Scenario 3's accept-invitation example claimed `201`; the contract returns `200`.
+      Scenario 7's final check claimed to test the `family_platform_owner` role but ran as `-U
+      postgres` — the actual cluster superuser, which has implicit `BYPASSRLS` no table setting can
+      override, making the check pass unconditionally regardless of whether `FORCE ROW LEVEL
+      SECURITY` works at all. Corrected to `-U family_platform_owner`, and reran both forms to
+      confirm the contrast: the owner role correctly gets `0`, the superuser gets every row. All
+      eight scenarios then ran clean end to end against the running container (fresh accounts via
+      Mailpit's HTTP API for token extraction), including the demote-Grace-then-remove-Ada-guardian
+      sequence in Scenario 5, which only reads as consistent once `changeMemberRole`'s guardianship
+      cascade (documented behaviour, not a bug) is accounted for. Stopped the containers this task
+      started afterward, leaving only the `postgres` container that was already running beforehand.
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: T001 blocks everything, including the rest of Setup. T002 and T003 are
+  parallel once it merges.
+- **Foundational (Phase 2)**: depends on Setup. Blocks every user story. Within it, T008–T012 are
+  one migration and must land in order; T013–T014 depend on T010; T016 depends on T011 and T013;
+  T017–T018 depend on T016; T025–T028 depend on T007, T016 and T020.
+- **User Stories (Phases 3–7)**: all depend on Foundational, and are written in priority order.
+- **Polish (Phase 8)**: depends on all five stories. T087 depends on every route existing, which is
+  the point of running it last.
+
+### User Story Dependencies
+
+Unlike spec 006's chain, these fan out from a common root:
+
+- **US1** has no dependency on another story. Everything else needs a family to exist.
+- **US2** needs US1's `Family` and `FamilyMember`. It is independent of US3, US4 and US5.
+- **US3** needs US1. Independent of US2 — an adult can be invited into a family with no children.
+- **US4** needs US1 and reuses US2's `addMember` command, which is why it is only two tasks.
+- **US5** needs US1, and its last-guardian tests need US2's guardianships to exist.
+
+So US2, US3 and US4 are genuinely parallelisable across three people or three branches once
+Foundational lands; only US5's guardianship tests reach back into US2.
+
+### Within Each User Story
+
+- Tests are written first and MUST fail before implementation.
+- Domain → application → persistence → contract → controller, the dependency-inversion order the
+  port boundary requires.
+
+### Parallel Opportunities
+
+- Foundational: T004–T007 (kernel and the capability map, one file each); T019–T020 (compliance);
+  T022–T024 (ports and events). The migration block T008–T012 is strictly sequential.
+- Every story's test block is fully parallel within itself.
+- US2, US3 and US4 in parallel after Foundational (see above).
+- Polish: T084–T086 and T091 are independent of each other.
+
+---
+
+## Parallel Example: Foundational
+
+```bash
+# Kernel and the capability map, launched together:
+Task: "Add family branded ids in packages/kernel/src/branded-id.ts"
+Task: "Move EmailAddress to packages/kernel/src/email-address.vo.ts"
+Task: "Add family error kinds in packages/kernel/src/errors.ts"
+Task: "Implement capabilitiesFor in packages/core/src/family/domain/capabilities.ts"
+
+# Ports and events, launched together:
+Task: "Declare FamilyContextPort in packages/core/src/family/application/ports/family-context.port.ts"
+Task: "Declare ErasurePort in packages/core/src/family/application/ports/erasure.port.ts"
+Task: "Implement the six event builders in packages/core/src/family/domain/events.ts"
+```
+
+---
+
+## Implementation Strategy
+
+### MVP: User Story 1 alone
+
+Unlike spec 006, the default guidance fits here. US1 is demonstrable on its own — a family exists,
+it has exactly one owner, and that owner's capabilities resolve through the port every later context
+will consume. That is the tenant root, and it is worth reviewing before anything is built on it.
+
+1. T001 (ADR-017) merges. Nothing else starts first.
+2. Phase 2 (Foundational). **STOP and VALIDATE**: quickstart Scenario 7 — the RLS check. If that
+   scenario does not behave as written, nothing built afterwards is isolated, and finding out later
+   means re-doing the schema.
+3. Phase 3 (US1) → quickstart Scenario 1.
+4. Phase 4 (US2) → quickstart Scenario 2, audit rows included. This is the privacy promise; treat
+   its review as the most consequential of the feature.
+5. Phases 5–7 (US3, US4, US5) → quickstart Scenarios 3, 4, 5.
+6. Phase 8 (Polish) → quickstart Scenario 6 and 8, then the full run (T092).
+
+### Incremental Delivery
+
+Seven reviewable pull requests: ADR-017; Foundational; then one per user story; then Polish. The
+Foundational PR is the large one and the one worth the most review attention — it decides how every
+future bounded context reaches the database.

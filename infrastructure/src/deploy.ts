@@ -54,6 +54,11 @@ export FOUNDER_EMAIL FOUNDER_PASSWORD`
   return `set -euo pipefail
 IFS= read -r POSTGRES_PASSWORD
 export POSTGRES_PASSWORD
+# ADR-017's two additional roles. Line order here must match the order
+# \`stdin\` composes them in below.
+IFS= read -r DB_OWNER_PASSWORD
+IFS= read -r DB_APP_PASSWORD
+export DB_OWNER_PASSWORD DB_APP_PASSWORD
 ${founderCredentialsStep}
 # docker-compose.staging.yml's DATABASE_URL needs the password safe to sit
 # inside a postgresql:// URL. A real, randomly-generated password can
@@ -65,15 +70,24 @@ ${founderCredentialsStep}
 # (set from the unencoded value above, via docker-compose.yml) takes it as a
 # literal string, not a URL component, so only the URL-consuming variable
 # needs encoding.
-POSTGRES_PASSWORD_URLENCODED=''
-for ((i = 0; i < \${#POSTGRES_PASSWORD}; i++)); do
-  c="\${POSTGRES_PASSWORD:i:1}"
-  case "$c" in
-    [a-zA-Z0-9.~_-]) POSTGRES_PASSWORD_URLENCODED+="$c" ;;
-    *) printf -v hex '%%%02X' "'$c"; POSTGRES_PASSWORD_URLENCODED+="$hex" ;;
-  esac
-done
-export POSTGRES_PASSWORD_URLENCODED
+# A function rather than three copies of the loop: ADR-017 turned one
+# URL-consuming password into three, and three hand-copied encoders is three
+# places for the next character class to be missed.
+urlencode() {
+  local raw="$1" out='' c hex i
+  for ((i = 0; i < \${#raw}; i++)); do
+    c="\${raw:i:1}"
+    case "$c" in
+      [a-zA-Z0-9.~_-]) out+="$c" ;;
+      *) printf -v hex '%%%02X' "'$c"; out+="$hex" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+POSTGRES_PASSWORD_URLENCODED="$(urlencode "$POSTGRES_PASSWORD")"
+DB_OWNER_PASSWORD_URLENCODED="$(urlencode "$DB_OWNER_PASSWORD")"
+DB_APP_PASSWORD_URLENCODED="$(urlencode "$DB_APP_PASSWORD")"
+export POSTGRES_PASSWORD_URLENCODED DB_OWNER_PASSWORD_URLENCODED DB_APP_PASSWORD_URLENCODED
 export API_PUBLISHED_PORT='${String(stackConfig.apiPublishedPort)}'
 export STAGING_NETWORK_NAME='${stackConfig.stagingNetworkName}'
 cd '${REMOTE_DIR}'
@@ -193,7 +207,13 @@ export function createDeployCommand(
       // `remote.Command.stdin` accepts one string, so every secret the
       // script needs shares it, in a fixed line order both sides agree on.
       stdin: pulumi.secret(
-        [stackConfig.postgresPassword, stackConfig.founderEmail, stackConfig.founderPassword]
+        [
+          stackConfig.postgresPassword,
+          stackConfig.dbOwnerPassword,
+          stackConfig.dbAppPassword,
+          stackConfig.founderEmail,
+          stackConfig.founderPassword,
+        ]
           .filter((value): value is string => value !== undefined)
           .map((value) => `${value}\n`)
           .join(''),

@@ -4,10 +4,13 @@ import { disconnectDatabase } from '@fp/persistence';
 import { runEraseDeletedAccountsSweep } from './sweeps/erase-deleted-accounts.sweep.js';
 import { runEraseStaleSessionsSweep } from './sweeps/erase-stale-sessions.sweep.js';
 import { runEraseUnverifiedSweep } from './sweeps/erase-unverified.sweep.js';
+import { runExpireInvitationsSweep } from './sweeps/expire-invitations.sweep.js';
+import { runGuardianCoverageSweep } from './sweeps/guardian-coverage.sweep.js';
 
 /**
- * Runs all three retention sweeps (FR-019, FR-020, spec.md's stale-session
- * rule) in one invocation. `--as-of <ISO 8601>` overrides the clock so
+ * Runs every retention sweep (FR-019, FR-020, spec.md's stale-session rule,
+ * and spec 008's FR-012 invitation expiry) in one invocation. `--as-of
+ * <ISO 8601>` overrides the clock so
  * quickstart.md's Scenario 7 can prove 30/90-day retention without waiting
  * out real time — the sweeps themselves take `Clock` as an injected port
  * for exactly this reason.
@@ -48,6 +51,12 @@ async function main(): Promise<void> {
 
   const staleSessions = await runEraseStaleSessionsSweep(clock);
   console.log(`erase-stale-sessions: deleted ${String(staleSessions.deletedCount)}`);
+
+  const expiredInvitations = await runExpireInvitationsSweep(clock);
+  console.log(`expire-invitations: expired ${String(expiredInvitations.expiredCount)}`);
+
+  const guardianCoverage = await runGuardianCoverageSweep();
+  console.log(`guardian-coverage: uncovered ${String(guardianCoverage.uncoveredChildren.length)}`);
 
   await disconnectDatabase();
 }

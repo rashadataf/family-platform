@@ -6,5 +6,18 @@
  * harness that handed one out would be a second door into the database with
  * none of the family-scoping the first one will carry.
  */
-export { prepareTestDatabase, resolveTestDatabase, type TestDatabase } from './database.js';
-export { withDatabase, type TransactionClient } from './transaction.js';
+export {
+  prepareTestDatabase,
+  resolveTestDatabase,
+  resolvedTestDatabaseOwnerUrl,
+  type TestDatabase,
+} from './database.js';
+export { withDatabase, withDatabaseCommitted, type TransactionClient } from './transaction.js';
+export {
+  scopeTo,
+  seedChild,
+  seedFamily,
+  seedMember,
+  type SeededFamily,
+} from './family-factories.js';
+export { readAuditLogRows, type RawAuditRow } from './audit-log.js';

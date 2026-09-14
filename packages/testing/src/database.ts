@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { provisionDatabaseRoles } from '@fp/persistence';
 
 /**
  * Ensures the test database exists and carries every committed migration,
@@ -28,11 +29,35 @@ const PERSISTENCE_DIR = fileURLToPath(new URL('../../persistence/', import.meta.
 const TEST_DATABASE_SUFFIX = '_test';
 
 export interface TestDatabase {
-  /** Connection string for the test database. */
+  /** Connection string for the test database, as the APPLICATION role. What the tests use. */
   url: string;
-  /** Connection string for the `postgres` maintenance database. */
+  /** The same database, as the OWNER role. Used to apply migrations and nothing else. */
+  ownerUrl: string;
+  /** The `postgres` maintenance database, as the cluster superuser. Used to CREATE DATABASE. */
   maintenanceUrl: string;
+  /** The test database itself, as the cluster superuser. Used once, to hand its objects to the owner. */
+  bootstrapUrl: string;
   name: string;
+}
+
+/**
+ * ADR-017 gave the platform three database roles, and the harness needs all
+ * three for the same reasons a deployment does: only a superuser can create a
+ * database and a role, only the owner can run a migration, and only the
+ * application role is subject to the row-level security policies the tests are
+ * there to verify.
+ *
+ * Running the suite as the owner would be much simpler and would quietly make
+ * every isolation assertion vacuous — the owner is not filtered by its own
+ * tables' policies unless FORCE applies, and a test that passes by seeing
+ * everything looks exactly like a test that passes by being filtered.
+ */
+function requireEnv(name: string, hint: string): string {
+  const value = process.env[name];
+  if (value === undefined || value === '') {
+    throw new Error(`${name} is not set. ${hint}`);
+  }
+  return value;
 }
 
 /**
@@ -40,17 +65,29 @@ export interface TestDatabase {
  * harness works unchanged on both local paths and in CI (FR-020): each already
  * points `DATABASE_URL` at its own PostgreSQL, and none of them needs a flag.
  */
-export function resolveTestDatabase(databaseUrl: string): TestDatabase {
+export function resolveTestDatabase(
+  databaseUrl: string,
+  ownerDatabaseUrl: string,
+  bootstrapDatabaseUrl: string,
+): TestDatabase {
   const url = new URL(databaseUrl);
   const name = `${url.pathname.replace(/^\//, '')}${TEST_DATABASE_SUFFIX}`;
 
-  const testUrl = new URL(url.toString());
-  testUrl.pathname = `/${name}`;
+  const withDatabase = (from: string, database: string): string => {
+    const next = new URL(from);
+    next.pathname = `/${database}`;
+    return next.toString();
+  };
 
-  const maintenanceUrl = new URL(url.toString());
-  maintenanceUrl.pathname = '/postgres';
-
-  return { url: testUrl.toString(), maintenanceUrl: maintenanceUrl.toString(), name };
+  return {
+    url: withDatabase(databaseUrl, name),
+    ownerUrl: withDatabase(ownerDatabaseUrl, name),
+    // `postgres` rather than the test database: CREATE DATABASE cannot run
+    // from inside the database it is creating.
+    maintenanceUrl: withDatabase(bootstrapDatabaseUrl, 'postgres'),
+    bootstrapUrl: withDatabase(bootstrapDatabaseUrl, name),
+    name,
+  };
 }
 
 interface CommandResult {
@@ -98,15 +135,36 @@ function requireDatabaseUrl(): string {
  * a single statement through `db execute` rather than a migration.
  */
 async function createDatabaseIfAbsent(target: TestDatabase): Promise<void> {
+  // Owned by `family_platform_owner`, not by the superuser that creates it.
+  // From PostgreSQL 15 the `public` schema is writable only by the database's
+  // owner, so a database owned by anyone else leaves the migrator unable to
+  // create a table in it — and, more importantly, tables created by a
+  // superuser owner are exempt from their own policies even under FORCE
+  // (ADR-017), which would make the isolation tests pass while proving
+  // nothing.
   const result = await runPrisma(['db', 'execute', '--url', target.maintenanceUrl, '--stdin'], {
-    stdin: `CREATE DATABASE "${target.name}"`,
+    stdin: `CREATE DATABASE "${target.name}" OWNER family_platform_owner`,
   });
 
-  if (result.code === 0 || /already exists/i.test(result.output)) return;
+  if (result.code !== 0 && !/already exists/i.test(result.output)) {
+    throw new Error(
+      `Could not create the test database "${target.name}":\n${result.output}\n\nIs PostgreSQL running? \`docker compose up -d postgres\``,
+    );
+  }
 
-  throw new Error(
-    `Could not create the test database "${target.name}":\n${result.output}\n\nIs PostgreSQL running? \`docker compose up -d postgres\``,
-  );
+  // Unconditionally, because a test database created before ADR-017 is owned
+  // by the superuser that created it, and a database owned by a superuser
+  // cannot have its `public` schema written by the migrator — nor would tables
+  // created in it be subject to their own policies. Idempotent when it is
+  // already right.
+  const owned = await runPrisma(['db', 'execute', '--url', target.maintenanceUrl, '--stdin'], {
+    stdin: `ALTER DATABASE "${target.name}" OWNER TO family_platform_owner`,
+  });
+  if (owned.code !== 0) {
+    throw new Error(
+      `Could not hand the test database "${target.name}" to family_platform_owner:\n${owned.output}`,
+    );
+  }
 }
 
 let prepared: Promise<TestDatabase> | undefined;
@@ -117,15 +175,47 @@ let prepared: Promise<TestDatabase> | undefined;
  */
 export function prepareTestDatabase(): Promise<TestDatabase> {
   prepared ??= (async () => {
-    const target = resolveTestDatabase(requireDatabaseUrl());
+    const bootstrapUrl = requireEnv(
+      'BOOTSTRAP_DATABASE_URL',
+      'The integration tier needs a superuser connection to create the test database and the two ' +
+        'application roles (ADR-017). See .env.example.',
+    );
+    const ownerUrl = requireEnv(
+      'MIGRATOR_DATABASE_URL',
+      'The integration tier applies migrations as `family_platform_owner` (ADR-017). See .env.example.',
+    );
+    const target = resolveTestDatabase(requireDatabaseUrl(), ownerUrl, bootstrapUrl);
+
+    // Roles are cluster-wide, so this is idempotent across runs and across
+    // databases. It reuses the one implementation the migrate service runs,
+    // rather than a second copy that could drift from it.
+    await provisionDatabaseRoles({
+      bootstrapDatabaseUrl: bootstrapUrl,
+      ownerPassword: requireEnv('DB_OWNER_PASSWORD', 'Needed to provision the owner role.'),
+      appPassword: requireEnv('DB_APP_PASSWORD', 'Needed to provision the application role.'),
+    });
+
     await createDatabaseIfAbsent(target);
+
+    // Again, this time inside the test database: the first call created the
+    // roles (which are cluster-wide), and this one hands over the objects that
+    // already exist there — `_prisma_migrations` above all, which the migrator
+    // must be able to write, and which a pre-ADR-017 run left owned by the
+    // superuser.
+    await provisionDatabaseRoles({
+      bootstrapDatabaseUrl: target.bootstrapUrl,
+      ownerPassword: requireEnv('DB_OWNER_PASSWORD', 'Needed to provision the owner role.'),
+      appPassword: requireEnv('DB_APP_PASSWORD', 'Needed to provision the application role.'),
+    });
 
     // `migrate deploy`, never `db push`: the test database is built from the
     // same committed migrations every other environment runs (ADR-003). A
     // schema pushed straight from the model would pass tests that a real
     // deployment fails, which is the one thing a migration test must not do.
     const migrated = await runPrisma(['migrate', 'deploy'], {
-      env: { ...process.env, DATABASE_URL: target.url },
+      // As the OWNER, never as the application role: the application role
+      // holds no DDL rights, which is the point of ADR-017.
+      env: { ...process.env, DATABASE_URL: target.ownerUrl },
     });
     if (migrated.code !== 0) {
       throw new Error(`Migrations failed against the test database:\n${migrated.output}`);
@@ -135,7 +225,32 @@ export function prepareTestDatabase(): Promise<TestDatabase> {
     // @fp/persistence — which reads DATABASE_URL when it first connects —
     // never touches the development one.
     process.env.DATABASE_URL = target.url;
+
+    // A second env var, propagated to worker processes the same way
+    // `DATABASE_URL` is (`vitest-global-setup.ts`'s own comment on why this
+    // must happen before workers fork): a test that needs the owner
+    // connection — to read `audit_log`, which the application role cannot
+    // (ADR-017) — must not call `prepareTestDatabase()` itself to get one.
+    // This module's `prepared` cache is per-process; a worker importing this
+    // file fresh would re-run everything above against an ALREADY-suffixed
+    // `DATABASE_URL` and double-suffix the name. Reading the env var this
+    // process already resolved is the only correct path from a worker.
+    process.env.TEST_DATABASE_OWNER_URL = target.ownerUrl;
     return target;
   })();
   return prepared;
+}
+
+/**
+ * The owner connection to the SAME test database `DATABASE_URL` already
+ * points the application role at — for test verification only (reading
+ * `audit_log`, which the application role has no `SELECT` grant on). See
+ * `prepareTestDatabase`'s comment on why this reads an env var rather than
+ * calling `prepareTestDatabase()` again.
+ */
+export function resolvedTestDatabaseOwnerUrl(): string {
+  return requireEnv(
+    'TEST_DATABASE_OWNER_URL',
+    'Not set — this must be read after prepareTestDatabase() has run in this process (normally via globalSetup), not before.',
+  );
 }

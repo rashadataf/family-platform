@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  EmailAddress,
   err,
   ok,
   asDeviceId,
@@ -12,7 +13,6 @@ import {
   type TokenGeneratorPort,
 } from '@fp/kernel';
 import { Device } from '../../domain/device.js';
-import { EmailAddress } from '../../domain/email-address.vo.js';
 import { userAuthenticatedEvent } from '../../domain/events.js';
 import { Session } from '../../domain/session.aggregate.js';
 import type { IdentityUnitOfWorkPort } from '../ports/identity-unit-of-work.port.js';

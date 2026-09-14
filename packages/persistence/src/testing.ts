@@ -67,3 +67,16 @@ export async function withRollback<T>(work: (tx: TransactionClient) => Promise<T
 export async function assertMigrated(): Promise<void> {
   await prisma.$queryRaw`SELECT 1 FROM "_prisma_migrations" LIMIT 1`;
 }
+
+/**
+ * Runs `work` inside a transaction that COMMITS — the variant `withRollback`'s
+ * own doc comment says does not exist yet "because nothing needs it". Spec
+ * 008's apps/api integration tests do: a fixture meant to be visible to the
+ * running app under test (a separate request, its own transaction, possibly
+ * its own pooled connection) must actually be there once this call returns,
+ * the same way every apps/api integration test that calls a real HTTP route
+ * already commits a real row rather than rolling one back.
+ */
+export async function withCommit<T>(work: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  return prisma.$transaction(work);
+}

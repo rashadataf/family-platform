@@ -54,6 +54,8 @@ const VALID_RAW = {
 MC4CAQAwBQYDK2VwBCIEIMKN9gLVY833sHBscKsZE+SdwV5sJw5yFgnoRgm4VN5l
 -----END PRIVATE KEY-----`,
   postgresPassword: 'a-real-secret-would-go-here',
+  dbOwnerPassword: 'another-real-secret-would-go-here',
+  dbAppPassword: 'a-third-real-secret-would-go-here',
 };
 
 describe('infrastructure resource wiring', () => {
@@ -108,9 +110,28 @@ describe('infrastructure resource wiring', () => {
     expect(script).toContain(`STAGING_NETWORK_NAME='${stackConfig.stagingNetworkName}'`);
   });
 
-  it('never puts the postgres password in the deploy script text itself', async () => {
+  it('never puts a database password in the deploy script text itself', async () => {
     const script = await resolveOutput(deploy.create);
+    // All three roles ADR-017 introduced, not just the original one: the
+    // deploy script is written into Pulumi state and shown in a preview, so a
+    // password reaching it is a password in a place nobody thinks to look.
     expect(script).not.toContain(stackConfig.postgresPassword);
+    expect(script).not.toContain(stackConfig.dbOwnerPassword);
+    expect(script).not.toContain(stackConfig.dbAppPassword);
+  });
+
+  it('delivers all three role passwords over stdin, in the order the script reads them', async () => {
+    const stdin = await resolveOutput(deploy.stdin);
+    // The script reads POSTGRES_PASSWORD, then DB_OWNER_PASSWORD, then
+    // DB_APP_PASSWORD, line by line. Order is the entire protocol between the
+    // two sides — get it wrong and the application silently connects as the
+    // owner, which works, and bypasses every row-level security policy.
+    expect(stdin ?? '').not.toBe('');
+    expect((stdin ?? '').split('\n').slice(0, 3)).toEqual([
+      stackConfig.postgresPassword,
+      stackConfig.dbOwnerPassword,
+      stackConfig.dbAppPassword,
+    ]);
   });
 
   /**

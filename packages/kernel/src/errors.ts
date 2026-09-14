@@ -24,4 +24,26 @@ export type DomainError =
    */
   | { readonly kind: 'SessionReplayDetected'; readonly sessionId: SessionId }
   | { readonly kind: 'VerificationInvalid' }
+  /**
+   * Family and Membership (spec 008). One kind per error type in that
+   * feature's contract, so the controller's mapping from domain failure to
+   * wire response is exhaustive by the compiler rather than by review.
+   *
+   * `NotFound` below is deliberately reused for every cross-family access
+   * rather than given a family-specific kind: FR-021 requires a caller with
+   * no standing to be unable to distinguish "not yours" from "does not
+   * exist", and the cheapest way to keep that true is for the domain not to
+   * produce a distinguishable value in the first place. The audit log records
+   * which it really was.
+   */
+  | { readonly kind: 'CapabilityRequired'; readonly capability: string }
+  | { readonly kind: 'GuardianshipRequired' }
+  | { readonly kind: 'GuardianIneligible'; readonly reason: string }
+  | { readonly kind: 'LastGuardian' }
+  | { readonly kind: 'OwnerRequired' }
+  | { readonly kind: 'OwnerIneligible'; readonly reason: string }
+  | { readonly kind: 'AlreadyMember' }
+  | { readonly kind: 'InvitationInvalid' }
+  | { readonly kind: 'InvitationEmailMismatch' }
+  | { readonly kind: 'NameRequired'; readonly reason: string }
   | { readonly kind: 'NotFound' };

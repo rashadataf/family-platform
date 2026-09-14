@@ -89,6 +89,14 @@ keywords = ["postgres", "postgresql", "mysql", "mongodb", "redis", "amqp"]
   regexTarget = "match"
   regexes = [
     '''(?i):(localdev|postgres|password|changeme|secret|example|test|arealpassword|realpassword)@''',
+    # ADR-017's two-role split (`family_platform_owner` / `family_platform_app`,
+    # spec 008): `ownerdev`/`appdev` are `.env.example`'s and
+    # `load-env.spec.ts`'s placeholder passwords for the two roles on a local
+    # database; `ownerci`/`appci` are the same two roles' placeholders in
+    # `.github/workflows/ci.yml`'s ephemeral CI database, torn down with the
+    # runner. None of the four connect to anything that outlives the process
+    # that created it.
+    '''(?i):(ownerdev|appdev|ownerci|appci)@''',
     # `arealpassword` / `realpassword`: this feature's own spec.md and research.md
     # illustrated a connection-string leak using an illustrative English phrase
     # rather than a placeholder token, before the prose was corrected to

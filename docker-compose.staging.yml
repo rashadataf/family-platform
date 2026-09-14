@@ -61,7 +61,10 @@ services:
     # (data-model.md's ComposeServiceSet note).
     volumes: !reset []
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
+      BOOTSTRAP_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DATABASE_URL: postgresql://family_platform_owner:${DB_OWNER_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
     networks:
       - staging
 
@@ -81,7 +84,7 @@ services:
     ports: !override
       - '${API_PUBLISHED_PORT}:3000'
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
+      DATABASE_URL: postgresql://family_platform_app:${DB_APP_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
     # No source bind mount: the base file's `.:/app` and per-package
     # node_modules volumes exist for the `development` target's live-edit
     # workflow, which staging's `runtime` image target does not use at all.

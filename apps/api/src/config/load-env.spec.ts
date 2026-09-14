@@ -15,7 +15,7 @@ const VALID_ENV = {
   LOG_LEVEL: 'info',
   POSTGRES_PORT: '5432',
   POSTGRES_DB: 'family_platform',
-  DATABASE_URL: 'postgresql://postgres:localdev@localhost:5432/family_platform',
+  DATABASE_URL: 'postgresql://family_platform_app:appdev@localhost:5432/family_platform',
   MAIL_HOST: 'localhost',
   MAIL_PORT: '1025',
 } as const;
@@ -90,6 +90,25 @@ describe('loadEnv', () => {
 
     expect(code).toBe(1);
     expect(stderr).toContain('DATABASE_URL');
+  });
+
+  it.each([
+    [
+      'the table owner',
+      'postgresql://family_platform_owner:ownerdev@localhost:5432/family_platform',
+    ],
+    ['a superuser', 'postgresql://postgres:localdev@localhost:5432/family_platform'],
+  ])('refuses to boot when DATABASE_URL connects as %s (ADR-017)', (_who, url) => {
+    // Both of these are valid URLs that would connect and serve traffic
+    // perfectly — while bypassing every row-level security policy in the
+    // schema, because neither role is subject to one. The failure has to
+    // happen at boot, because there is no later moment at which it looks
+    // like a failure at all.
+    const { code, stderr } = captureBootFailure({ ...VALID_ENV, DATABASE_URL: url });
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('DATABASE_URL');
+    expect(stderr).toContain('family_platform_app');
   });
 
   it('refuses to boot on a malformed DATABASE_URL rather than failing on first query', () => {

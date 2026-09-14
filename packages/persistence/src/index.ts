@@ -1,7 +1,11 @@
-import type { identity } from '@fp/core';
+import type { IdempotencyPort } from '@fp/kernel';
+import type { family, identity } from '@fp/core';
 import { prisma } from './client.js';
 import { PrismaIdentityUnitOfWork } from './repositories/identity/identity-unit-of-work.js';
 import { PrismaSessionRepository } from './repositories/identity/session.repository.js';
+import { PrismaFamilyDirectory } from './repositories/family/family-directory.repository.js';
+import { PrismaIdempotencyRepository } from './repositories/idempotency-key.repository.js';
+import { eraseForFamily, eraseForMember } from './repositories/family/erasure.js';
 
 export { checkDatabaseHealth } from './health.js';
 export { disconnectDatabase } from './lifecycle.js';
@@ -10,6 +14,17 @@ export {
   deleteStaleSessionsBefore,
   deleteUnverifiedRegistrationsBefore,
 } from './repositories/identity/retention.js';
+export { expireOverdueInvitations } from './repositories/family/invitation-sweep.js';
+export {
+  findChildrenWithoutGuardian,
+  type UncoveredChild,
+} from './repositories/family/guardian-coverage.js';
+export { eraseForFamily, eraseForMember };
+
+/** Constitution Principle XI: the one implementation of `family.ErasurePort`. */
+export function createErasurePort(): family.ErasurePort {
+  return { eraseForFamily, eraseForMember };
+}
 
 /**
  * The one place a composition root reaches for identity's unit of work. The
@@ -27,4 +42,26 @@ export function createIdentityUnitOfWork(): identity.IdentityUnitOfWorkPort {
  */
 export function createSessionRepository(): identity.SessionRepository {
   return new PrismaSessionRepository(prisma);
+}
+
+export {
+  createFamilyUnitOfWork,
+  createAuditLog,
+  createInvitationTokenLookup,
+} from './family-context.js';
+export { provisionDatabaseRoles } from './provision-roles.js';
+
+/**
+ * The cross-family membership list (FR-024). Bound to `app.user_id` rather
+ * than to a family, because "which families am I in?" spans the tenant
+ * boundary by definition — see the repository's own doc comment and
+ * `20260913170000_self_and_token_policies`.
+ */
+export function createFamilyDirectory(): family.FamilyDirectoryPort {
+  return new PrismaFamilyDirectory();
+}
+
+/** ADR-006, Principle IX: the one store behind every route's `Idempotency-Key` handling. */
+export function createIdempotencyStore(): IdempotencyPort {
+  return new PrismaIdempotencyRepository(prisma);
 }

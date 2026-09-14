@@ -111,6 +111,13 @@ const baseStackConfigSchema = z.object({
   // case rather than silently seeding an account with an empty password.
   founderEmail: z.string().min(1, 'founderEmail must not be empty').optional(),
   founderPassword: z.string().min(1, 'founderPassword must not be empty').optional(),
+  // ADR-017. Three roles reach the database and only one of them may be a
+  // superuser, so staging needs two more secrets than it did. Required, not
+  // optional: a missing value here would leave the application connecting as
+  // whatever else is available, and the failure mode of getting that wrong is
+  // silent — row-level security enforced against nobody.
+  dbOwnerPassword: z.string().min(1, 'dbOwnerPassword must not be empty'),
+  dbAppPassword: z.string().min(1, 'dbAppPassword must not be empty'),
 });
 
 export const stackConfigSchema = baseStackConfigSchema.superRefine((data, ctx) => {
@@ -148,6 +155,8 @@ export interface RawStackConfig {
   resetData?: string;
   founderEmail?: string;
   founderPassword?: string;
+  dbOwnerPassword?: string;
+  dbAppPassword?: string;
 }
 
 /**

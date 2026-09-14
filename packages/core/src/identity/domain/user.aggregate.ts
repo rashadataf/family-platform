@@ -1,5 +1,5 @@
 import { err, ok, type DomainError, type Result, type UserId } from '@fp/kernel';
-import type { EmailAddress } from './email-address.vo.js';
+import type { EmailAddress } from '@fp/kernel';
 
 /**
  * Matches the `user_status` enum in packages/persistence/prisma/schema.prisma

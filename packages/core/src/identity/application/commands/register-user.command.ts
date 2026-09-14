@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  EmailAddress,
   err,
   ok,
   asUserId,
@@ -11,7 +12,6 @@ import {
   type TokenGeneratorPort,
   type UserId,
 } from '@fp/kernel';
-import { EmailAddress } from '../../domain/email-address.vo.js';
 import { EmailVerification } from '../../domain/email-verification.entity.js';
 import { userRegisteredEvent } from '../../domain/events.js';
 import { User } from '../../domain/user.aggregate.js';

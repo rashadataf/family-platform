@@ -134,3 +134,265 @@ model OutboxEvent {
   @@index([publishedAt])
   @@map("outbox_event")
 }
+
+// ---------------------------------------------------------------------------
+// Family and Membership (spec 008, ARCHITECTURE.md §5.2) — the tenant root.
+//
+// Every model in this block except `AuditLog` is FAMILY-SCOPED: it carries
+// `family_id`, and the migration places it under ENABLE + FORCE ROW LEVEL
+// SECURITY with a policy keyed on `current_setting('app.family_id')`
+// (ADR-017). Adding a family-scoped table here without those three things is
+// a Principle V violation, not an oversight to fix later.
+//
+// UUIDv7 (ARCHITECTURE.md §10): time-ordered, so these index well and do not
+// fragment B-trees. Identity's tables above use v4 — pre-existing drift,
+// recorded in spec 008 research.md §9 and deliberately not fixed here, since
+// changing a generator on a populated table is expand-and-contract work.
+// ---------------------------------------------------------------------------
+
+model Family {
+  id String @id @default(uuid(7))
+
+  name String
+
+  // The household profile downstream contexts read (ARCHITECTURE.md §5.2).
+  // `localAuthorityCode` is an IDENTIFIER, never a council name — the
+  // constitution's UK-first-without-being-UK-welded constraint. Neither is
+  // validated against real reference data here; that is Reference and Locale.
+  postcode           String?
+  localAuthorityCode String? @map("local_authority_code")
+  composition        Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Set by FamilyDeletionRequested (FR-023). Non-null revokes every member's
+  // access immediately; the erasure itself follows the Compliance saga's
+  // grace period. Write-once, enforced in the domain.
+  deletionRequestedAt DateTime? @map("deletion_requested_at")
+
+  members       FamilyMember[]
+  invitations   Invitation[]
+  guardianships Guardianship[]
+
+  @@map("family")
+}
+
+// The privacy discriminator (spec 008 research.md §5). Orthogonal to
+// `MemberRole`: ARCHITECTURE.md §9 speaks of a member "marked as" a child,
+// and a child is not a fifth role because a role answers what a person may
+// do — and a child has no login path through which to do anything.
+enum MemberKind {
+  adult
+  child
+
+  @@map("member_kind")
+}
+
+// The four coarse roles of ARCHITECTURE.md §5.2. Code checks capabilities,
+// never these values (FR-015); the mapping lives in
+// packages/core/src/family/domain/capabilities.ts.
+enum MemberRole {
+  owner
+  adult
+  extended
+  viewer
+
+  @@map("member_role")
+}
+
+/// A person the family tracks — NOT a `User`. The most important modelling
+/// decision in the system (ARCHITECTURE.md §5.2). A child is a member with no
+/// `userId`, no credentials and no login path at all: that is the privacy
+/// design, not a shortcut, and the CHECK constraints in this table's migration
+/// are what make it true against a raw query as well as against the domain.
+model FamilyMember {
+  id       String @id @default(uuid(7))
+  familyId String @map("family_id")
+
+  kind MemberKind
+  role MemberRole
+
+  // The link to Identity. No foreign key, deliberately (ARCHITECTURE.md §10):
+  // cross-context references are to published stable ids only, and a foreign
+  // key would let identity's erasure cascade a family's member row away.
+  userId String? @map("user_id")
+
+  // Personal data. Two fields, each justified in spec 008's Personal Data
+  // section — nothing else is collected here (Principle VI). Both are nulled
+  // by `eraseForMember`, which is why they are nullable; a CHECK requires
+  // `displayName` on any member that has not been removed.
+  displayName String?   @map("display_name")
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  removedAt DateTime? @map("removed_at")
+
+  family              Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  sentInvitations     Invitation[]   @relation("InvitationInvitedBy")
+  acceptedInvitations Invitation[]   @relation("InvitationAcceptedBy")
+  guardianOf          Guardianship[] @relation("GuardianshipGuardian")
+  guardedBy           Guardianship[] @relation("GuardianshipChild")
+
+  // `FamilyContextPort.resolve(userId, familyId)` runs in the guard on every
+  // family-scoped request, ahead of everything else (research.md §12).
+  @@index([userId])
+  @@index([familyId])
+  @@map("family_member")
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+
+  @@map("invitation_status")
+}
+
+/// An offer for one email address to join one family. The token is stored only
+/// as a hash, exactly as spec 006 handles verification tokens — the raw value
+/// exists in the recipient's inbox and nowhere else.
+model Invitation {
+  id       String @id @default(uuid(7))
+  familyId String @map("family_id")
+
+  // Normalised by `EmailAddress` before it reaches here. Nullable because
+  // retention removes it 90 days after the invitation is settled, while the
+  // record itself survives a little longer.
+  email String?
+
+  proposedRole MemberRole       @map("proposed_role")
+  tokenHash    Bytes            @unique @map("token_hash")
+  status       InvitationStatus @default(pending)
+  expiresAt    DateTime         @map("expires_at")
+
+  invitedByMemberId  String  @map("invited_by_member_id")
+  acceptedByMemberId String? @map("accepted_by_member_id")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  acceptedAt DateTime? @map("accepted_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  family     Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  invitedBy  FamilyMember  @relation("InvitationInvitedBy", fields: [invitedByMemberId], references: [id], onDelete: Cascade)
+  acceptedBy FamilyMember? @relation("InvitationAcceptedBy", fields: [acceptedByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([status, expiresAt])
+  @@index([familyId])
+  @@map("invitation")
+}
+
+/// Guardianship is EXPLICIT, never inferred from membership (FR-004,
+/// Principle VI). `familyId` is denormalised rather than derived through
+/// either member because ARCHITECTURE.md §10 requires the tenant key to be
+/// present and not join-derived — a join-derived tenant key is one that can be
+/// forgotten.
+model Guardianship {
+  id       String @id @default(uuid(7))
+  familyId String @map("family_id")
+
+  guardianMemberId String @map("guardian_member_id")
+  childMemberId    String @map("child_member_id")
+
+  establishedAt DateTime  @default(now()) @map("established_at")
+  endedAt       DateTime? @map("ended_at")
+
+  family   Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  guardian FamilyMember @relation("GuardianshipGuardian", fields: [guardianMemberId], references: [id], onDelete: Cascade)
+  child    FamilyMember @relation("GuardianshipChild", fields: [childMemberId], references: [id], onDelete: Cascade)
+
+  // The guardian-count check on every mutation, and the access check on every
+  // read of a child's details.
+  @@index([childMemberId])
+  @@index([guardianMemberId])
+  @@map("guardianship")
+}
+
+// ---------------------------------------------------------------------------
+// Audit and Compliance (ARCHITECTURE.md §5.12) — owned by that context, NOT by
+// Family, and DELIBERATELY NOT FAMILY-SCOPED.
+//
+// It has no row-level security policy on purpose. A denial is frequently
+// recorded when `app.family_id` is unset or names a different family — exactly
+// the row a policy would discard, and exactly the row that matters. Its
+// isolation is a grant instead: the application role holds INSERT and nothing
+// else, which is §5.12's "append-only, no update or delete grants" expressed
+// as a grant rather than as a convention (ADR-017, spec 008 research.md §7).
+//
+// Do not "fix" this by adding a policy. See ADR-017's "What is explicitly
+// outside the policy set".
+// ---------------------------------------------------------------------------
+
+enum AuditResult {
+  granted
+  denied
+
+  @@map("audit_result")
+}
+
+/// Append-only. No foreign keys anywhere: this table must survive the erasure
+/// of everything it refers to, carrying identifiers only. Erasing the record of
+/// who read a child's file would defeat the control that produced it.
+model AuditLog {
+  id         String   @id @default(uuid(7))
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  actorUserId   String? @map("actor_user_id")
+  // Null when the actor had no standing in the family — which is itself the
+  // finding, not missing data.
+  actorMemberId String? @map("actor_member_id")
+  familyId      String? @map("family_id")
+
+  subjectType String @map("subject_type")
+  subjectId   String @map("subject_id")
+
+  action  String
+  /// Principle VI names purpose explicitly as a required field on a child-record read.
+  purpose String
+  result  AuditResult
+  /// The REAL reason, including the one the caller was not told (FR-021).
+  reason  String?
+
+  correlationId String @map("correlation_id")
+
+  @@index([subjectId, occurredAt])
+  @@index([familyId, occurredAt])
+  @@map("audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// Idempotency (ADR-006, Constitution Principle IX) — a platform mechanism,
+// not owned by any one bounded context, the same way the outbox is not.
+//
+// `POST /v1/families` is the first route that genuinely needs it: unlike
+// registration (a duplicate is caught for free by the email unique
+// constraint), creating a family twice with the same body has no natural
+// dedup — nothing stops it. Scoped by `userId` rather than by family, because
+// the whole point is to protect the ONE creating call for which no family
+// exists yet to scope to.
+//
+// No foreign key to `User`: an idempotency record's job is to survive exactly
+// as long as its own short retry window, never as long as the account. A
+// future sweep deleting rows past that window (not yet written — nothing
+// depends on it existing yet) is the intended lifecycle, not account
+// deletion.
+// ---------------------------------------------------------------------------
+
+model IdempotencyKey {
+  id     String @id @default(uuid(7))
+  userId String @map("user_id")
+  key    String
+
+  /// Detects a caller reusing the same key for a genuinely different request
+  /// (a client bug, not a retry) — the response is meaningless to replay then.
+  requestHash    String @map("request_hash")
+  responseStatus Int    @map("response_status")
+  responseBody   Json   @map("response_body")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, key])
+  @@map("idempotency_key")
+}
