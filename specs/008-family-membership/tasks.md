@@ -722,14 +722,29 @@ stories; the requirements below are not covered by any of them.
       the same `{familyId, memberId}` rather than erring or creating a second member, so the test
       replays the token directly and asserts the roster still has exactly two rows (owner + the one
       invitee), never three.
-- [ ] T089 Add `packages/core/src/family/family-owns-the-relationship.spec.ts`, the mirror of
+- [X] T089 Add `packages/core/src/family/family-owns-the-relationship.spec.ts`, the mirror of
       identity's existing `no-family-references.spec.ts`: assert `core/identity` still contains no
       family, role or capability identifier after T005's `EmailAddress` move (FR-022,
       ARCHITECTURE §5.1).
-- [ ] T090 Assert the capability discipline mechanically: a test that no file under
+      **Note:** near-identical AST walk to identity's own test (same forbidden-word list, same
+      identifier-only scan so doc comments explaining the absence don't self-trigger it), scanning
+      `identity/{domain,application}` from `family`'s own directory via `join(import.meta.dirname,
+      '..', 'identity')` — checking the boundary from the side that grew this session (new
+      aggregates, and T005's `EmailAddress` relocation into `@fp/kernel`) rather than trusting
+      identity's copy alone to keep catching a reference this feature's own additions might tempt.
+- [X] T090 Assert the capability discipline mechanically: a test that no file under
       `apps/api/src/` compares against a role string literal, walking the TypeScript AST rather than
       grepping, the way `no-family-references.spec.ts` does — the same reason applies, since this
       file and several doc comments legitimately mention the words while explaining them (FR-015).
+      **Note:** added `apps/api/src/family/checks-capabilities-not-roles.spec.ts`. Narrower than "any
+      string literal matching a role name": it only flags a `===`/`!==`/`==`/`!=` comparison or
+      `switch` discriminant where the *compared name itself* (an identifier or the last segment of a
+      property access) matches `/role/i` — `member.role === 'owner'` is caught,
+      `body.kind === 'extended'` (translating `AddMemberRequest.kind` to the domain's `kind` field in
+      `addMember`) is correctly left alone, and `role: member.role` in a response body (reading/
+      displaying a role, not deciding on one) is untouched. Confirmed empty today across all of
+      `apps/api/src/`, and confirmed the detector actually fires by hand-testing it against a
+      throwaway `member.role === 'owner'` snippet before relying on the real scan finding nothing.
 - [ ] T091 [P] Update `docs/` with a runbook note for the two database roles and what to do when a
       query returns unexpectedly empty (the RLS-empty alert's first response), and update
       `README.md`'s environment table for `MIGRATOR_DATABASE_URL`.
