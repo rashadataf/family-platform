@@ -745,9 +745,20 @@ stories; the requirements below are not covered by any of them.
       displaying a role, not deciding on one) is untouched. Confirmed empty today across all of
       `apps/api/src/`, and confirmed the detector actually fires by hand-testing it against a
       throwaway `member.role === 'owner'` snippet before relying on the real scan finding nothing.
-- [ ] T091 [P] Update `docs/` with a runbook note for the two database roles and what to do when a
+- [X] T091 [P] Update `docs/` with a runbook note for the two database roles and what to do when a
       query returns unexpectedly empty (the RLS-empty alert's first response), and update
       `README.md`'s environment table for `MIGRATOR_DATABASE_URL`.
+      **Note:** added "Database roles, and the RLS-empty alert's first response" to
+      `docs/local-development.md` (a table of the three roles/variables, then a four-step first
+      response for `family_rls_empty_result_total`). The `README.md` half of this task doesn't apply
+      as written: `README.md` has no per-variable environment table (only the CI-checks table under
+      "Continuous Integration") and `MIGRATOR_DATABASE_URL` is already fully documented in
+      `.env.example`'s own three-role comment block, predating this feature. Confirmed
+      `apps/api/src/config/env.schema.ts` — what `verify-env` checks `.env.example` against — never
+      references `MIGRATOR_DATABASE_URL` at all (it's read by the `migrate`/`db:seed` steps, not the
+      API process), so there is nothing there for this task to have drifted. Left `README.md`
+      unedited rather than inventing a table that doesn't otherwise exist in this repository's
+      documentation convention.
 - [ ] T092 Run `pnpm verify` — typecheck, lint, boundaries, unit, integration, format, build — and
       then the full [quickstart.md](quickstart.md), all eight scenarios, against a fresh
       `docker compose up`. Scenario 7 is the one that cannot be inferred from a green pipeline.

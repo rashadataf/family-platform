@@ -85,6 +85,27 @@ To author a **new** migration (an interactive workflow — it prompts you for a 
 docker compose run --rm api pnpm --filter @fp/persistence exec prisma migrate dev
 ```
 
+## Database roles, and the RLS-empty alert's first response
+
+Three connection strings in `.env`, three roles, on purpose (ADR-017):
+
+| Variable | Role | Holds this | Used by |
+|---|---|---|---|
+| `DATABASE_URL` | `family_platform_app` | Ordinary reads and writes, `NOBYPASSRLS` | `apps/api` and `apps/worker` — the worker holds no more privilege than the API |
+| `MIGRATOR_DATABASE_URL` | `family_platform_owner` | DDL and migrations, `NOSUPERUSER` — `FORCE ROW LEVEL SECURITY` constrains it too | The `migrate` step and `db:seed` only |
+| `BOOTSTRAP_DATABASE_URL` | the cluster superuser | Creates the two roles above, nothing else | `db:provision-roles`, exactly once per environment |
+
+A superuser bypasses row-level security unconditionally, so nothing long-running ever holds the bootstrap connection — the API refuses to boot if `DATABASE_URL` resolves to anyone but the app role.
+
+**When `family_rls_empty_result_total` fires.** This log line means a query made *inside* an already-guard-verified family scope came back empty — `FamilyMembershipGuard` had already proven the caller has standing in the family, and the follow-up lookup found nothing anyway. ARCHITECTURE §9 calls this "should be unreachable": it is an alert, not a metric to browse, because every path that logs it (`getFamily`, `updateFamily`, `createInvitation`, `requestFamilyDeletion` today) runs after the guard, never before. It is deliberately never logged for an ordinary "this id does not exist" 404, which is expected and carries no alert.
+
+First response:
+
+1. Read the `correlationId` off the log line and grep the audit log and outbox for the same id — this ties the HTTP request, the audit entry and any published event together.
+2. Confirm which route logged it and re-read that route's own scoped lookup in `family.controller.ts` — the most likely cause is a `withFamilyContext` scope that didn't actually get set to the family the guard resolved (a copy-paste of the wrong `familyId` variable), not a genuine RLS defect.
+3. Rule out a migration drift: `docker compose run --rm api pnpm --filter @fp/persistence exec prisma migrate status` against the affected environment. A policy that didn't apply would make a scoped query see nothing even for rows that exist.
+4. If neither explains it, treat it as a possible RLS policy regression and stop deploying further migrations to that environment until [contracts/family-api.md](../specs/008-family-membership/contracts/family-api.md)'s row-level-security test (an unscoped transaction seeing zero rows, then the owner role seeing them anyway once `FORCE ROW LEVEL SECURITY` is respected) has been re-run against it directly.
+
 ## Stopping, restarting, and resetting
 
 These are different operations. Don't confuse them:
