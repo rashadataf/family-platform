@@ -11,3 +11,7 @@ config:
   infrastructure:founderEmail: rashadattaf@gmail.com
   infrastructure:founderPassword:
     secure: AAABACHft0k+235gHfmay2gailLW15du5rDzb3Hhee3x0Wo5Mo+QPb75QBURvF5b15lxqMdaeeAiZwqc/0j6XA==
+  infrastructure:dbOwnerPassword:
+    secure: AAABANaPsDGVOyfg29VHfIUEeRsh4Nbv46N9zs82Uus0lpV9zlBMtZJy4eaRJsGkWcNQ6LndthI64Nxl7mnL
+  infrastructure:dbAppPassword:
+    secure: AAABAMyZenxKK6MJvOHjP6wsYxcAC2GX20TgDMIAgp1LUrufV+4dyX7wwg6iJ+K8ODBfcQbEsaAlXqJziK6f
