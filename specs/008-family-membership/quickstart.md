@@ -35,10 +35,11 @@ session credentials as `$ADA`, `$GRACE` and `$ALAN`.
 ```sh
 curl -s -X POST localhost:3000/v1/families \
   -H "authorization: Bearer $ADA" -H 'content-type: application/json' \
-  -d '{"name":"Lovelace","postcode":"SW1A 1AA","localAuthorityCode":"E09000033"}'
+  -d '{"name":"Lovelace","ownerDisplayName":"Ada","postcode":"SW1A 1AA","localAuthorityCode":"E09000033"}'
 ```
 
-**Expect** `201` with a `familyId`. Then:
+**Expect** `201` with a `familyId`. (`ownerDisplayName` is required — FR-001's owner is created in the
+same action as the family, so there is no separate member record to read a name off yet.) Then:
 
 ```sh
 curl -s localhost:3000/v1/families -H "authorization: Bearer $ADA"
@@ -47,7 +48,11 @@ curl -s localhost:3000/v1/families -H "authorization: Bearer $ADA"
 **Expect** one family, `"role":"owner"`, and a `capabilities` array containing `billing:manage` and
 `family:delete`. The client is given capabilities, not a role to branch on (FR-015).
 
-Creating without a name must return `422 family/name_required` (US1 Scenario 3).
+Creating with an **empty** name (`{"name":"","ownerDisplayName":"Ada"}`) must return
+`422 family/name_required` (US1 Scenario 3) — `name` is trimmed but not schema-required to be
+non-empty, precisely so this reaches the domain's own actionable error rather than a generic `400`.
+Omitting the field entirely is a different, and less interesting, `400`: the wire schema still
+requires the key to be present.
 
 ---
 
@@ -108,8 +113,8 @@ curl -s -X POST localhost:3000/v1/invitations/accept \
   -d '{"token":"<token>"}'
 ```
 
-**Expect** `201`. Note the invitation was addressed in a different case from Grace's registered
-address and still matched (spec.md Edge Cases).
+**Expect** `200` with `{familyId, memberId}`. Note the invitation was addressed in a different case
+from Grace's registered address and still matched (spec.md Edge Cases).
 
 Four negatives, each of which has been a real bug in a real system:
 
@@ -209,16 +214,20 @@ docker compose exec postgres psql -U family_platform_app -d family_platform \
   -c "begin; select set_config('app.family_id','$FAMILY',true); select count(*) from family_member; commit;"
 ```
 
-**Expect** only that family's members. Finally, as the owner role:
+**Expect** only that family's members. Finally, as the **owner** role — `family_platform_owner`, not
+`postgres`. The cluster superuser has implicit `BYPASSRLS` that no table setting can override, so
+running this as `postgres` would pass unconditionally and prove nothing; `family_platform_owner` is
+the one ADR-017 actually constrains with `FORCE ROW LEVEL SECURITY`:
 
 ```sh
-docker compose exec postgres psql -U postgres -d family_platform \
+docker compose exec postgres psql -U family_platform_owner -d family_platform \
   -c "select count(*) from family_member"
 ```
 
 **Expect `0` as well** — that is `FORCE ROW LEVEL SECURITY` doing its job. If this returns every
 row, the policy is decorative and the platform's fifth isolation layer does not exist, however
-green CI is.
+green CI is. (Running it as `postgres` instead is a different, weaker check worth knowing about but
+not a substitute for this one: it always returns every row, superuser or not.)
 
 ---
 

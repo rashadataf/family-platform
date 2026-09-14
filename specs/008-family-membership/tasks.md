@@ -759,9 +759,36 @@ stories; the requirements below are not covered by any of them.
       API process), so there is nothing there for this task to have drifted. Left `README.md`
       unedited rather than inventing a table that doesn't otherwise exist in this repository's
       documentation convention.
-- [ ] T092 Run `pnpm verify` — typecheck, lint, boundaries, unit, integration, format, build — and
+- [X] T092 Run `pnpm verify` — typecheck, lint, boundaries, unit, integration, format, build — and
       then the full [quickstart.md](quickstart.md), all eight scenarios, against a fresh
       `docker compose up`. Scenario 7 is the one that cannot be inferred from a green pipeline.
+      **Note:** `pnpm verify` passed in full (typecheck, lint, boundaries — 357 modules/925
+      dependencies, 280 unit tests, 116 integration tests, format, every `verify:*` script, build).
+      `docker compose up` then found a real bug `pnpm verify` could not see: `CapabilityGuard`
+      injected `Reflector` by bare type (no `@Inject`), and the containerized dev server — `tsx
+      watch`, esbuild-based — does not reliably emit the `design:paramtypes` metadata that implicit
+      injection depends on, so the API failed to boot at all (`UndefinedDependencyException`),
+      reproducible on host `tsx` too, just never exercised there. `vitest`'s own transform happened
+      to emit a (differently-shaped, but present) metadata array, which is why every test suite —
+      280 unit and 116 integration tests, `bootstrapTestApp` included — passed while the real
+      container could not start. Fixed with an explicit `@Inject(Reflector)`, matching the
+      explicit-token convention every other injectable in this codebase already follows; re-verified
+      the container boots clean and all 17 routes map. Also found and fixed two quickstart.md bugs
+      surfaced only by actually running its curl examples: Scenario 1's `POST /v1/families` example
+      omitted the required `ownerDisplayName` field, and its "creating without a name" claim
+      conflated an absent field (`400`, schema validation) with an empty one (`422
+      family/name_required`, the domain's own actionable error) — corrected to use `name:""`
+      explicitly. Scenario 3's accept-invitation example claimed `201`; the contract returns `200`.
+      Scenario 7's final check claimed to test the `family_platform_owner` role but ran as `-U
+      postgres` — the actual cluster superuser, which has implicit `BYPASSRLS` no table setting can
+      override, making the check pass unconditionally regardless of whether `FORCE ROW LEVEL
+      SECURITY` works at all. Corrected to `-U family_platform_owner`, and reran both forms to
+      confirm the contrast: the owner role correctly gets `0`, the superuser gets every row. All
+      eight scenarios then ran clean end to end against the running container (fresh accounts via
+      Mailpit's HTTP API for token extraction), including the demote-Grace-then-remove-Ada-guardian
+      sequence in Scenario 5, which only reads as consistent once `changeMemberRole`'s guardianship
+      cascade (documented behaviour, not a bug) is accounted for. Stopped the containers this task
+      started afterward, leaving only the `postgres` container that was already running beforehand.
 
 ---
 

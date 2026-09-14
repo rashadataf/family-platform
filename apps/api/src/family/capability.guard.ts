@@ -39,7 +39,14 @@ export class CapabilityGuard implements CanActivate {
   private readonly logger = new Logger(CapabilityGuard.name);
 
   constructor(
-    private readonly reflector: Reflector,
+    // Explicit `@Inject(Reflector)`, not the bare-type inference NestJS
+    // normally allows for a concrete class: this codebase's dev server runs
+    // under `tsx` (esbuild), which does not reliably emit the
+    // `design:paramtypes` metadata that bare-type injection depends on —
+    // confirmed by a real boot failure under `docker compose up`, invisible
+    // to `vitest`'s own transform. Every other injectable here already uses
+    // an explicit token for exactly this reason; this was the one exception.
+    @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(AUDIT_LOG) private readonly auditLog: compliance.AuditLogPort,
   ) {}
 
