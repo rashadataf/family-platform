@@ -675,16 +675,39 @@ stories; the requirements below are not covered by any of them.
       called at the four spots where a query *inside* an already-guard-verified scope comes back
       empty — `getFamily`, `updateFamily`, `createInvitation`, `requestFamilyDeletion` — never at
       an ordinary "this id does not exist" 404, which is expected and not an anomaly).
-- [ ] T086 [P] Add `apps/api/src/family/no-personal-data-in-telemetry.integration.spec.ts`,
+- [X] T086 [P] Add `apps/api/src/family/no-personal-data-in-telemetry.integration.spec.ts`,
       mirroring spec 006's `no-secrets-in-logs.integration.spec.ts`: exercise every route and assert
       no `displayName`, `dateOfBirth`, `postcode` or email value appears in any log line, metric
       label, span attribute or outbox payload (Principle VI).
-- [ ] T087 Run the parameterised cross-family sweep from T031, in
+      **Note:** used the same `CapturingLogger implements LoggerService` + `app.useLogger()`
+      interception point as spec 006's test. Exercised create-family (postcode), add-child
+      (displayName + dateOfBirth), a granted `readMember`, and `listMembers` — enough surface to hit
+      every logging call site this controller has (`logRlsEmptyResult`,
+      `family_context_resolve_duration`, the guard's access-denied warn, plus ordinary Nest request
+      logs), without re-running all 17 routes (T087 already owns the "every route" sweep, for a
+      different property). Asserted the raw values are absent from both `logger.messages.join('\n')`
+      and `JSON.stringify()` of every matching `outbox_event.payload` row (read via `withDatabase`,
+      which is a plain SELECT with no RLS on `outbox_event` — it is a shared, family-agnostic table).
+- [X] T087 Run the parameterised cross-family sweep from T031, in
       `apps/api/src/family/cross-family-access.integration.spec.ts`, over **every** route in
       [contracts/family-api.md](contracts/family-api.md)'s family-scoped table, asserting `404` with
       an identical body to a genuinely missing family id, and assert the route list in the test
       matches the router's own registered routes — so a route added later without a test fails by
       being absent rather than passing by being unnoticed (SC-004).
+      **Note:** T031's own `expectNotFoundAcrossFamilies(routes)` helper was never actually added to
+      `packages/testing` (only the factories were) — built the equivalent directly in this spec file
+      instead, since deriving the route list needed to live next to the hand-copied expected list
+      it's checked against, and a shared helper would have had to import `@fp/contracts` for no
+      other caller. Every `@TsRestHandler(familyContract.X)` binding in `family.controller.ts` is 1:1
+      with a contract route, so `familyContract`'s own `{method, path}` pairs *are* "the router's own
+      registered routes" here — filtering to paths containing `:familyId` and comparing against a
+      hand-copied 14-row list (mirroring the contract doc's table) means a route silently dropped
+      from either side fails the comparison. Guards run before Nest pipes, and ts-rest's own
+      body/param validation happens inside `tsRestHandler`'s callback (invoked only once the guarded
+      method executes), so `FamilyMembershipGuard` returns 404 before any body is ever validated —
+      confirmed by sending an empty `{}` body on every POST/PATCH/DELETE case and still getting the
+      guard's 404, never a 422. Verified both "member of a different family" and "family does not
+      exist at all" produce byte-identical bodies for all 14 routes.
 - [ ] T088 Verify, in `apps/api/src/family/idempotency.integration.spec.ts`, that `Idempotency-Key`
       is honoured on `POST /v1/families`, `POST …/members`,
       `POST …/invitations` and `POST /v1/invitations/accept`, with a test replaying each (Principle
