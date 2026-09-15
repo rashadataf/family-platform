@@ -24,6 +24,10 @@ export {
   type FamilyContext,
   type FamilyContextPort,
 } from './application/ports/family-context.port.js';
+export {
+  type MemberVisibility,
+  type MemberVisibilityPort,
+} from './application/ports/member-visibility.port.js';
 export { type ErasurePort } from './application/ports/erasure.port.js';
 export {
   FAMILY_EVENT_TYPES,

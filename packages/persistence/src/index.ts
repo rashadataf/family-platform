@@ -1,11 +1,13 @@
 import type { IdempotencyPort } from '@fp/kernel';
-import type { family, identity } from '@fp/core';
+import type { calendar, family, identity } from '@fp/core';
 import { prisma } from './client.js';
 import { PrismaIdentityUnitOfWork } from './repositories/identity/identity-unit-of-work.js';
 import { PrismaSessionRepository } from './repositories/identity/session.repository.js';
 import { PrismaFamilyDirectory } from './repositories/family/family-directory.repository.js';
 import { PrismaIdempotencyRepository } from './repositories/idempotency-key.repository.js';
 import { eraseForFamily, eraseForMember } from './repositories/family/erasure.js';
+import { PrismaMemberVisibility } from './repositories/family/member-visibility.js';
+import { eraseCalendarForFamily, eraseCalendarForMember } from './repositories/calendar/erasure.js';
 
 export { checkDatabaseHealth } from './health.js';
 export { disconnectDatabase } from './lifecycle.js';
@@ -64,4 +66,28 @@ export function createFamilyDirectory(): family.FamilyDirectoryPort {
 /** ADR-006, Principle IX: the one store behind every route's `Idempotency-Key` handling. */
 export function createIdempotencyStore(): IdempotencyPort {
   return new PrismaIdempotencyRepository(prisma);
+}
+
+/**
+ * Spec 009: the adapter behind Family's second published port. A new instance
+ * per call site is fine — it holds no state, and must not: FR-016 evaluates
+ * guardianship at read time, so nothing here may cache.
+ */
+export function createMemberVisibility(): family.MemberVisibilityPort {
+  return new PrismaMemberVisibility();
+}
+
+export { createCalendarUnitOfWork } from './calendar-context.js';
+export {
+  findEventsDueForMaterialisation,
+  findFamiliesWithPrunableOccurrences,
+  measureCalendarHorizons,
+  type DueEvent,
+  type FamilyHorizon,
+} from './repositories/calendar/materialisation-sweep.js';
+export { eraseCalendarForFamily, eraseCalendarForMember };
+
+/** Constitution Principle XI: the one implementation of `calendar.ErasurePort`. */
+export function createCalendarErasurePort(): calendar.ErasurePort {
+  return { eraseForFamily: eraseCalendarForFamily, eraseForMember: eraseCalendarForMember };
 }

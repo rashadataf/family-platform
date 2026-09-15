@@ -187,6 +187,15 @@ module.exports = {
     },
 
     {
+      name: 'calendar-repositories-are-private',
+      severity: 'error',
+      comment:
+        "FR-027 (spec 009): Calendar's own tables are reachable only through Calendar's own application layer, exactly as FR-020 makes Family's reachable only through Family's. packages/persistence exposes narrow factories (createCalendarUnitOfWork and friends); the repository implementations behind them are private to the package, the same argument family-repositories-are-private makes one context over.",
+      from: { pathNot: '^packages/persistence/' },
+      to: { path: '^packages/persistence/src/repositories/calendar/' },
+    },
+
+    {
       name: 'no-cross-app',
       severity: 'error',
       comment:
@@ -283,9 +292,10 @@ module.exports = {
     doNotFollow: { path: 'node_modules' },
 
     // Build output, coverage and the generated Prisma client are not source.
-    // Excluding `dist` is what makes the resolution below necessary.
+    // Excluding `dist` is what makes the resolution below necessary. Nor are
+    // local tool worktrees, which are whole checkouts of other branches.
     exclude: {
-      path: '(^|/)(dist|\\.turbo|coverage|node_modules)(/|$)|/src/generated/',
+      path: '(^|/)(dist|\\.turbo|coverage|node_modules)(/|$)|/src/generated/|^\\.claude/',
     },
 
     // Workspace packages resolve to SOURCE, not to `dist`.

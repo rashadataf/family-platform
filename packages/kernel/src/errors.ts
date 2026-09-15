@@ -46,4 +46,24 @@ export type DomainError =
   | { readonly kind: 'InvitationInvalid' }
   | { readonly kind: 'InvitationEmailMismatch' }
   | { readonly kind: 'NameRequired'; readonly reason: string }
-  | { readonly kind: 'NotFound' };
+  | { readonly kind: 'NotFound' }
+  /**
+   * Calendar (spec 009). `CapabilityRequired` and `NotFound` above are reused
+   * as they are: FR-028's non-disclosure rule is exactly the reasoning
+   * `NotFound`'s comment already gives, one context over, and a hidden child
+   * event (FR-016) collapses into the same kind for the same reason.
+   *
+   * The recurrence kinds live here rather than in `recurrence/` because the
+   * shared kernel returns them and Tasks will map them to its own wire types —
+   * a kind declared inside Calendar would be a Calendar import in Tasks.
+   */
+  | { readonly kind: 'InvalidTimeRange'; readonly reason: string }
+  | { readonly kind: 'UnknownTimeZone'; readonly timeZone: string }
+  | { readonly kind: 'RecurrenceInvalid'; readonly reason: string }
+  /** Well-formed RFC 5545, outside the declared subset. `part` names the offending keyword. */
+  | { readonly kind: 'RecurrenceUnsupported'; readonly part: string }
+  | { readonly kind: 'RecurrenceTooDense'; readonly limit: number }
+  | { readonly kind: 'RangeTooWide'; readonly maxDays: number }
+  | { readonly kind: 'OccurrenceNotMovable' }
+  /** FR-018. Carries nothing about the member: whether they exist elsewhere is not disclosed. */
+  | { readonly kind: 'ParticipantInvalid' };

@@ -7,6 +7,8 @@ export {
   asFamilyMemberId,
   asInvitationId,
   asGuardianshipId,
+  asCalendarEventId,
+  asEventOccurrenceId,
   type Branded,
   type UserId,
   type SessionId,
@@ -15,6 +17,8 @@ export {
   type FamilyMemberId,
   type InvitationId,
   type GuardianshipId,
+  type CalendarEventId,
+  type EventOccurrenceId,
 } from './branded-id.js';
 export { EmailAddress } from './email-address.vo.js';
 export { type DomainError } from './errors.js';
