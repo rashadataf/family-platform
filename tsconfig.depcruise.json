@@ -6,6 +6,7 @@
       "@fp/persistence/testing": ["packages/persistence/src/testing.ts"],
       "@fp/testing": ["packages/testing/src/index.ts"],
       "@fp/kernel": ["packages/kernel/src/index.ts"],
+      "@fp/kernel/recurrence": ["packages/kernel/src/recurrence/index.ts"],
       "@fp/core": ["packages/core/src/index.ts"],
       "@fp/contracts": ["packages/contracts/src/index.ts"],
       "@fp/platform": ["packages/platform/src/index.ts"],

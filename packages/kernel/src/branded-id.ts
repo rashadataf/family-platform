@@ -52,3 +52,20 @@ export function asInvitationId(value: string): InvitationId {
 export function asGuardianshipId(value: string): GuardianshipId {
   return value as GuardianshipId;
 }
+
+/**
+ * Calendar (spec 009). Branded separately so that an occurrence id passed
+ * where an event id is expected is a compile error — the cancel-one-occurrence
+ * route takes both in the same path, which is exactly where the two would
+ * otherwise be swapped silently.
+ */
+export type CalendarEventId = Branded<string, 'CalendarEventId'>;
+export type EventOccurrenceId = Branded<string, 'EventOccurrenceId'>;
+
+export function asCalendarEventId(value: string): CalendarEventId {
+  return value as CalendarEventId;
+}
+
+export function asEventOccurrenceId(value: string): EventOccurrenceId {
+  return value as EventOccurrenceId;
+}

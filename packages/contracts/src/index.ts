@@ -41,3 +41,23 @@ export {
   changeMemberRoleRequestSchema,
   transferOwnershipRequestSchema,
 } from './v1/family.contract.js';
+export {
+  calendarContract,
+  eventCategorySchema,
+  eventStatusSchema,
+  createEventRequestSchema,
+  updateEventRequestSchema,
+  eventResponseSchema,
+  occurrenceResponseSchema,
+  listOccurrencesQuerySchema,
+  calendarNotFoundSchema,
+  calendarCapabilityRequiredSchema,
+  invalidTimeRangeSchema,
+  unknownTimeZoneSchema,
+  recurrenceInvalidSchema,
+  recurrenceUnsupportedSchema,
+  recurrenceTooDenseSchema,
+  rangeTooWideSchema,
+  occurrenceNotMovableSchema,
+  participantInvalidSchema,
+} from './v1/calendar.contract.js';

@@ -30,16 +30,16 @@ datasource db {
 // the repository is the only writer, so a plain unique index on the
 // already-normalised value gives the same guarantee without an extension.
 model User {
-  id                  String    @id @default(uuid())
-  email               String    @unique
-  passwordHash        String    @map("password_hash")
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  passwordHash        String     @map("password_hash")
   status              UserStatus @default(pending_verification)
-  emailVerifiedAt     DateTime? @map("email_verified_at")
-  deletionRequestedAt DateTime? @map("deletion_requested_at")
-  failedAttemptCount  Int       @default(0) @map("failed_attempt_count")
-  throttledUntil      DateTime? @map("throttled_until")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  emailVerifiedAt     DateTime?  @map("email_verified_at")
+  deletionRequestedAt DateTime?  @map("deletion_requested_at")
+  failedAttemptCount  Int        @default(0) @map("failed_attempt_count")
+  throttledUntil      DateTime?  @map("throttled_until")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
 
   sessions           Session[]
   devices            Device[]
@@ -171,9 +171,10 @@ model Family {
   // grace period. Write-once, enforced in the domain.
   deletionRequestedAt DateTime? @map("deletion_requested_at")
 
-  members       FamilyMember[]
-  invitations   Invitation[]
-  guardianships Guardianship[]
+  members        FamilyMember[]
+  invitations    Invitation[]
+  guardianships  Guardianship[]
+  calendarEvents CalendarEvent[]
 
   @@map("family")
 }
@@ -229,12 +230,18 @@ model FamilyMember {
   updatedAt DateTime  @updatedAt @map("updated_at")
   removedAt DateTime? @map("removed_at")
 
-  family              Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  sentInvitations     Invitation[]   @relation("InvitationInvitedBy")
-  acceptedInvitations Invitation[]   @relation("InvitationAcceptedBy")
-  guardianOf          Guardianship[] @relation("GuardianshipGuardian")
-  guardedBy           Guardianship[] @relation("GuardianshipChild")
+  family              Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  sentInvitations     Invitation[]       @relation("InvitationInvitedBy")
+  acceptedInvitations Invitation[]       @relation("InvitationAcceptedBy")
+  guardianOf          Guardianship[]     @relation("GuardianshipGuardian")
+  guardedBy           Guardianship[]     @relation("GuardianshipChild")
+  calendarEvents      EventParticipant[]
 
+  // Spec 009: redundant against the primary key, and what lets
+  // `event_participant`'s composite foreign key prove a participant belongs to
+  // the SAME family as the event (FR-018) — a plain FK on `member_id` would not,
+  // because foreign-key checks are not subject to row-level security.
+  @@unique([id, familyId])
   // `FamilyContextPort.resolve(userId, familyId)` runs in the guard on every
   // family-scoped request, ahead of everything else (research.md §12).
   @@index([userId])
@@ -308,6 +315,152 @@ model Guardianship {
   @@index([childMemberId])
   @@index([guardianMemberId])
   @@map("guardianship")
+}
+
+// ---------------------------------------------------------------------------
+// Calendar (spec 009, ARCHITECTURE.md §5.3) — the first context built on top
+// of the tenant root rather than beside it.
+//
+// Every model here is FAMILY-SCOPED and sits under ENABLE + FORCE ROW LEVEL
+// SECURITY in its migration, exactly as the Family block above does (ADR-017).
+// `calendar_event` is authored; `event_occurrence` is derived, with exactly one
+// authored attribute — an individual cancellation — which is why its rebuild
+// is a reconcile rather than a regenerate (data-model.md).
+//
+// Instants are `timestamptz`, unlike the Family block's `timestamp`: this is
+// the context whose correctness is measured in wall-clock time across a clock
+// change, and the constitution's "UTC with time zone" is not negotiable here.
+// ---------------------------------------------------------------------------
+
+/// The discriminant of the timed | all-day union. The CHECK constraints in the
+/// migration make "an all-day event with a start time" unrepresentable against
+/// a raw query too, not only in the domain (Principle I).
+enum EventKind {
+  timed
+  all_day
+
+  @@map("event_kind")
+}
+
+/// Platform-defined, never family-authored text, so a category carries no
+/// personal data and later contexts can reason about it (spec.md Assumptions).
+enum EventCategory {
+  medical
+  school
+  nursery
+  activity
+  birthday
+  holiday
+  deadline
+  social
+  household
+  other
+
+  @@map("event_category")
+}
+
+/// A cancelled event keeps its slot (FR-021). There is no `deleted`.
+enum EventStatus {
+  confirmed
+  cancelled
+
+  @@map("event_status")
+}
+
+/// The record of truth. Every occurrence is derived from it.
+model CalendarEvent {
+  id       String @id @default(uuid(7))
+  familyId String @map("family_id")
+
+  // Personal data (spec.md Principle XI answer 1). Free text, never parsed,
+  // never logged, never put in an outbox payload.
+  title       String
+  description String?
+  location    String?
+
+  kind      EventKind
+  // Set for `timed`, null for `all_day` — and the reverse below. The
+  // `event_shape` CHECK enforces the pairing.
+  startsAt  DateTime? @map("starts_at") @db.Timestamptz(3)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(3)
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  /// IANA identifier, validated against the runtime's zone set. NOT NULL even
+  /// for all-day events: the constitution requires the authored zone be kept.
+  timeZone  String    @map("time_zone")
+
+  category       EventCategory?
+  /// The canonical serialisation of the parsed rule (`RecurrenceRule.toString`).
+  recurrenceRule String?        @map("recurrence_rule")
+  /// FR-031: opaque references into a context that does not exist yet. Never
+  /// validated, resolved or dereferenced.
+  attachmentRefs String[]       @default([]) @map("attachment_refs")
+  status         EventStatus    @default(confirmed)
+
+  /// How far this series' occurrences reach. Null when there is nothing
+  /// further to materialise — a one-off, or a series whose COUNT/UNTIL has
+  /// already ended — so `min()` over it is the horizon-lag gauge (FR-026).
+  materialisedThrough DateTime? @map("materialised_through") @db.Timestamptz(3)
+
+  /// No foreign key: member erasure tombstones the member row, so this never
+  /// dangles, and a key would let a hard delete cascade a family's history away.
+  createdByMemberId String? @map("created_by_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  family       Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  occurrences  EventOccurrence[]
+  participants EventParticipant[]
+
+  // Redundant against the primary key; the price of letting the two children
+  // below denormalise `family_id` without it ever being able to drift.
+  @@unique([id, familyId])
+  // The materialisation sweep's claim query (research.md §8).
+  @@index([materialisedThrough])
+  @@map("calendar_event")
+}
+
+/// Derived data with one authored attribute (`cancelledAt`, FR-022).
+model EventOccurrence {
+  id       String @id @default(uuid(7))
+  /// Denormalised so the RLS policy needs no join on the one query in this
+  /// feature that must stay cheap. The composite FK below keeps it honest.
+  familyId String @map("family_id")
+  eventId  String @map("event_id")
+
+  startsAt    DateTime  @map("starts_at") @db.Timestamptz(3)
+  endsAt      DateTime  @map("ends_at") @db.Timestamptz(3)
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(3)
+
+  event CalendarEvent @relation(fields: [eventId, familyId], references: [id, familyId], onDelete: Cascade)
+
+  /// THE identity. The sweep is idempotent because re-expanding a rule finds
+  /// the same rows here and inserts nothing (FR-025, research.md §5).
+  @@unique([eventId, startsAt])
+  /// The range query (research.md §7).
+  @@index([familyId, startsAt, endsAt])
+  @@map("event_occurrence")
+}
+
+/// A member id and a timestamp — and nothing else about the person. No kind,
+/// no age, no guardianship: FR-016 is answered by asking Family who may be
+/// seen, not by caching a classification here (research.md §1).
+model EventParticipant {
+  eventId  String @map("event_id")
+  familyId String @map("family_id")
+  memberId String @map("member_id")
+
+  addedAt DateTime @default(now()) @map("added_at") @db.Timestamptz(3)
+
+  event  CalendarEvent @relation(fields: [eventId, familyId], references: [id, familyId], onDelete: Cascade)
+  /// FR-018 as a key, not only a check: the member must exist in THIS family.
+  member FamilyMember  @relation(fields: [memberId, familyId], references: [id, familyId], onDelete: Cascade)
+
+  @@id([eventId, memberId])
+  /// Erasure, and the visibility filter's anti-join.
+  @@index([memberId])
+  @@map("event_participant")
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CalendarModule } from './calendar/calendar.module.js';
 import { RateLimitModule } from './common/rate-limit.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { FamilyModule } from './family/family.module.js';
@@ -15,6 +16,7 @@ export function buildAppModule(env: AppEnv) {
       HealthModule,
       IdentityModule,
       FamilyModule,
+      CalendarModule,
     ],
     // Registered at the root: the connection pool belongs to the process,
     // not to any one feature module (FR-009).

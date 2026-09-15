@@ -7,9 +7,11 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { compliance, family } from '@fp/core';
 import { asFamilyId, type FamilyId } from '@fp/kernel';
 import type { RequestWithIdentityContext } from '../identity/session.guard.js';
+import { problemNamespaceOf } from './problem-namespace.js';
 import { AUDIT_LOG, FAMILY_UNIT_OF_WORK } from './family.tokens.js';
 
 /**
@@ -42,9 +44,12 @@ export class FamilyMembershipGuard implements CanActivate {
   constructor(
     @Inject(FAMILY_UNIT_OF_WORK) private readonly unitOfWork: family.FamilyUnitOfWorkPort,
     @Inject(AUDIT_LOG) private readonly auditLog: compliance.AuditLogPort,
+    // Explicit token for the same tsx/esbuild reason `CapabilityGuard` gives.
+    @Inject(Reflector) private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const notFound = { type: `${problemNamespaceOf(this.reflector, context)}/not_found` };
     const request = context.switchToHttp().getRequest<RequestWithFamilyContext>();
     const correlationId = request.correlationId ?? randomUUID();
     request.correlationId = correlationId;
@@ -54,12 +59,12 @@ export class FamilyMembershipGuard implements CanActivate {
       // Unreachable in a correctly wired module: SessionGuard runs first. If
       // it ever happens, the family guard must not be the thing that decides
       // an unauthenticated request is fine.
-      throw new NotFoundException({ type: 'family/not_found' });
+      throw new NotFoundException(notFound);
     }
 
     const rawFamilyId = request.params?.familyId;
     if (rawFamilyId === undefined || rawFamilyId === '') {
-      throw new NotFoundException({ type: 'family/not_found' });
+      throw new NotFoundException(notFound);
     }
     const familyId = asFamilyId(rawFamilyId);
 
@@ -100,7 +105,7 @@ export class FamilyMembershipGuard implements CanActivate {
       this.logger.warn(
         `Family access denied for user ${identity.userId} on family ${familyId} [correlationId=${correlationId}]`,
       );
-      throw new NotFoundException({ type: 'family/not_found' });
+      throw new NotFoundException(notFound);
     }
 
     request.familyContext = { ...resolved, familyId };

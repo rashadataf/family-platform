@@ -100,7 +100,7 @@ Two rules that must be refused rather than expanded:
 
 ```sh
 # "FREQ=HOURLY"                     → 422 calendar/recurrence_unsupported  (names the part)
-# "FREQ=MINUTELY;INTERVAL=1"        → 422 calendar/recurrence_too_dense
+# "FREQ=MINUTELY;INTERVAL=1"        → 422 calendar/recurrence_unsupported  (sub-daily is outside the subset, research.md §2)
 ```
 
 ---

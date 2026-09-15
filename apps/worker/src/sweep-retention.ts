@@ -6,10 +6,12 @@ import { runEraseStaleSessionsSweep } from './sweeps/erase-stale-sessions.sweep.
 import { runEraseUnverifiedSweep } from './sweeps/erase-unverified.sweep.js';
 import { runExpireInvitationsSweep } from './sweeps/expire-invitations.sweep.js';
 import { runGuardianCoverageSweep } from './sweeps/guardian-coverage.sweep.js';
+import { runMaterialiseOccurrencesSweep } from './sweeps/materialise-occurrences.sweep.js';
 
 /**
  * Runs every retention sweep (FR-019, FR-020, spec.md's stale-session rule,
- * and spec 008's FR-012 invitation expiry) in one invocation. `--as-of
+ * spec 008's FR-012 invitation expiry, and spec 009's calendar horizon) in one
+ * invocation. `--as-of
  * <ISO 8601>` overrides the clock so
  * quickstart.md's Scenario 7 can prove 30/90-day retention without waiting
  * out real time — the sweeps themselves take `Clock` as an injected port
@@ -57,6 +59,13 @@ async function main(): Promise<void> {
 
   const guardianCoverage = await runGuardianCoverageSweep();
   console.log(`guardian-coverage: uncovered ${String(guardianCoverage.uncoveredChildren.length)}`);
+
+  // Spec 009 FR-024: the calendar horizon advances here, on the same
+  // invocation and the same injectable clock, so `--as-of` moves it too.
+  const materialised = await runMaterialiseOccurrencesSweep(clock);
+  console.log(
+    `materialise-occurrences: extended ${String(materialised.extended)}, inserted ${String(materialised.occurrencesInserted)}, pruned ${String(materialised.occurrencesPruned)}, failed ${String(materialised.failed.length)}, lagging families ${String(materialised.lagging.length)}`,
+  );
 
   await disconnectDatabase();
 }

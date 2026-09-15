@@ -21,3 +21,13 @@ export {
   type SeededFamily,
 } from './family-factories.js';
 export { readAuditLogRows, type RawAuditRow } from './audit-log.js';
+export {
+  fixedClock,
+  seedAllDayEvent,
+  seedTimedEvent,
+  seedWeeklyEvent,
+  UK_FALL_BACK_2026,
+  UK_SPRING_FORWARD_2026,
+  type FixedClock,
+  type SeededEvent,
+} from './calendar-factories.js';

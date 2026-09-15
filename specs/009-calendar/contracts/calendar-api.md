@@ -22,6 +22,7 @@ third column is consulted. The guard chain is spec 008's, unchanged.
 | `PATCH` | `/v1/families/:familyId/events/:eventId` | `calendar:write` |
 | `POST` | `/v1/families/:familyId/events/:eventId/cancel` | `calendar:write` |
 | `POST` | `/v1/families/:familyId/events/:eventId/occurrences/:occurrenceId/cancel` | `calendar:write` |
+| `PATCH` | `/v1/families/:familyId/events/:eventId/occurrences/:occurrenceId` | `calendar:write` — always `422 calendar/occurrence_not_movable` once existence and visibility pass (FR-022) |
 
 **`calendar:read` and `calendar:write` already exist.** Spec 008 issued them into the
 role-to-capability map for a context that did not yet exist, which was the stated point of the

@@ -11,6 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { compliance, family } from '@fp/core';
 import { AUDIT_LOG } from './family.tokens.js';
+import { problemNamespaceOf } from './problem-namespace.js';
 import type { RequestWithFamilyContext } from './family-membership.guard.js';
 
 export const REQUIRED_CAPABILITY = 'family:requiredCapability';
@@ -61,13 +62,14 @@ export class CapabilityGuard implements CanActivate {
     // mandatory would add ceremony without adding a decision.
     if (required === undefined) return true;
 
+    const namespace = problemNamespaceOf(this.reflector, context);
     const request = context.switchToHttp().getRequest<RequestWithFamilyContext>();
     const familyContext = request.familyContext;
     if (familyContext === undefined) {
       // Unreachable when the module is wired correctly, and a hard failure
       // rather than a silent allow: a capability check with nothing to check
       // against must never read as a pass.
-      throw new ForbiddenException({ type: 'family/capability_required' });
+      throw new ForbiddenException({ type: `${namespace}/capability_required` });
     }
 
     if (familyContext.capabilities.includes(required)) return true;
@@ -91,6 +93,9 @@ export class CapabilityGuard implements CanActivate {
     );
     // Names the capability, never the caller's role — a client that branches
     // on the response branches on capabilities too (FR-015).
-    throw new ForbiddenException({ type: 'family/capability_required', capability: required });
+    throw new ForbiddenException({
+      type: `${namespace}/capability_required`,
+      capability: required,
+    });
   }
 }
