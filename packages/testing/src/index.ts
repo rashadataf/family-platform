@@ -31,3 +31,10 @@ export {
   type FixedClock,
   type SeededEvent,
 } from './calendar-factories.js';
+export {
+  seedDateOnlyTask,
+  seedDateTimeTask,
+  seedUndatedTask,
+  seedWeeklyRecurringTask,
+  type SeededTask,
+} from './tasks-factories.js';

@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
@@ -27,7 +27,26 @@ import { describe, expect, it } from 'vitest';
  * "role".
  */
 const ROLE_LITERALS = new Set(['owner', 'adult', 'extended', 'viewer']);
-const SCANNED_ROOT = join(import.meta.dirname, '..');
+
+/**
+ * `apps/api/src` in full — so a new context's controller is covered the moment
+ * it exists, with no glob to remember to widen — plus `packages/core/tasks`,
+ * added by spec 010 (T094): Tasks decides visibility in its own application
+ * layer rather than in a guard, so a role comparison that crept in there would
+ * never have been seen by an apps/api-only scan.
+ *
+ * `packages/core/family` is deliberately NOT scanned. FR-015 is about
+ * AUTHORIZATION code checking capabilities instead of roles; Family's own
+ * domain is where roles are defined and their invariants enforced — "a family
+ * has exactly one owner", ownership transfer, and `capabilities.ts`'s
+ * role-to-capability table itself. Those comparisons are the subject matter,
+ * not a violation of it, and a scan that flagged them would be asking Family
+ * to stop modelling the thing every other context then consumes.
+ */
+const SCANNED_ROOTS = [
+  join(import.meta.dirname, '..'),
+  resolve(import.meta.dirname, '../../../../packages/core/src/tasks'),
+];
 
 function collectSourceFiles(dir: string): string[] {
   const files: string[] = [];
@@ -107,10 +126,28 @@ function findViolations(filePath: string): string[] {
   return violations;
 }
 
-describe('FR-015: apps/api never branches a decision on a role literal', () => {
+describe('FR-015: no decision branches on a role literal', () => {
+  function scanned(): string[] {
+    return SCANNED_ROOTS.flatMap(collectSourceFiles);
+  }
+
   it('contains no role-literal comparison or switch case in any non-test source file', () => {
-    const violations = collectSourceFiles(SCANNED_ROOT).flatMap(findViolations);
+    const violations = scanned().flatMap(findViolations);
 
     expect(violations).toEqual([]);
+  });
+
+  /**
+   * The scan is only worth anything if it reaches the code it claims to. A
+   * refactor that moved a directory would otherwise leave this test passing
+   * over nothing.
+   */
+  it('actually reaches the Tasks context, in both the API and the core layers', () => {
+    const files = scanned();
+    expect(files.some((file) => file.includes(join('apps', 'api', 'src', 'tasks')))).toBe(true);
+    expect(files.some((file) => file.includes(join('core', 'src', 'tasks')))).toBe(true);
+    // The API's other contexts come along with the apps/api root.
+    expect(files.some((file) => file.includes(join('apps', 'api', 'src', 'calendar')))).toBe(true);
+    expect(files.some((file) => file.includes(join('apps', 'api', 'src', 'family')))).toBe(true);
   });
 });

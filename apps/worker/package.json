@@ -22,11 +22,13 @@
     "@nestjs/common": "^11.1.6",
     "@nestjs/core": "^11.1.6",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
     "@fp/config-typescript": "workspace:*",
+    "@fp/testing": "workspace:*",
     "@types/node": "^24.0.0",
     "eslint": "^9.39.1",
     "tsx": "^4.19.2",

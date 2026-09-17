@@ -1,7 +1,12 @@
 import * as pulumi from '@pulumi/pulumi';
 import { remote, types } from '@pulumi/command';
 import type { StackConfig } from './config.js';
-import { MIGRATOR_TARBALL_NAME, RUNTIME_TARBALL_NAME, type StagingImages } from './image.js';
+import {
+  MIGRATOR_TARBALL_NAME,
+  RUNTIME_TARBALL_NAME,
+  WORKER_RUNTIME_TARBALL_NAME,
+  type StagingImages,
+} from './image.js';
 
 /**
  * Where the bundle lands on the VPS, and where `deploy.ts`'s script `cd`s to
@@ -21,8 +26,8 @@ export function connectionFor(stackConfig: StackConfig): types.input.remote.Conn
 }
 
 /**
- * Five separate `CopyToRemote` resources — one per file — rather than one
- * `AssetArchive` bundling all five. An `AssetArchive` combining the two
+ * Six separate `CopyToRemote` resources — one per file — rather than one
+ * `AssetArchive` bundling them all. An `AssetArchive` combining the
  * large (100-300MB) image tarballs with small text files was tried first
  * and failed at apply time with "archive must be a path to a file or
  * directory" / a nil archive value, for reasons that didn't repay further
@@ -42,6 +47,11 @@ export function createTransfer(
   const files: Record<string, { local: string; digestDep?: pulumi.Output<string> }> = {
     [RUNTIME_TARBALL_NAME]: { local: RUNTIME_TARBALL_NAME, digestDep: images.runtime.digest },
     [MIGRATOR_TARBALL_NAME]: { local: MIGRATOR_TARBALL_NAME, digestDep: images.migrator.digest },
+    // Spec 010 FR-037: the worker is deployed, so its tarball travels too.
+    [WORKER_RUNTIME_TARBALL_NAME]: {
+      local: WORKER_RUNTIME_TARBALL_NAME,
+      digestDep: images.worker.digest,
+    },
     'docker-compose.yml': { local: '../docker-compose.yml' },
     'docker-compose.staging.yml': { local: '../docker-compose.staging.yml' },
     '.env': { local: '../docker-compose.staging.env' },

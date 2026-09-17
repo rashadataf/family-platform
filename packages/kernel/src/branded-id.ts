@@ -69,3 +69,19 @@ export function asCalendarEventId(value: string): CalendarEventId {
 export function asEventOccurrenceId(value: string): EventOccurrenceId {
   return value as EventOccurrenceId;
 }
+
+/**
+ * Tasks (spec 010). `TaskSeriesId` is branded apart from `TaskId` because every
+ * instance of a recurring chore carries both, and a series id passed where a
+ * task id is expected would address the wrong row on every completion.
+ */
+export type TaskId = Branded<string, 'TaskId'>;
+export type TaskSeriesId = Branded<string, 'TaskSeriesId'>;
+
+export function asTaskId(value: string): TaskId {
+  return value as TaskId;
+}
+
+export function asTaskSeriesId(value: string): TaskSeriesId {
+  return value as TaskSeriesId;
+}

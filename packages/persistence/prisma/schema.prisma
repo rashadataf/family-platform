@@ -175,6 +175,7 @@ model Family {
   invitations    Invitation[]
   guardianships  Guardianship[]
   calendarEvents CalendarEvent[]
+  tasks          Task[]
 
   @@map("family")
 }
@@ -236,6 +237,7 @@ model FamilyMember {
   guardianOf          Guardianship[]     @relation("GuardianshipGuardian")
   guardedBy           Guardianship[]     @relation("GuardianshipChild")
   calendarEvents      EventParticipant[]
+  taskAssignments     TaskAssignment[]
 
   // Spec 009: redundant against the primary key, and what lets
   // `event_participant`'s composite foreign key prove a participant belongs to
@@ -548,4 +550,133 @@ model IdempotencyKey {
 
   @@unique([userId, key])
   @@map("idempotency_key")
+}
+
+// ---------------------------------------------------------------------------
+// Tasks (spec 010, ARCHITECTURE.md §5.4). Two family-scoped tables under
+// ENABLE + FORCE row-level security (ADR-017), declared in the migration.
+//
+// Every instance of a recurring chore is its own `task` row: there is no
+// series table and no materialised future. A series is a shared `series_id`,
+// a `predecessor_id` chain, and exactly one row flagged `is_series_head`
+// (data-model.md). The partial unique index that makes "exactly one head"
+// true, the list and sweep indexes, and the shape CHECKs are hand-written in
+// the migration, because Prisma's schema language cannot express them.
+// ---------------------------------------------------------------------------
+
+enum TaskStatus {
+  open
+  completed
+  cancelled
+
+  @@map("task_status")
+}
+
+enum TaskPriority {
+  low
+  normal
+  high
+
+  @@map("task_priority")
+}
+
+enum TaskCategory {
+  household
+  school
+  health
+  finance
+  admin
+  other
+
+  @@map("task_category")
+}
+
+enum TaskDueKind {
+  none
+  date
+  date_time
+
+  @@map("task_due_kind")
+}
+
+model Task {
+  id       String @id @default(uuid(7))
+  familyId String @map("family_id")
+
+  // Personal data (spec.md Principle XI answer 1). Free text, never parsed,
+  // never logged, never put in an outbox payload or an audit purpose.
+  title String
+  notes String?
+
+  priority TaskPriority  @default(normal)
+  category TaskCategory?
+  status   TaskStatus    @default(open)
+
+  /// The due-date discriminant. `task_due_shape` pairs it with the columns below.
+  dueKind      TaskDueKind @default(none) @map("due_kind")
+  dueDate      DateTime?   @map("due_date") @db.Date
+  dueLocalTime DateTime?   @map("due_local_time") @db.Time(0)
+  /// IANA identifier; set whenever there is a due date.
+  timeZone     String?     @map("time_zone")
+  /// DERIVED due moment, written by the domain: the end of `due_date` for a
+  /// date-only due, the resolved instant otherwise (research.md §4).
+  dueAt        DateTime?   @map("due_at") @db.Timestamptz(3)
+
+  /// Canonical serialisation of the parsed rule (`RecurrenceRule.toString`).
+  recurrenceRule   String?   @map("recurrence_rule")
+  /// Local wall-clock reading (no zone) the rule is counted from (research.md §2).
+  recurrenceAnchor DateTime? @map("recurrence_anchor") @db.Timestamp(0)
+  seriesId         String?   @map("series_id")
+  /// FR-022 as a key: one successor per instance.
+  predecessorId    String?   @unique @map("predecessor_id")
+  /// FR-019: exactly one head per series, by a partial unique index in the migration.
+  isSeriesHead     Boolean   @default(false) @map("is_series_head")
+
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz(3)
+  completedByMemberId String?   @map("completed_by_member_id")
+  cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByMemberId String?   @map("cancelled_by_member_id")
+  /// `coalesce(completed_at, cancelled_at)`, kept equal by a CHECK; the history index's key.
+  closedAt            DateTime? @map("closed_at") @db.Timestamptz(3)
+
+  /// The `due_at` last reported overdue (research.md §5).
+  overdueReportedFor DateTime? @map("overdue_reported_for") @db.Timestamptz(3)
+
+  /// No foreign key, as Calendar's: member erasure tombstones the member row.
+  createdByMemberId String? @map("created_by_member_id")
+
+  /// FR-011: optimistic concurrency.
+  version Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  family      Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  predecessor Task?            @relation("TaskSuccession", fields: [predecessorId], references: [id], onDelete: SetNull)
+  successor   Task?            @relation("TaskSuccession")
+  assignments TaskAssignment[]
+
+  // Redundant against the primary key; what `task_assignment`'s composite
+  // foreign key references, so its denormalised `family_id` cannot drift.
+  @@unique([id, familyId])
+  @@map("task")
+}
+
+model TaskAssignment {
+  taskId   String @map("task_id")
+  familyId String @map("family_id")
+  memberId String @map("member_id")
+
+  assignedAt         DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  /// Tombstoned on member erasure.
+  assignedByMemberId String?  @map("assigned_by_member_id")
+
+  task   Task         @relation(fields: [taskId, familyId], references: [id, familyId], onDelete: Cascade)
+  /// FR-016 as a key: the assignee must be a member of THIS family.
+  member FamilyMember @relation(fields: [memberId, familyId], references: [id, familyId], onDelete: Cascade)
+
+  @@id([taskId, memberId])
+  /// The assignee filter, the visibility anti-join, and erasure.
+  @@index([memberId])
+  @@map("task_assignment")
 }

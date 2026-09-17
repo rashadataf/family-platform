@@ -1,29 +1,22 @@
 import type { Clock } from '@fp/kernel';
-import { SystemClock } from '@fp/platform';
 import { disconnectDatabase } from '@fp/persistence';
-import { runEraseDeletedAccountsSweep } from './sweeps/erase-deleted-accounts.sweep.js';
-import { runEraseStaleSessionsSweep } from './sweeps/erase-stale-sessions.sweep.js';
-import { runEraseUnverifiedSweep } from './sweeps/erase-unverified.sweep.js';
-import { runExpireInvitationsSweep } from './sweeps/expire-invitations.sweep.js';
-import { runGuardianCoverageSweep } from './sweeps/guardian-coverage.sweep.js';
-import { runMaterialiseOccurrencesSweep } from './sweeps/materialise-occurrences.sweep.js';
+import { SystemClock } from '@fp/platform';
+import { SWEEPS } from './sweeps/registry.js';
 
 /**
- * Runs every retention sweep (FR-019, FR-020, spec.md's stale-session rule,
- * spec 008's FR-012 invitation expiry, and spec 009's calendar horizon) in one
- * invocation. `--as-of
- * <ISO 8601>` overrides the clock so
- * quickstart.md's Scenario 7 can prove 30/90-day retention without waiting
- * out real time — the sweeps themselves take `Clock` as an injected port
- * for exactly this reason.
+ * Runs every sweep once, in registry order, in one invocation.
  *
- * No in-process scheduler is wired up here (T087's "scheduled invocation
- * for real operation" is intentionally scoped down — see tasks.md's note):
- * choosing where a recurring invocation of this script lives (VPS crontab,
- * a Pulumi-managed systemd timer, a future queue-based scheduler) is an
- * infrastructure decision neither this spec's research.md/plan.md nor any
- * ADR has made, and it belongs to spec 003's deployment domain, not this
- * one. This script is what such a scheduler would call.
+ * `--as-of <ISO 8601>` overrides the clock so quickstart.md's Scenario 7 can
+ * prove 30/90-day retention, and Scenario 6 an overdue task, without waiting
+ * out real time — the sweeps themselves take `Clock` as an injected port for
+ * exactly this reason.
+ *
+ * The recurring invocation now lives in the worker process itself:
+ * `scheduler/scheduler.ts`, started by `main.ts`, runs these same registry
+ * entries on their own per-sweep cadences (spec 010 FR-037). This script
+ * remains the one-shot, clock-movable entry point for a quickstart scenario or
+ * an operator, and reads its list from the same `SWEEPS` registry so the two
+ * can never disagree about which sweeps exist.
  */
 function parseAsOf(argv: readonly string[]): Date | null {
   const flagIndex = argv.indexOf('--as-of');
@@ -45,27 +38,10 @@ async function main(): Promise<void> {
   const asOf = parseAsOf(process.argv.slice(2));
   const clock: Clock = asOf ? { now: () => asOf } : new SystemClock();
 
-  const unverified = await runEraseUnverifiedSweep(clock);
-  console.log(`erase-unverified: deleted ${String(unverified.deletedCount)}`);
-
-  const deletedAccounts = await runEraseDeletedAccountsSweep(clock);
-  console.log(`erase-deleted-accounts: deleted ${String(deletedAccounts.deletedCount)}`);
-
-  const staleSessions = await runEraseStaleSessionsSweep(clock);
-  console.log(`erase-stale-sessions: deleted ${String(staleSessions.deletedCount)}`);
-
-  const expiredInvitations = await runExpireInvitationsSweep(clock);
-  console.log(`expire-invitations: expired ${String(expiredInvitations.expiredCount)}`);
-
-  const guardianCoverage = await runGuardianCoverageSweep();
-  console.log(`guardian-coverage: uncovered ${String(guardianCoverage.uncoveredChildren.length)}`);
-
-  // Spec 009 FR-024: the calendar horizon advances here, on the same
-  // invocation and the same injectable clock, so `--as-of` moves it too.
-  const materialised = await runMaterialiseOccurrencesSweep(clock);
-  console.log(
-    `materialise-occurrences: extended ${String(materialised.extended)}, inserted ${String(materialised.occurrencesInserted)}, pruned ${String(materialised.occurrencesPruned)}, failed ${String(materialised.failed.length)}, lagging families ${String(materialised.lagging.length)}`,
-  );
+  for (const sweep of SWEEPS) {
+    const summary = await sweep.run(clock);
+    console.log(`${sweep.name}: ${summary}`);
+  }
 
   await disconnectDatabase();
 }

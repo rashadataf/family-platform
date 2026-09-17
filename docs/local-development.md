@@ -117,6 +117,28 @@ These are different operations. Don't confuse them:
 | Restart just the API | `docker compose restart api` | Kept |
 | Watch the logs | `docker compose logs -f api` | — |
 
+## The background sweeps run on their own
+
+The `worker` container runs the platform's scheduled sweeps itself — retention, invitation expiry, guardian coverage, the calendar horizon, and overdue-task detection. Nothing invokes them; `docker compose up` is enough. The shortest cadence is 60 seconds (overdue detection), so within about a minute of starting up you will see one line per sweep:
+
+```bash
+docker compose logs -f worker | grep worker_sweep_run
+```
+
+Those lines carry a sweep name, an outcome, a duration and a correlation id, never a task title or anyone's name. `docker compose ps worker` reports health from a heartbeat file the scheduler rewrites after every tick, so a worker that has stopped ticking goes `unhealthy` rather than merely looking alive.
+
+To make a sweep run more often while working on one, set its interval in your `.env` — for example `SWEEP_GUARDIAN_COVERAGE_INTERVAL_SECONDS=30`. The worker validates every cadence at boot and refuses to start on a zero, a negative or a non-numeric value, naming the variable.
+
+### Moving the clock instead of waiting
+
+Some behaviour is about elapsed time — 30- and 90-day retention, a task going overdue — and waiting for it is not an option. `sweep-retention` runs every sweep once, against a clock you choose:
+
+```bash
+docker compose exec worker pnpm --filter @fp/worker sweep:retention -- --as-of 2027-01-01T00:00:00Z
+```
+
+That remains the way to prove a time-dependent scenario (quickstart Scenarios 6 and 7). It reads the same sweep registry the scheduler does, so the two can never disagree about which sweeps exist.
+
 ## The host-based path (optional)
 
 If you already have **Node.js 24** and **pnpm 10** installed, `pnpm dev` still works and is faster.

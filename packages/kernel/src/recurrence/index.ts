@@ -24,6 +24,7 @@ export {
   type ExpandedOccurrence,
   type Expansion,
 } from './expand.js';
+export { nextOccurrenceAfter, type NextOccurrenceInput } from './next-occurrence.js';
 export { type PublicHolidayProvider } from './public-holiday.port.js';
 export {
   addDays,

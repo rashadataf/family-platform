@@ -102,4 +102,14 @@ RUN rm -rf /usr/local/lib/node_modules/npm \
 
 USER node
 
+# The scheduler rewrites WORKER_HEARTBEAT_PATH after every tick (spec 010
+# FR-038). A worker whose ticks have stopped still has a live process and an
+# open connection pool, so without this it would sit in `docker ps` looking
+# perfectly healthy. 180 s is three times the shortest cadence (60 s), so a
+# single slow pass is not enough to trip it.
+ENV WORKER_HEARTBEAT_PATH=/tmp/fp-worker-heartbeat
+
+HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["node", "-e", "const fs=require('node:fs');const p=process.env.WORKER_HEARTBEAT_PATH;try{const age=Date.now()-fs.statSync(p).mtimeMs;process.exit(age<180000?0:1)}catch{process.exit(1)}"]
+
 CMD ["node", "dist/main.js"]

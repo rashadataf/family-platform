@@ -1,5 +1,5 @@
 import type { IdempotencyPort } from '@fp/kernel';
-import type { calendar, family, identity } from '@fp/core';
+import type { calendar, family, identity, tasks } from '@fp/core';
 import { prisma } from './client.js';
 import { PrismaIdentityUnitOfWork } from './repositories/identity/identity-unit-of-work.js';
 import { PrismaSessionRepository } from './repositories/identity/session.repository.js';
@@ -8,6 +8,7 @@ import { PrismaIdempotencyRepository } from './repositories/idempotency-key.repo
 import { eraseForFamily, eraseForMember } from './repositories/family/erasure.js';
 import { PrismaMemberVisibility } from './repositories/family/member-visibility.js';
 import { eraseCalendarForFamily, eraseCalendarForMember } from './repositories/calendar/erasure.js';
+import { eraseTasksForFamily, eraseTasksForMember } from './repositories/tasks/erasure.js';
 
 export { checkDatabaseHealth } from './health.js';
 export { disconnectDatabase } from './lifecycle.js';
@@ -90,4 +91,17 @@ export { eraseCalendarForFamily, eraseCalendarForMember };
 /** Constitution Principle XI: the one implementation of `calendar.ErasurePort`. */
 export function createCalendarErasurePort(): calendar.ErasurePort {
   return { eraseForFamily: eraseCalendarForFamily, eraseForMember: eraseCalendarForMember };
+}
+
+export { createTasksUnitOfWork } from './tasks-context.js';
+export {
+  findTasksNeedingOverdueReport,
+  measureOverdueLag,
+  type OverdueCandidate,
+} from './repositories/tasks/overdue-sweep.js';
+export { eraseTasksForFamily, eraseTasksForMember };
+
+/** Constitution Principle XI: the one implementation of `tasks.ErasurePort`. */
+export function createTasksErasurePort(): tasks.ErasurePort {
+  return { eraseForFamily: eraseTasksForFamily, eraseForMember: eraseTasksForMember };
 }

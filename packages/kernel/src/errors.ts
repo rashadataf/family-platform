@@ -66,4 +66,19 @@ export type DomainError =
   | { readonly kind: 'RangeTooWide'; readonly maxDays: number }
   | { readonly kind: 'OccurrenceNotMovable' }
   /** FR-018. Carries nothing about the member: whether they exist elsewhere is not disclosed. */
-  | { readonly kind: 'ParticipantInvalid' };
+  | { readonly kind: 'ParticipantInvalid' }
+  /**
+   * Tasks (spec 010). `NotFound`, `CapabilityRequired`, `NameRequired`,
+   * `UnknownTimeZone`, `RecurrenceInvalid`, `RecurrenceUnsupported` and
+   * `RangeTooWide` above are reused unchanged.
+   */
+  /** A due date or time that is not a real calendar value. `field` names which. */
+  | { readonly kind: 'InvalidDue'; readonly field: string; readonly reason: string }
+  /** FR-017: a rule needs a date to recur from. */
+  | { readonly kind: 'RecurrenceRequiresDue' }
+  /** FR-016. Like `ParticipantInvalid`, carries nothing about the member. */
+  | { readonly kind: 'AssigneeInvalid' }
+  /** FR-008: not permitted from the task's current status. */
+  | { readonly kind: 'InvalidTransition'; readonly from: string; readonly command: string }
+  /** FR-011: the caller's `expectedVersion` is stale. Carries the current version and nothing else. */
+  | { readonly kind: 'VersionConflict'; readonly currentVersion: number };

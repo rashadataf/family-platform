@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
@@ -47,6 +47,39 @@ function parse(file: string): ts.SourceFile {
 describe('@fp/kernel/recurrence is pure (FR-013, SC-010)', () => {
   it('has source files to check', () => {
     expect(sourceFiles().length).toBeGreaterThanOrEqual(4);
+  });
+
+  /**
+   * Spec 010 added `next-occurrence.ts` — the first file here written for a
+   * second consumer (Tasks). The directory scan picks it up automatically,
+   * which is the point; this names it so that a file dropping out of the scan
+   * is a failure rather than a silently smaller check.
+   */
+  it('covers next-occurrence.ts, the kernel addition spec 010 made', () => {
+    expect(sourceFiles().map((file) => basename(file))).toContain('next-occurrence.ts');
+  });
+
+  /**
+   * SC-010's other half: the kernel stays dependency-free. A recurrence helper
+   * that reached for a date library would make every consumer inherit it, and
+   * the purity assertions above would still pass.
+   */
+  it('adds no dependency to the kernel package', () => {
+    const manifest: unknown = JSON.parse(
+      readFileSync(join(KERNEL_SRC, '..', 'package.json'), 'utf-8'),
+    );
+    const pkg = manifest as {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    expect(pkg.dependencies ?? {}).toEqual({});
+    expect(pkg.peerDependencies ?? {}).toEqual({});
+    // Dev dependencies are the toolchain only — no runtime library may appear.
+    for (const name of Object.keys(pkg.devDependencies ?? {})) {
+      expect(name, name).toMatch(/^(@fp\/config-|@types\/node$|eslint$|typescript$)/);
+    }
   });
 
   it('imports only its own directory and the kernel’s own primitives', () => {

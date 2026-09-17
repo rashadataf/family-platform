@@ -2,7 +2,12 @@ import * as pulumi from '@pulumi/pulumi';
 import { remote } from '@pulumi/command';
 import type { StackConfig } from './config.js';
 import { connectionFor, REMOTE_DIR } from './transfer.js';
-import { MIGRATOR_TARBALL_NAME, RUNTIME_TARBALL_NAME, type StagingImages } from './image.js';
+import {
+  MIGRATOR_TARBALL_NAME,
+  RUNTIME_TARBALL_NAME,
+  WORKER_RUNTIME_TARBALL_NAME,
+  type StagingImages,
+} from './image.js';
 
 /**
  * Migrate-before-swap (research.md §2, corrects issue #9): load both new
@@ -93,26 +98,17 @@ export STAGING_NETWORK_NAME='${stackConfig.stagingNetworkName}'
 cd '${REMOTE_DIR}'
 docker load -i '${RUNTIME_TARBALL_NAME}'
 docker load -i '${MIGRATOR_TARBALL_NAME}'
+docker load -i '${WORKER_RUNTIME_TARBALL_NAME}'
 COMPOSE='docker compose -p family-platform-staging -f docker-compose.yml -f docker-compose.staging.yml'
 ${migrateStep}
-# Named explicitly, not a bare \`up -d\`: broke a real deploy right after
-# spec 006 merged \`worker\` into the base docker-compose.yml with a
-# \`build:\` pointing at apps/worker/Dockerfile. docker-compose.staging.yml
-# only overrides postgres/migrate/api/mailpit to point at the transferred
-# tarball images (or, for migrate, exclude it from this line entirely — it
-# is a one-shot service already run above via \`run --rm\`, not one \`up -d\`
-# should manage); \`worker\` never got one, because there is no staging
-# worker runtime image to override it with yet — this deploy pipeline
-# builds and transfers only the api runtime and migrator tarballs. A bare
-# \`up -d\` therefore tries to BUILD worker from source that was never
-# transferred (only two tarballs, the compose files, and .env are), and
-# fails with "lstat REMOTE_DIR/apps: no such file or directory" before any
-# other service starts, since a build failure for one service aborts the
-# whole \`up\` command. Nothing is lost by leaving worker out: its
-# WorkerModule is currently an empty NestJS DI context with no queue
-# consumer or scheduled sweep (T087 in specs/006-identity-access/tasks.md
-# already defers wiring that up), so it does nothing when it does run.
-$COMPOSE up -d postgres api mailpit
+# The worker now ships its own runtime image (spec 010 FR-037), so it is
+# brought up alongside the api rather than left out. \`migrate\` stays off
+# this line: it is a one-shot service already run above via
+# \`run --rm\`, not one \`up -d\` should manage. Still named explicitly
+# rather than a bare \`up -d\`, so a service added to the base compose file
+# without a staging override cannot be built from source that was never
+# transferred.
+$COMPOSE up -d postgres api mailpit worker
 `;
 }
 
@@ -225,7 +221,12 @@ export function createDeployCommand(
       // means this resource is replaced on every single deploy (image.ts's
       // cache-busting label changes the digest every time) — exactly why it
       // must never own a real delete script (see below).
-      triggers: [images.runtime.digest, images.migrator.digest, stackConfig.resetData],
+      triggers: [
+        images.runtime.digest,
+        images.migrator.digest,
+        images.worker.digest,
+        stackConfig.resetData,
+      ],
     },
     { dependsOn },
   );

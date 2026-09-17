@@ -1,5 +1,6 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as pulumi from '@pulumi/pulumi';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * `Output<T>` has no `.promise()` in this SDK version — only `.apply()`
@@ -74,7 +75,11 @@ describe('infrastructure resource wiring', () => {
 
     stackConfig = loadStackConfig(VALID_RAW);
     const images = buildStagingImages();
-    transfers = createTransfer(stackConfig, images, [images.runtimeSaved, images.migratorSaved]);
+    transfers = createTransfer(stackConfig, images, [
+      images.runtimeSaved,
+      images.migratorSaved,
+      images.workerSaved,
+    ]);
     deploy = createDeployCommand(stackConfig, images, transfers);
     teardown = createTeardownCommand(stackConfig, transfers);
   });
@@ -224,5 +229,59 @@ describe('infrastructure resource wiring', () => {
   it('guards the compose-down step against an already-emptied remote directory', async () => {
     const script = await resolveOutput(teardown.delete);
     expect(script).toMatch(/if \[ -f docker-compose\.yml \]; then/);
+  });
+
+  /**
+   * Spec 010 T079. Before that feature the worker was deliberately left out of
+   * the deploy — it had no staging runtime image and its module was empty — so
+   * these three assertions are what stop it silently dropping back out.
+   */
+  describe('the worker is actually deployed (spec 010 FR-037)', () => {
+    it('brings the worker up alongside the api', async () => {
+      const script = await resolveOutput(deploy.create);
+      expect(script).toContain('up -d postgres api mailpit worker');
+    });
+
+    it('loads the worker tarball on the VPS', async () => {
+      const { WORKER_RUNTIME_TARBALL_NAME } = await import('./image.js');
+      const script = await resolveOutput(deploy.create);
+      expect(script).toContain(`docker load -i '${WORKER_RUNTIME_TARBALL_NAME}'`);
+    });
+
+    it('transfers the worker tarball to the VPS', async () => {
+      const { WORKER_RUNTIME_TARBALL_NAME } = await import('./image.js');
+      const remotePaths = await Promise.all(transfers.map((t) => resolveOutput(t.remotePath)));
+      expect(remotePaths.some((path) => path.endsWith(WORKER_RUNTIME_TARBALL_NAME))).toBe(true);
+    });
+
+    it('re-runs the deploy when the worker image changes', async () => {
+      const triggers = await resolveOutput(deploy.triggers);
+      // Three digests plus resetData: a new worker image must redeploy too,
+      // or a fixed sweep would sit in a tarball nobody loaded.
+      expect(triggers).toHaveLength(4);
+    });
+
+    /**
+     * The hazard image.ts's own header warns about: the tag is a plain string
+     * in two files with no shared source of truth, so a rename in one fails at
+     * `docker compose up` with "image not found" rather than at review time.
+     * This closes it for the worker by reading both.
+     */
+    it('uses the same worker image tag in image.ts and docker-compose.staging.yml', async () => {
+      const { WORKER_RUNTIME_IMAGE_TAG } = await import('./image.js');
+      const compose = readFileSync('docker-compose.staging.yml', 'utf8');
+
+      const workerBlock = compose.slice(compose.indexOf('\n  worker:'));
+      const image = /\n\s+image:\s*(\S+)/.exec(workerBlock)?.[1];
+
+      expect(image).toBe(WORKER_RUNTIME_IMAGE_TAG);
+    });
+
+    it('uses the same api and migrator tags in both files too', async () => {
+      const { RUNTIME_IMAGE_TAG, MIGRATOR_IMAGE_TAG } = await import('./image.js');
+      const compose = readFileSync('docker-compose.staging.yml', 'utf8');
+      expect(compose).toContain(`image: ${RUNTIME_IMAGE_TAG}`);
+      expect(compose).toContain(`image: ${MIGRATOR_IMAGE_TAG}`);
+    });
   });
 });

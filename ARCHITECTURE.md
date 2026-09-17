@@ -241,7 +241,7 @@ Family
 
 **Shared kernel: `@fp/kernel/recurrence`.** An RFC 5545 RRULE value object plus expansion, timezone-correct against Europe/London including DST transitions and UK bank holidays. It is pure, has no dependencies, has exhaustive unit tests, and is the only shared kernel in the system. A shared kernel is a coupling and this one is justified only because it is small, stable, pure, and duplicating it would guarantee two subtly different DST bugs.
 
-**Publishes.** `TaskCreated`, `TaskAssigned`, `TaskCompleted`, `TaskOverdue`.
+**Publishes.** `TaskCreated`, `TaskAssigned`, `TaskUpdated`, `TaskCompleted`, `TaskCancelled`, `TaskOverdue`. `TaskUpdated` and `TaskCancelled` were added by spec 010 (research.md §8): Reminders needs them to withdraw or reschedule a reminder when a task's due date moves or the task is called off, which the other four cannot express.
 
 ### 5.5 Document Vault — *core subdomain, highest sensitivity*
 
