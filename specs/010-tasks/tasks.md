@@ -571,9 +571,15 @@ Tasks, and it can be built and reviewed as its own pull request.
       120 per user per minute on both lists, and 120 per user per hour on `POST …/tasks`.
 - [X] T098 [P] Update `ARCHITECTURE.md` §5.4's **Publishes** line to add `TaskUpdated` and
       `TaskCancelled` ([research.md §8](research.md)).
-- [ ] T099 Run `pnpm verify` (typecheck, lint, boundaries, unit, integration, format, build), then all
+- [X] T099 Run `pnpm verify` (typecheck, lint, boundaries, unit, integration, format, build), then all
       ten [quickstart.md](quickstart.md) scenarios against a fresh `docker compose up`, and Scenario 10's
       staging half after deploy. Scenarios 8, 9 and 10 cannot be inferred from a green pipeline.
+      Staging half not run — no staging deploy exists yet; verify separately once `vps-staging` is
+      actually deployed. Verification surfaced and fixed two real defects: the worker's scheduler
+      never ticked (unref'd timers with nothing else keeping the process's event loop alive), and
+      `POST …/tasks` was double-throttled per-IP and per-user, falsely rate-limiting a family member's
+      first request after another member's usage from the same address (see
+      `apps/worker/src/scheduler/scheduler.ts` and `apps/api/src/common/global-rate-limit.guard.ts`).
 
 ---
 

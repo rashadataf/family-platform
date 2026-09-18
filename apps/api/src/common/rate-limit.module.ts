@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { RateLimitGuard } from './rate-limit.guard.js';
+import { GlobalRateLimitGuard } from './global-rate-limit.guard.js';
 
 /**
  * Story-agnostic rate-limiting infrastructure (contracts/identity-api.md's
@@ -16,7 +16,7 @@ import { RateLimitGuard } from './rate-limit.guard.js';
  */
 @Module({
   imports: [ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }])],
-  providers: [{ provide: APP_GUARD, useClass: RateLimitGuard }],
+  providers: [{ provide: APP_GUARD, useClass: GlobalRateLimitGuard }],
   exports: [ThrottlerModule],
 })
 export class RateLimitModule {}

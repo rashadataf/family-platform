@@ -180,8 +180,12 @@ export class SweepScheduler {
       state.timer = null;
       void this.tick(state);
     }, delayMs);
-    // A pending tick must not hold the process open on its own.
-    state.timer.unref();
+    // Deliberately left ref'd: `main.ts` starts no server and no queue
+    // consumer, so a pending tick is the ONLY thing keeping the process
+    // alive. `unref()` here left nothing else to hold the event loop open —
+    // Node exited right after `bootstrap()` returned, before any timer ever
+    // fired (spec 010 quickstart Scenario 10). `stop()` still clears every
+    // timer explicitly, so graceful shutdown is unaffected.
   }
 
   private async tick(state: SweepState): Promise<void> {

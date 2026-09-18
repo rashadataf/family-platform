@@ -24,6 +24,7 @@ import {
   type JsonValue,
 } from '@fp/kernel';
 import { formatLocalDate } from '@fp/kernel/recurrence';
+import { SkipGlobalRateLimit } from '../common/global-rate-limit.guard.js';
 import { hashIdempotentRequest, readIdempotencyKey } from '../common/idempotency.js';
 import { PerUserThrottlerGuard } from '../common/per-user-throttler.guard.js';
 import { CapabilityGuard, RequiresCapability } from '../family/capability.guard.js';
@@ -247,11 +248,21 @@ function toTaskBody(task: tasks.Task, now: Date) {
  * members, and the integration tier (every request from 127.0.0.1) starts
  * failing in ways that look like unrelated flakiness.
  *
+ * `@SkipGlobalRateLimit()` on the class, not just the guard on each route:
+ * `GlobalRateLimitGuard` runs as `APP_GUARD` regardless of what a route's own
+ * `@UseGuards` lists, so `PerUserThrottlerGuard` alone does not stop it —
+ * both would enforce the *same* `@Throttle()` limit, one per user and one per
+ * source IP, and the household-behind-one-NAT failure above happens anyway
+ * (quickstart Scenario 7 caught this: a fresh user's very first request was
+ * rejected because another family member's earlier calls, from the same IP,
+ * had already spent the shared bucket).
+ *
  * Log lines carry identifiers, counts and durations — never a title or notes
  * (Principle VI, SC-011).
  */
 @Controller()
 @UsesProblemNamespace('task')
+@SkipGlobalRateLimit()
 export class TasksController {
   private readonly logger = new Logger(TasksController.name);
 
