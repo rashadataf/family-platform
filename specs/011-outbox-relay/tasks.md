@@ -344,7 +344,7 @@ and confirm the lag measure does not rise under a burst of such events.
 
 ### Implementation for User Story 4
 
-- [ ] T043 [US4] No new production code: T029 already resolves an event type to zero-or-more
+- [X] T043 [US4] No new production code: T029 already resolves an event type to zero-or-more
       destinations and marks the row published either way (data-model.md's lifecycle diagram). Add a
       one-line comment on that branch in `outbox-relay.sweep.ts` citing FR-004/SC-006, and confirm
       T041–T042 pass against the existing implementation (depends on T029).

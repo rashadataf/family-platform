@@ -223,6 +223,7 @@ export async function runOutboxRelaySweep(
       let sent = 0;
 
       for (const [index, event] of claimed.entries()) {
+        // No destinations is not a failure: the row is still marked published below, having sent nothing (FR-004, SC-006).
         const destinations = resolveDestinations(event.eventType);
         const body = serialiseEnvelope(event);
 
