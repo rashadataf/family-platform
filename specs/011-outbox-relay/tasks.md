@@ -109,7 +109,7 @@ deliverable, built on top of what this phase provides.
       exactly, per contracts/relay-interfaces.md §4's atomicity note). `wasProcessed` is a
       `findUnique` on the composite unique key; `markProcessed` is an `upsert` with a no-op `update`,
       so a duplicate call is not an error (depends on T004, T007).
-- [ ] T009 [P] Create `packages/persistence/src/repositories/outbox-relay.repository.ts`:
+- [X] T009 [P] Create `packages/persistence/src/repositories/outbox-relay.repository.ts`:
       `claimUnpublishedOutboxEvents(limit, clock)` — a raw query,
       `SELECT ... FROM outbox_event WHERE published_at IS NULL ORDER BY occurred_at LIMIT $1 FOR
       UPDATE SKIP LOCKED`, run inside a transaction the caller holds open until it also calls
