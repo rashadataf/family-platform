@@ -118,15 +118,55 @@ async function reportLag(clock: Clock): Promise<void> {
   lagAlertRaised = over;
 }
 
+interface QueueDepths {
+  /** `ApproximateNumberOfMessages` on the queue itself: delivered, not yet consumed. */
+  readonly pending: number;
+  /** The same, on its dead-letter queue. */
+  readonly dlq: number;
+}
+
 /**
- * Reads every queue's DLQ depth, logs it (always), and raises
- * `ALERT dead_letter_arrived` on the tick a DLQ first becomes non-empty.
- * A message on a DLQ is one a consumer failed on `maxReceiveCount` times, so
- * it needs a person (FR-013).
+ * Read once per tick, after the sends: the summary line (FR-017) and the
+ * dead-letter alert (FR-014) both need every queue's depths, and asking
+ * ElasticMQ twice for the same number would only let the two disagree.
  */
-async function reportDeadLetters(publisher: MessagePublisherPort): Promise<void> {
+async function readQueueDepths(
+  publisher: MessagePublisherPort,
+): Promise<ReadonlyMap<string, QueueDepths>> {
+  const depths = new Map<string, QueueDepths>();
   for (const queue of QUEUE_TOPOLOGY) {
-    const depth = await publisher.approximateDepth(queue.dlqName);
+    depths.set(queue.name, {
+      pending: await publisher.approximateDepth(queue.name),
+      dlq: await publisher.approximateDepth(queue.dlqName),
+    });
+  }
+  return depths;
+}
+
+/**
+ * FR-017: per configured queue, what this tick delivered to it, what is now
+ * waiting on it, and what sits on its dead-letter queue — one `queue=…` group
+ * each, appended to the tick's `outbox_relay_run` line so a single grep shows
+ * whether every queue is keeping up.
+ */
+function formatQueueCounts(
+  delivered: ReadonlyMap<string, number>,
+  depths: ReadonlyMap<string, QueueDepths>,
+): string {
+  return QUEUE_TOPOLOGY.map(
+    (queue) =>
+      `queue=${queue.name} delivered=${String(delivered.get(queue.name) ?? 0)} pending=${String(depths.get(queue.name)?.pending ?? 0)} dlq=${String(depths.get(queue.name)?.dlq ?? 0)}`,
+  ).join(' ');
+}
+
+/**
+ * Logs every DLQ's depth (always) and raises `ALERT dead_letter_arrived` on the
+ * tick a DLQ first becomes non-empty. A message on a DLQ is one a consumer
+ * failed on `maxReceiveCount` times, so it needs a person (FR-013).
+ */
+function reportDeadLetters(depths: ReadonlyMap<string, QueueDepths>): void {
+  for (const queue of QUEUE_TOPOLOGY) {
+    const depth = depths.get(queue.name)?.dlq ?? 0;
     console.log(`outbox_relay_dlq_depth queue=${queue.dlqName} depth=${String(depth)}`);
 
     const nonEmpty = depth > 0;
@@ -172,6 +212,8 @@ export async function runOutboxRelaySweep(
 ): Promise<OutboxRelaySweepResult> {
   const publisher = defaultPublisher();
   const correlationId = randomUUID();
+  /** Messages this tick put on each queue (FR-017). Counted as they are sent, not as rows finish. */
+  const delivered = new Map<string, number>();
 
   const result = await claimUnpublishedOutboxEvents(
     RELAY_BATCH_SIZE,
@@ -192,6 +234,7 @@ export async function runOutboxRelaySweep(
               deduplicationId: event.id,
             });
             sent += 1;
+            delivered.set(destination.name, (delivered.get(destination.name) ?? 0) + 1);
           }
         } catch (error) {
           failed.push(event.id);
@@ -217,12 +260,14 @@ export async function runOutboxRelaySweep(
     },
   );
 
+  const depths = await readQueueDepths(publisher);
+
   console.log(
-    `outbox_relay_run claimed=${String(result.claimed)} published=${String(result.published)} sent=${String(result.sent)} failed=${String(result.failed.length)} [correlationId=${correlationId}]`,
+    `outbox_relay_run claimed=${String(result.claimed)} published=${String(result.published)} sent=${String(result.sent)} failed=${String(result.failed.length)} ${formatQueueCounts(delivered, depths)} [correlationId=${correlationId}]`,
   );
 
   await reportLag(clock);
-  await reportDeadLetters(publisher);
+  reportDeadLetters(depths);
 
   return result;
 }

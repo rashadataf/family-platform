@@ -310,7 +310,7 @@ no tick to stall).
       same pattern as `OVERDUE_LAG_ALERT_SECONDS` in `report-overdue-tasks.sweep.ts`, and the same
       number, arrived at independently (research.md §9). Always log `outbox_relay_lag_seconds=<n>`
       every tick (depends on T029, T034).
-- [ ] T039 [US3] Extend `outbox-relay.sweep.ts`'s summary line to include, per queue, delivered /
+- [X] T039 [US3] Extend `outbox-relay.sweep.ts`'s summary line to include, per queue, delivered /
       pending / DLQ-depth counts in the comma-joined shape `report-overdue-tasks.sweep.ts` already
       uses (depends on T038).
 - [ ] T040 [US3] Update `docs/staging-environment.md`: add a short section on reading the relay's
