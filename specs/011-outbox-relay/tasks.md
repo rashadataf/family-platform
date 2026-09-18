@@ -218,7 +218,7 @@ published.
 - [X] T027 [P] [US1] Unit test in `apps/worker/src/relay/queue-topology.spec.ts`: `resolveDestinations`
       returns the one configured queue for `relay.VerificationPing.v1`, and an empty array for any
       other event type.
-- [ ] T028 [P] [US1] Integration test using the stub consumer (T022): force a duplicate delivery of
+- [X] T028 [P] [US1] Integration test using the stub consumer (T022): force a duplicate delivery of
       the same message (publish twice with the same `eventId`, or replay via a test hook), and assert
       the handler's own side effect (a counter the stub increments) is recorded exactly once (SC-008,
       FR-011).
