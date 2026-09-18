@@ -56,7 +56,7 @@ feature: once for lag, once for dead-letter arrival).
 
 **Purpose**: the boundary rule and the new dependency, in force before the code they govern exists.
 
-- [ ] T001 [P] Add a `no-direct-sqs-access` rule to `.dependency-cruiser.cjs`, forbidding any module
+- [X] T001 [P] Add a `no-direct-sqs-access` rule to `.dependency-cruiser.cjs`, forbidding any module
       matching `packages/core/**` from importing `packages/platform/src/sqs-message-publisher` or
       `packages/platform/src/sqs-consumer` (or their barrel re-exports). Copy
       `tasks-repositories-are-private`'s shape exactly, citing FR-010 (spec 011) in its comment.
