@@ -294,7 +294,7 @@ no tick to stall).
       a fixed/injectable clock: seed rows old enough to exceed 300 s of lag, run a tick, assert the
       `ALERT outbox_lag_seconds=... threshold=300` line appears; run a second tick with lag now under
       threshold and assert it does not (SC-010, FR-016).
-- [ ] T036 [P] [US3] Test in `apps/worker/src/sweeps/scheduled-sweeps.integration.spec.ts` (extend the
+- [X] T036 [P] [US3] Test in `apps/worker/src/scheduler/scheduled-sweeps.integration.spec.ts` (extend the
       existing suite): confirm `outbox-relay` is present in `SWEEPS`, is scheduled by
       `SweepScheduler`, and that scheduler's existing stall detection applies to it — no new code
       needed, this is a confirmation that FR-025 holds by construction.
