@@ -252,7 +252,7 @@ delivered normally.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T031 [P] [US2] Integration test in `apps/worker/src/relay/dead-letter.integration.spec.ts`:
+- [X] T031 [P] [US2] Integration test in `apps/worker/src/relay/dead-letter.integration.spec.ts`:
       using the stub consumer set to always fail, poll a message to exactly `maxReceiveCount` (5)
       receives and assert it is then present on the DLQ and absent from the source queue (SC-004).
 - [ ] T032 [P] [US2] Integration test, same file: drive a queue's DLQ from empty to non-empty; assert
