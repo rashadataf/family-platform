@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Clock, ProcessedEventPort } from '@fp/kernel';
+import { claimUnpublishedOutboxEvents } from '@fp/persistence';
 import { createSqsClient, SqsConsumer } from '@fp/platform';
 import { seedOutboxEvent, withDatabase, withDatabaseCommitted } from '@fp/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -63,6 +64,38 @@ async function receiveEnvelope(eventId: string, deadline: number): Promise<unkno
   } while (Date.now() < deadline);
 
   return undefined;
+}
+
+/**
+ * How long a claimer waits for the other before giving up on the rendezvous.
+ * Only ever reached if a claimer BLOCKS on the other's row locks — which is
+ * exactly the failure `SKIP LOCKED` exists to prevent — so the test then goes
+ * on to fail on its assertions instead of hanging until the transaction times out.
+ */
+const RENDEZVOUS_TIMEOUT_MS = 5_000;
+
+/**
+ * Returns a function each claimer awaits from inside its claim transaction:
+ * it resolves once BOTH have claimed, so the two transactions are provably
+ * holding their row locks at the same moment.
+ */
+function rendezvousOfTwo(): () => Promise<void> {
+  let arrived = 0;
+  let openGate: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    openGate = resolve;
+  });
+
+  return async () => {
+    arrived += 1;
+    if (arrived === 2) openGate();
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, RENDEZVOUS_TIMEOUT_MS);
+    });
+    await Promise.race([gate, timeout]);
+    clearTimeout(timer);
+  };
 }
 
 async function publishedAtOf(eventId: string): Promise<Date | null> {
@@ -181,5 +214,37 @@ describe('the outbox relay sweep (US1, FR-001–FR-006)', () => {
     expect(await receiveEnvelope(eventId, Date.now() + DELIVERY_BUDGET_MS)).toMatchObject({
       eventId,
     });
+  });
+
+  // T026 / SC-003, FR-023
+  it('never hands the same row to two concurrent claimers', async () => {
+    const seededIds = await withDatabaseCommitted(async (tx) => {
+      const ids: string[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const { id } = await seedOutboxEvent(tx, {
+          eventType: PING,
+          payload: { note: 'T026', i },
+          occurredAt: new Date(Date.now() - (6 - i) * 1_000),
+        });
+        ids.push(id);
+      }
+      return ids;
+    });
+
+    // Both claims run against the same connection pool, and each holds its
+    // transaction — and so its row locks — open until the other has claimed.
+    const rendezvous = rendezvousOfTwo();
+    const claim = () =>
+      claimUnpublishedOutboxEvents(3, async (claimed) => {
+        await rendezvous();
+        return claimed.map((row) => row.id);
+      });
+    const [first, second] = await Promise.all([claim(), claim()]);
+
+    expect(first).toHaveLength(3);
+    expect(second).toHaveLength(3);
+    expect(first.filter((id) => second.includes(id))).toEqual([]);
+    // Skipping a locked row is not the same as skipping a row: nothing is left over.
+    expect([...first, ...second].sort()).toEqual([...seededIds].sort());
   });
 });

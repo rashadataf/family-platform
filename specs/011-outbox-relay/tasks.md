@@ -212,7 +212,7 @@ published.
       failure after `send` succeeds but before the transaction commits, using a test-only hook
       mirroring `OverdueSweepHooks`'s interrupt seam), restart the tick, and assert the row ends up
       published with the event delivered — zero loss across the interruption (SC-002).
-- [ ] T026 [P] [US1] Integration test, same file: seed several rows, run two concurrent
+- [X] T026 [P] [US1] Integration test, same file: seed several rows, run two concurrent
       `claimUnpublishedOutboxEvents` calls against the same connection pool, and assert no row id
       appears in both result sets (SC-003, FR-023).
 - [ ] T027 [P] [US1] Unit test in `apps/worker/src/relay/queue-topology.spec.ts`: `resolveDestinations`
