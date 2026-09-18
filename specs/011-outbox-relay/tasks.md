@@ -225,7 +225,7 @@ published.
 
 ### Implementation for User Story 1
 
-- [ ] T029 [US1] Create `apps/worker/src/relay/outbox-relay.sweep.ts`:
+- [X] T029 [US1] Create `apps/worker/src/relay/outbox-relay.sweep.ts`:
       `runOutboxRelaySweep(clock): Promise<OutboxRelaySweepResult>` — claim a batch via
       `claimUnpublishedOutboxEvents`, resolve each row's destinations via `resolveDestinations`,
       `send` to each (or none — see US4), mark all attempted rows published, log a structured
