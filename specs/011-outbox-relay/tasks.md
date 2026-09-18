@@ -79,7 +79,7 @@ deliverable, built on top of what this phase provides.
 
 ### Kernel ports
 
-- [ ] T003 [P] Create `packages/kernel/src/message-publisher.port.ts`: `MessageToPublish` (`queueName`,
+- [X] T003 [P] Create `packages/kernel/src/message-publisher.port.ts`: `MessageToPublish` (`queueName`,
       `body`, `deduplicationId`) and `MessagePublisherPort` with `send(message)` and
       `approximateDepth(queueName): Promise<number>` (contracts/relay-interfaces.md §1, extended for
       FR-014/FR-017's depth reads).
