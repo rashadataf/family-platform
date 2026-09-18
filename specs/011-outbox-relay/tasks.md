@@ -204,7 +204,7 @@ published.
 
 > Write these first; they must fail (or not compile) before T029 exists.
 
-- [ ] T024 [P] [US1] Integration test in `apps/worker/src/relay/outbox-relay.sweep.integration.spec.ts`:
+- [X] T024 [P] [US1] Integration test in `apps/worker/src/relay/outbox-relay.sweep.integration.spec.ts`:
       seed a row via the outbox repository directly, run one tick, assert a message carrying the
       exact envelope fields (contracts/relay-interfaces.md §3) arrives on
       `outbox-relay-verification` within 5 s, and the row's `published_at` is set (SC-001).
