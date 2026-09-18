@@ -1,10 +1,11 @@
-import type { IdempotencyPort } from '@fp/kernel';
+import type { IdempotencyPort, ProcessedEventPort } from '@fp/kernel';
 import type { calendar, family, identity, tasks } from '@fp/core';
 import { prisma } from './client.js';
 import { PrismaIdentityUnitOfWork } from './repositories/identity/identity-unit-of-work.js';
 import { PrismaSessionRepository } from './repositories/identity/session.repository.js';
 import { PrismaFamilyDirectory } from './repositories/family/family-directory.repository.js';
 import { PrismaIdempotencyRepository } from './repositories/idempotency-key.repository.js';
+import { PrismaProcessedEventRepository } from './repositories/processed-event.repository.js';
 import { eraseForFamily, eraseForMember } from './repositories/family/erasure.js';
 import { PrismaMemberVisibility } from './repositories/family/member-visibility.js';
 import { eraseCalendarForFamily, eraseCalendarForMember } from './repositories/calendar/erasure.js';
@@ -69,6 +70,11 @@ export function createIdempotencyStore(): IdempotencyPort {
   return new PrismaIdempotencyRepository(prisma);
 }
 
+/** ADR-005 Layer 3, FR-011: the one store behind `SqsConsumer`'s idempotency check. */
+export function createProcessedEventStore(): ProcessedEventPort {
+  return new PrismaProcessedEventRepository(prisma);
+}
+
 /**
  * Spec 009: the adapter behind Family's second published port. A new instance
  * per call site is fine — it holds no state, and must not: FR-016 evaluates
@@ -105,3 +111,10 @@ export { eraseTasksForFamily, eraseTasksForMember };
 export function createTasksErasurePort(): tasks.ErasurePort {
   return { eraseForFamily: eraseTasksForFamily, eraseForMember: eraseTasksForMember };
 }
+
+export {
+  claimUnpublishedOutboxEvents,
+  markOutboxEventsPublished,
+  measureOutboxLag,
+  type ClaimedOutboxEvent,
+} from './repositories/outbox-relay.repository.js';

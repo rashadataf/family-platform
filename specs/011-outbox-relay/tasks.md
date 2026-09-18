@@ -116,7 +116,7 @@ deliverable, built on top of what this phase provides.
       `markOutboxEventsPublished`; `markOutboxEventsPublished(ids)`; `measureOutboxLag(now)` (mirrors
       `measureOverdueLag` in `repositories/tasks/overdue-sweep.ts`: `now − min(occurred_at) WHERE
       published_at IS NULL`, zero when nothing is unpublished). No change to `outbox_event`'s schema.
-- [ ] T010 Update `packages/persistence/src/index.ts`: add `createProcessedEventStore(): ProcessedEventPort`
+- [X] T010 Update `packages/persistence/src/index.ts`: add `createProcessedEventStore(): ProcessedEventPort`
       (mirrors `createIdempotencyStore`), and re-export `claimUnpublishedOutboxEvents`,
       `markOutboxEventsPublished`, `measureOutboxLag` with their types (depends on T008, T009).
 
