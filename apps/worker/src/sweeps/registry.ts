@@ -5,6 +5,7 @@ import { runEraseUnverifiedSweep } from './erase-unverified.sweep.js';
 import { runExpireInvitationsSweep } from './expire-invitations.sweep.js';
 import { runGuardianCoverageSweep } from './guardian-coverage.sweep.js';
 import { runMaterialiseOccurrencesSweep } from './materialise-occurrences.sweep.js';
+import { runOutboxRelaySweep } from '../relay/outbox-relay.sweep.js';
 import { runReportOverdueTasksSweep } from './report-overdue-tasks.sweep.js';
 
 /**
@@ -101,6 +102,20 @@ export const SWEEPS: readonly RegisteredSweep[] = [
         `skipped ${String(result.skipped)}`,
         `failed ${String(result.failed.length)}`,
         `lag ${String(result.lagSeconds)}s`,
+      ].join(', ');
+    },
+  },
+  {
+    // ADR-005's polling floor, and what SC-001's five-second delivery is built on.
+    name: 'outbox-relay',
+    defaultCadenceSeconds: 1,
+    async run(clock) {
+      const result = await runOutboxRelaySweep(clock);
+      return [
+        `claimed ${String(result.claimed)}`,
+        `published ${String(result.published)}`,
+        `sent ${String(result.sent)}`,
+        `failed ${String(result.failed.length)}`,
       ].join(', ');
     },
   },

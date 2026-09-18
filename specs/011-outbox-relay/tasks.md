@@ -231,7 +231,7 @@ published.
       `send` to each (or none — see US4), mark all attempted rows published, log a structured
       `outbox_relay_run` summary line following `report-overdue-tasks.sweep.ts`'s exact shape
       (depends on T009, T011, T015; tests T024–T028 exist first).
-- [ ] T030 [US1] Add one entry to `apps/worker/src/sweeps/registry.ts`'s `SWEEPS` list: `name:
+- [X] T030 [US1] Add one entry to `apps/worker/src/sweeps/registry.ts`'s `SWEEPS` list: `name:
       'outbox-relay'`, `defaultCadenceSeconds: 1`, `run: (clock) => runOutboxRelaySweep(clock)`
       (depends on T029).
 
