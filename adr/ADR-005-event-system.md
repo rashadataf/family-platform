@@ -1,8 +1,17 @@
 # ADR-005: Event system — domain events, transactional outbox, SQS
 
-- **Status:** Accepted
+- **Status:** Amended by ADR-018
 - **Date:** 2026-09-08
 - **Deciders:** Principal Engineer
+
+> **Scope of the amendment.** [ADR-018](ADR-018-stage-0-event-transport.md) decides Layer 3's
+> transport at Stage 0, which this ADR left open: the relay publishes to an SQS-compatible emulator,
+> ElasticMQ, until Stage 1 begins, at which point it publishes to real SQS with no code change, only
+> configuration. Everything else here — the three-layer model, the requirement that the outbox write
+> land in the same transaction as the domain change, one queue per logical consumer, idempotent
+> consumers, and adopting EventBridge only at genuine multi-service extraction — **remains in full
+> effect and is unamended**. This ADR is deliberately *not* marked `Superseded`, because SQS is still
+> this project's queue mechanism from Stage 1 onward.
 
 ## Context
 
