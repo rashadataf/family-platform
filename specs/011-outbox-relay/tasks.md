@@ -122,19 +122,19 @@ deliverable, built on top of what this phase provides.
 
 ### Platform adapters
 
-- [ ] T011 [P] Create `packages/platform/src/sqs-message-publisher.ts`: `SqsMessagePublisherOptions`
+- [X] T011 [P] Create `packages/platform/src/sqs-message-publisher.ts`: `SqsMessagePublisherOptions`
       (`endpoint`, `region`), `createSqsClient(options)` (mirrors `createSmtpTransport`), and
       `SqsMessagePublisher implements MessagePublisherPort` — `send` via `SendMessageCommand`,
       `approximateDepth` via `GetQueueAttributesCommand` requesting
       `ApproximateNumberOfMessages` (depends on T002, T003).
-- [ ] T012 [P] Create `packages/platform/src/sqs-consumer.ts`: `ConsumerOutcome`, `ConsumerHandler`,
+- [X] T012 [P] Create `packages/platform/src/sqs-consumer.ts`: `ConsumerOutcome`, `ConsumerHandler`,
       `SqsConsumerOptions`, and `SqsConsumer` with `pollOnce()` — long-polls via
       `ReceiveMessageCommand`, checks `ProcessedEventPort.wasProcessed` per message, calls `handler`
       only on a fresh delivery, calls `markProcessed` on success, acknowledges
       (`DeleteMessageCommand`) only after a successful handle or a detected duplicate; a thrown
       handler leaves the message unacknowledged (contracts/relay-interfaces.md §4) (depends on T002,
       T004).
-- [ ] T013 Update `packages/platform/src/index.ts`: re-export `SqsMessagePublisher`,
+- [X] T013 Update `packages/platform/src/index.ts`: re-export `SqsMessagePublisher`,
       `createSqsClient`, `type SqsMessagePublisherOptions`, `SqsConsumer`, `type ConsumerHandler`,
       `type ConsumerOutcome` (depends on T011, T012).
 
