@@ -3,6 +3,7 @@ import {
   SendMessageCommand,
   GetQueueUrlCommand,
   GetQueueAttributesCommand,
+  ReceiveMessageCommand,
 } from '@aws-sdk/client-sqs';
 import type { MessagePublisherPort, MessageToPublish } from '@fp/kernel';
 
@@ -73,4 +74,35 @@ export class SqsMessagePublisher implements MessagePublisherPort {
     const raw = Attributes?.ApproximateNumberOfMessages;
     return raw === undefined ? 0 : Number(raw);
   }
+}
+
+/**
+ * `relay:peek` (quickstart.md), the manual-verification/debug tool — not
+ * part of `MessagePublisherPort`, which has no reason to read a message back
+ * without consuming it. `VisibilityTimeout: 0` makes the peek genuinely
+ * non-destructive: the message is immediately visible again, to a real
+ * consumer or a second peek alike, rather than sitting invisible for the
+ * queue's normal visibility timeout. Kept in this module, not
+ * `apps/worker`, so `@aws-sdk/client-sqs` stays imported from exactly one
+ * package (ADR-018).
+ */
+export async function peekQueueMessages(
+  client: SQSClient,
+  queueName: string,
+): Promise<readonly string[]> {
+  const { QueueUrl } = await client.send(new GetQueueUrlCommand({ QueueName: queueName }));
+  if (QueueUrl === undefined) {
+    throw new Error(`peekQueueMessages: no queue URL returned for "${queueName}"`);
+  }
+
+  const { Messages } = await client.send(
+    new ReceiveMessageCommand({
+      QueueUrl,
+      MaxNumberOfMessages: 10,
+      VisibilityTimeout: 0,
+      WaitTimeSeconds: 2,
+    }),
+  );
+
+  return (Messages ?? []).map((message) => message.Body ?? '');
 }

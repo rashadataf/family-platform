@@ -170,19 +170,19 @@ deliverable, built on top of what this phase provides.
 
 ### Dev and test tooling
 
-- [ ] T020 [P] Create `apps/worker/src/relay/seed-cli.ts` and add a `relay:seed` script to
+- [X] T020 [P] Create `apps/worker/src/relay/seed-cli.ts` and add a `relay:seed` script to
       `apps/worker/package.json` (`tsx src/relay/seed-cli.ts`): writes one `outbox_event` row
       directly via the existing `OutboxPort`, taking `--event-type` and `--payload` flags. Used only
       by quickstart.md and manual verification — the only place in the codebase that writes an
       outbox row outside a real command handler.
-- [ ] T021 [P] Create `apps/worker/src/relay/peek-cli.ts` and add a `relay:peek` script to
+- [X] T021 [P] Create `apps/worker/src/relay/peek-cli.ts` and add a `relay:peek` script to
       `apps/worker/package.json`: receives (without deleting) and prints whatever is currently on a
       named queue, using `SqsMessagePublisher`'s underlying client directly (depends on T011).
-- [ ] T022 [P] Create `apps/worker/src/test-support/stub-consumer.ts`: a `ConsumerHandler`-shaped
+- [X] T022 [P] Create `apps/worker/src/test-support/stub-consumer.ts`: a `ConsumerHandler`-shaped
       test fixture, configurable to always succeed or to always fail (reading a `forceFailure` flag
       out of the envelope's payload), used only by integration specs — never registered in `main.ts`
       (research.md §11) (depends on T012).
-- [ ] T023 [P] Add `outbox-event` and `processed-event` factories to `packages/testing/src/index.ts`
+- [X] T023 [P] Add `outbox-event` and `processed-event` factories to `packages/testing/src/index.ts`
       (or a new `relay-factories.ts` re-exported from it), following the existing factory
       conventions (depends on T006).
 

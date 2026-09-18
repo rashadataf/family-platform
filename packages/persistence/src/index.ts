@@ -1,4 +1,4 @@
-import type { IdempotencyPort, ProcessedEventPort } from '@fp/kernel';
+import type { IdempotencyPort, OutboxPort, ProcessedEventPort } from '@fp/kernel';
 import type { calendar, family, identity, tasks } from '@fp/core';
 import { prisma } from './client.js';
 import { PrismaIdentityUnitOfWork } from './repositories/identity/identity-unit-of-work.js';
@@ -6,6 +6,7 @@ import { PrismaSessionRepository } from './repositories/identity/session.reposit
 import { PrismaFamilyDirectory } from './repositories/family/family-directory.repository.js';
 import { PrismaIdempotencyRepository } from './repositories/idempotency-key.repository.js';
 import { PrismaProcessedEventRepository } from './repositories/processed-event.repository.js';
+import { PrismaOutboxRepository } from './repositories/outbox.repository.js';
 import { eraseForFamily, eraseForMember } from './repositories/family/erasure.js';
 import { PrismaMemberVisibility } from './repositories/family/member-visibility.js';
 import { eraseCalendarForFamily, eraseCalendarForMember } from './repositories/calendar/erasure.js';
@@ -73,6 +74,19 @@ export function createIdempotencyStore(): IdempotencyPort {
 /** ADR-005 Layer 3, FR-011: the one store behind `SqsConsumer`'s idempotency check. */
 export function createProcessedEventStore(): ProcessedEventPort {
   return new PrismaProcessedEventRepository(prisma);
+}
+
+/**
+ * A standalone `OutboxPort`, outside any context's own unit of work. Every
+ * real command handler appends through its own context's unit of work
+ * instead, in the same transaction as its domain write (Layer 2, unchanged
+ * by this feature) — this factory exists only for `relay:seed`
+ * (`apps/worker/src/relay/seed-cli.ts`), the one place in the codebase that
+ * writes an outbox row outside a real command handler (research.md §11-
+ * adjacent: a test/quickstart fixture, not shipped business logic).
+ */
+export function createOutboxAppender(): OutboxPort {
+  return new PrismaOutboxRepository(prisma);
 }
 
 /**

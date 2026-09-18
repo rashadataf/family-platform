@@ -5,6 +5,7 @@ export { SmtpMailer, createSmtpTransport, type SmtpMailerOptions } from './smtp-
 export {
   SqsMessagePublisher,
   createSqsClient,
+  peekQueueMessages,
   type SqsMessagePublisherOptions,
 } from './sqs-message-publisher.js';
 export {

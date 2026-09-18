@@ -11,6 +11,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "sweep:retention": "tsx src/sweep-retention.ts",
+    "relay:seed": "tsx src/relay/seed-cli.ts",
+    "relay:peek": "tsx src/relay/peek-cli.ts",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json"
   },
