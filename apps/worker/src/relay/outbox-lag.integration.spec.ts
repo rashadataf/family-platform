@@ -50,8 +50,9 @@ async function clearUnpublishedBacklog(): Promise<void> {
 /**
  * FR-016, SC-010, User Story 3. Lag is what a tick could NOT fix — a tick marks
  * everything it claims — so the only way to observe it is a backlog bigger than
- * one batch: `RELAY_BATCH_SIZE + 1` old rows leave one behind after the first
- * tick and none after the second.
+ * one batch. `2 × RELAY_BATCH_SIZE + 1` old rows take three ticks to clear and
+ * leave the oldest unpublished row over the threshold after the first two:
+ * alert, no repeat, then cleared.
  */
 describe('the outbox relay sweep reports how far behind it is (US3, FR-016, SC-010)', () => {
   beforeAll(() => {
@@ -64,10 +65,10 @@ describe('the outbox relay sweep reports how far behind it is (US3, FR-016, SC-0
   beforeEach(clearUnpublishedBacklog);
 
   // T035 / SC-010, FR-016
-  it('alerts when the oldest unpublished row is over 300 s old, and not once the backlog is cleared', async () => {
+  it('alerts once when the oldest unpublished row is over 300 s old, and not again until it recovers', async () => {
     const occurredAt = new Date(NOW.getTime() - ROW_AGE_SECONDS * 1_000);
     await withDatabaseCommitted(async (tx) => {
-      for (let i = 0; i <= RELAY_BATCH_SIZE; i += 1) {
+      for (let i = 0; i < 2 * RELAY_BATCH_SIZE + 1; i += 1) {
         await seedOutboxEvent(tx, {
           eventType: UNSUBSCRIBED,
           aggregateId: randomUUID(),
@@ -76,19 +77,27 @@ describe('the outbox relay sweep reports how far behind it is (US3, FR-016, SC-0
       }
     });
 
-    // One batch leaves one row behind, and that row is as old as the rest.
-    const behind = await captureLogs(() => runOutboxRelaySweep(fixedClock));
-    expect(await unpublishedCount()).toBe(1);
-    expect(alertLines(behind)).toHaveLength(1);
-    expect(alertLines(behind)[0]).toContain(
+    // First tick: a batch is cleared, the rest are as old as ever. The alert fires.
+    const crossing = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    expect(await unpublishedCount()).toBe(RELAY_BATCH_SIZE + 1);
+    expect(alertLines(crossing)).toHaveLength(1);
+    expect(alertLines(crossing)[0]).toContain(
       `ALERT outbox_lag_seconds=${String(ROW_AGE_SECONDS)} threshold=${String(LAG_ALERT_SECONDS)}`,
     );
     // The lag is reported on every tick, alert or not.
-    expect(lagLines(behind).map((line) => line.trim())).toEqual([
+    expect(lagLines(crossing).map((line) => line.trim())).toEqual([
       `outbox_relay_lag_seconds=${String(ROW_AGE_SECONDS)}`,
     ]);
 
-    // The next tick claims the last row: nothing outstanding, so nothing to alert on.
+    // Second tick: still over the threshold, and still reported — but already alerted.
+    const stillBehind = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    expect(await unpublishedCount()).toBe(1);
+    expect(alertLines(stillBehind)).toEqual([]);
+    expect(lagLines(stillBehind).map((line) => line.trim())).toEqual([
+      `outbox_relay_lag_seconds=${String(ROW_AGE_SECONDS)}`,
+    ]);
+
+    // Third tick claims the last row: nothing outstanding, so nothing to alert on.
     const caughtUp = await captureLogs(() => runOutboxRelaySweep(fixedClock));
     expect(await unpublishedCount()).toBe(0);
     expect(alertLines(caughtUp)).toEqual([]);

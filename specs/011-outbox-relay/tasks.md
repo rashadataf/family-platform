@@ -304,7 +304,7 @@ no tick to stall).
 
 ### Implementation for User Story 3
 
-- [ ] T038 [US3] Extend `outbox-relay.sweep.ts`: call `measureOutboxLag` after the mark step; hold a
+- [X] T038 [US3] Extend `outbox-relay.sweep.ts`: call `measureOutboxLag` after the mark step; hold a
       second module-level edge-triggered flag (independent of T034's DLQ flag) and log
       `ALERT outbox_lag_seconds=<n> threshold=300` only on the crossing, clearing on recovery — the
       same pattern as `OVERDUE_LAG_ALERT_SECONDS` in `report-overdue-tasks.sweep.ts`, and the same

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Clock, MessagePublisherPort } from '@fp/kernel';
-import { claimUnpublishedOutboxEvents, type ClaimedOutboxEvent } from '@fp/persistence';
+import {
+  claimUnpublishedOutboxEvents,
+  measureOutboxLag,
+  type ClaimedOutboxEvent,
+} from '@fp/persistence';
 import { createSqsClient, SqsMessagePublisher } from '@fp/platform';
 import { QUEUE_TOPOLOGY, resolveDestinations } from './queue-topology.js';
 
@@ -11,6 +15,13 @@ import { QUEUE_TOPOLOGY, resolveDestinations } from './queue-topology.js';
  * keeps a backlog moving.
  */
 export const RELAY_BATCH_SIZE = 100;
+
+/**
+ * SC-010 (clarified): the age of the oldest unpublished row that raises the
+ * alert. The same five minutes `OVERDUE_LAG_ALERT_SECONDS` (spec 010) chose for
+ * its own lag, arrived at independently for a different measure (research.md §9).
+ */
+export const OUTBOX_LAG_ALERT_SECONDS = 300;
 
 export interface OutboxRelaySweepResult {
   /** Rows this tick locked. */
@@ -79,6 +90,35 @@ function defaultPublisher(): MessagePublisherPort {
 const dlqNonEmptyLastTick = new Map<string, boolean>();
 
 /**
+ * FR-016: whether the previous tick was already over the lag threshold, so the
+ * alert fires on the crossing rather than every second it stays crossed, and
+ * fires again after a recovery. Independent of `dlqNonEmptyLastTick`: a stuck
+ * relay and a poisoned queue are different problems with different remedies.
+ */
+let lagAlertRaised = false;
+
+/**
+ * Logs how far behind the relay is (always) and raises `ALERT
+ * outbox_lag_seconds` on the tick it first exceeds the threshold.
+ *
+ * Measured after the tick's own claim has committed, so it is what the tick
+ * could NOT fix — rows a send failed on, or a backlog beyond one batch —
+ * not what it was about to (`measureOutboxLag`).
+ */
+async function reportLag(clock: Clock): Promise<void> {
+  const lagSeconds = await measureOutboxLag(clock.now());
+  console.log(`outbox_relay_lag_seconds=${String(lagSeconds)}`);
+
+  const over = lagSeconds > OUTBOX_LAG_ALERT_SECONDS;
+  if (over && !lagAlertRaised) {
+    console.warn(
+      `ALERT outbox_lag_seconds=${String(lagSeconds)} threshold=${String(OUTBOX_LAG_ALERT_SECONDS)}`,
+    );
+  }
+  lagAlertRaised = over;
+}
+
+/**
  * Reads every queue's DLQ depth, logs it (always), and raises
  * `ALERT dead_letter_arrived` on the tick a DLQ first becomes non-empty.
  * A message on a DLQ is one a consumer failed on `maxReceiveCount` times, so
@@ -127,7 +167,7 @@ function serialiseEnvelope(event: ClaimedOutboxEvent): string {
  * (Principle VI, SC-011).
  */
 export async function runOutboxRelaySweep(
-  _clock: Clock,
+  clock: Clock,
   hooks: OutboxRelaySweepHooks = {},
 ): Promise<OutboxRelaySweepResult> {
   const publisher = defaultPublisher();
@@ -181,6 +221,7 @@ export async function runOutboxRelaySweep(
     `outbox_relay_run claimed=${String(result.claimed)} published=${String(result.published)} sent=${String(result.sent)} failed=${String(result.failed.length)} [correlationId=${correlationId}]`,
   );
 
+  await reportLag(clock);
   await reportDeadLetters(publisher);
 
   return result;
