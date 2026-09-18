@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { Clock, ProcessedEventPort } from '@fp/kernel';
 import { claimUnpublishedOutboxEvents } from '@fp/persistence';
-import { createSqsClient, SqsConsumer } from '@fp/platform';
+import { createSqsClient, SqsConsumer, SqsMessagePublisher } from '@fp/platform';
 import { seedOutboxEvent, withDatabase, withDatabaseCommitted } from '@fp/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { captureLogs } from '../test-support/capture-logs.js';
 import { runOutboxRelaySweep } from './outbox-relay.sweep.js';
+import { QUEUE_TOPOLOGY } from './queue-topology.js';
 
 const QUEUE = 'outbox-relay-verification';
 const PING = 'relay.VerificationPing.v1';
@@ -246,5 +248,61 @@ describe('the outbox relay sweep (US1, FR-001–FR-006)', () => {
     expect(first.filter((id) => second.includes(id))).toEqual([]);
     // Skipping a locked row is not the same as skipping a row: nothing is left over.
     expect([...first, ...second].sort()).toEqual([...seededIds].sort());
+  });
+});
+
+/**
+ * FR-017, User Story 3: what an operator reads to tell whether a queue is
+ * keeping up — per configured queue, how many messages this tick delivered,
+ * how many are waiting on it, and how many sit on its dead-letter queue.
+ */
+describe('the outbox relay sweep reports per-queue counts (US3, FR-017)', () => {
+  beforeAll(() => {
+    process.env.RELAY_QUEUE_ENDPOINT = ENDPOINT;
+    process.env.RELAY_QUEUE_REGION = REGION;
+    process.env.AWS_ACCESS_KEY_ID ??= 'elasticmq-placeholder';
+    process.env.AWS_SECRET_ACCESS_KEY ??= 'elasticmq-placeholder';
+  });
+
+  beforeEach(clearUnpublishedBacklog);
+
+  // T037 / FR-017
+  it('reports, for each configured queue, a delivered count, a pending count and a DLQ depth', async () => {
+    const verification = QUEUE_TOPOLOGY.find((queue) => queue.name === QUEUE);
+    expect(verification, `${QUEUE} is in QUEUE_TOPOLOGY`).toBeDefined();
+    if (verification === undefined) return;
+
+    const depths = new SqsMessagePublisher(client);
+    const seeded = 2;
+    await withDatabaseCommitted(async (tx) => {
+      for (let i = 0; i < seeded; i += 1) {
+        await seedOutboxEvent(tx, { eventType: PING, payload: { note: 'T037', i } });
+      }
+    });
+
+    const lines = await captureLogs(() => runOutboxRelaySweep(realClock));
+    const summaries = lines.filter((line) => line.startsWith('outbox_relay_run'));
+    expect(summaries, 'one summary line per tick').toHaveLength(1);
+    const summary = summaries[0] ?? '';
+
+    // One group per configured queue, and every queue in the topology has one.
+    for (const queue of QUEUE_TOPOLOGY) {
+      expect(summary).toMatch(
+        new RegExp(`queue=${queue.name} delivered=\\d+ pending=\\d+ dlq=\\d+`),
+      );
+    }
+
+    const match = new RegExp(
+      `queue=${QUEUE} delivered=(\\d+) pending=(\\d+) dlq=(\\d+)`,
+    ).exec(summary);
+    const [delivered, pending, dlq] = [1, 2, 3].map((group) => Number(match?.[group]));
+
+    // Delivered: what this tick put on the queue — the two rows it just claimed.
+    expect(delivered).toBe(seeded);
+    // Pending: those two are visible on the queue right now, along with any
+    // leftovers another spec parked there, so "at least".
+    expect(pending).toBeGreaterThanOrEqual(seeded);
+    // DLQ depth: the DLQ's own depth, whatever it holds.
+    expect(dlq).toBe(await depths.approximateDepth(verification.dlqName));
   });
 });

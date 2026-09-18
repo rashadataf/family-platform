@@ -298,7 +298,7 @@ no tick to stall).
       existing suite): confirm `outbox-relay` is present in `SWEEPS`, is scheduled by
       `SweepScheduler`, and that scheduler's existing stall detection applies to it — no new code
       needed, this is a confirmation that FR-025 holds by construction.
-- [ ] T037 [P] [US3] Integration test, `outbox-relay.sweep.integration.spec.ts`: assert each tick's
+- [X] T037 [P] [US3] Integration test, `outbox-relay.sweep.integration.spec.ts`: assert each tick's
       summary line reports, per configured queue, a delivered count, a pending count, and a DLQ depth
       (FR-017).
 
