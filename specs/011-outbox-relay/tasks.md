@@ -97,7 +97,7 @@ deliverable, built on top of what this phase provides.
       `now()`), `@@unique([queueName, eventId])`, `@@map("processed_event")`. **Not** placed under
       `ENABLE`/`FORCE ROW LEVEL SECURITY` — it is not family-scoped, mirroring `IdempotencyKey`'s
       existing exception.
-- [ ] T007 Generate `packages/persistence/prisma/migrations/<timestamp>_processed_event/migration.sql`
+- [X] T007 Generate `packages/persistence/prisma/migrations/<timestamp>_processed_event/migration.sql`
       and apply it locally. Confirm in the generated SQL that no RLS policy or `FORCE ROW LEVEL
       SECURITY` clause was added for `processed_event` (depends on T006).
 
