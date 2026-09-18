@@ -255,7 +255,7 @@ delivered normally.
 - [X] T031 [P] [US2] Integration test in `apps/worker/src/relay/dead-letter.integration.spec.ts`:
       using the stub consumer set to always fail, poll a message to exactly `maxReceiveCount` (5)
       receives and assert it is then present on the DLQ and absent from the source queue (SC-004).
-- [ ] T032 [P] [US2] Integration test, same file: drive a queue's DLQ from empty to non-empty; assert
+- [X] T032 [P] [US2] Integration test, same file: drive a queue's DLQ from empty to non-empty; assert
       exactly one `ALERT dead_letter_arrived queue=...` log line on that transition, none on a
       subsequent tick while it remains non-empty, and the depth is logged every tick regardless
       (FR-014).

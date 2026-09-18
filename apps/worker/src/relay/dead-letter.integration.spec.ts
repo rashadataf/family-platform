@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { ProcessedEventPort } from '@fp/kernel';
+import type { Clock, ProcessedEventPort } from '@fp/kernel';
 import { createSqsClient, peekQueueMessages, SqsConsumer, SqsMessagePublisher } from '@fp/platform';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createStubConsumer, type StubConsumerCounters } from '../test-support/stub-consumer.js';
+import { runOutboxRelaySweep } from './outbox-relay.sweep.js';
 import { QUEUE_TOPOLOGY } from './queue-topology.js';
 
 const PING = 'relay.VerificationPing.v1';
@@ -19,6 +20,8 @@ const REGION = process.env.RELAY_QUEUE_REGION ?? 'elasticmq';
 
 /** How long to keep polling for the redrive before the test gives up and asserts on what it has. */
 const REDRIVE_BUDGET_MS = 20_000;
+
+const realClock: Clock = { now: () => new Date() };
 
 const client = createSqsClient({ endpoint: ENDPOINT, region: REGION });
 const publisher = new SqsMessagePublisher(client);
@@ -123,6 +126,61 @@ async function removeFromDlq(eventId: string): Promise<void> {
 }
 
 /**
+ * Empties the DLQ, so a test that starts from "nothing has been dead-lettered"
+ * does not depend on what an earlier run or a manual quickstart scenario left
+ * there. Every message on this queue is a test fixture: `outbox-relay-verification`
+ * has no real producer.
+ */
+async function emptyDlq(): Promise<void> {
+  const consumer = new SqsConsumer(
+    { queueName: DLQ, handler: () => Promise.resolve('processed') },
+    countingProcessedEvents(new Map()),
+    impatientClient,
+  );
+
+  const deadline = Date.now() + REDRIVE_BUDGET_MS;
+  while ((await publisher.approximateDepth(DLQ)) > 0 && Date.now() < deadline) {
+    await consumer.pollOnce();
+  }
+}
+
+/**
+ * Every line the sweep writes during one tick, whichever stream it uses: the
+ * alert's severity, and so its stream, is the implementation's to choose; the
+ * text of the line is what FR-014 fixes.
+ */
+async function logsOfOneTick(): Promise<readonly string[]> {
+  const lines: string[] = [];
+  const originals = { log: console.log, warn: console.warn, error: console.error };
+  const capture = (...args: unknown[]) => {
+    lines.push(args.map((arg) => String(arg)).join(' '));
+  };
+  console.log = capture;
+  console.warn = capture;
+  console.error = capture;
+  try {
+    await runOutboxRelaySweep(realClock);
+  } finally {
+    console.log = originals.log;
+    console.warn = originals.warn;
+    console.error = originals.error;
+  }
+  return lines;
+}
+
+/** The depth the tick reported for this test's DLQ, one entry per `outbox_relay_dlq_depth` line. */
+function reportedDlqDepths(lines: readonly string[]): number[] {
+  return lines.flatMap((line) => {
+    const match = /outbox_relay_dlq_depth queue=(\S+) depth=(\d+)/.exec(line);
+    return match?.[1] === DLQ ? [Number(match[2])] : [];
+  });
+}
+
+function deadLetterAlerts(lines: readonly string[]): string[] {
+  return lines.filter((line) => line.includes(`ALERT dead_letter_arrived queue=${DLQ}`));
+}
+
+/**
  * FR-013, User Story 2, SC-004. A message a consumer cannot process must be
  * retried a bounded number of times and then quarantined — not lost, and not
  * retried forever. Only a real queue with its committed redrive policy can show
@@ -130,6 +188,9 @@ async function removeFromDlq(eventId: string): Promise<void> {
  */
 describe('a message no consumer can process is dead-lettered (US2, FR-013, SC-004)', () => {
   beforeAll(() => {
+    // Read by the sweep when it builds its publisher (T032).
+    process.env.RELAY_QUEUE_ENDPOINT = ENDPOINT;
+    process.env.RELAY_QUEUE_REGION = REGION;
     process.env.AWS_ACCESS_KEY_ID ??= 'elasticmq-placeholder';
     process.env.AWS_SECRET_ACCESS_KEY ??= 'elasticmq-placeholder';
   });
@@ -183,6 +244,44 @@ describe('a message no consumer can process is dead-lettered (US2, FR-013, SC-00
       expect(stillOnSource.some((body) => body.includes(eventId))).toBe(false);
     } finally {
       await removeFromDlq(eventId);
+    }
+  });
+
+  // T032 / FR-014
+  it('alerts once when the DLQ first becomes non-empty, and reports its depth on every tick', async () => {
+    await emptyDlq();
+    expect(await publisher.approximateDepth(DLQ), 'the DLQ starts empty').toBe(0);
+
+    // The sweep can only ever see a DLQ's depth, so the fixture is a message put
+    // on it directly; how a message gets there is T031's subject, not this one's.
+    // The sweep's "was non-empty last tick" state lives in its module, and this
+    // is the only test in this file's module instance that runs a tick.
+    const eventId = randomUUID();
+    let sent = false;
+    try {
+      const whileEmpty = await logsOfOneTick();
+      expect(reportedDlqDepths(whileEmpty)).toEqual([0]);
+      expect(deadLetterAlerts(whileEmpty)).toEqual([]);
+
+      await publisher.send({
+        queueName: DLQ,
+        body: envelopeFor(eventId, { note: 'T032' }),
+        deduplicationId: eventId,
+      });
+      sent = true;
+
+      // The transition: empty on the last tick, non-empty on this one.
+      const onArrival = await logsOfOneTick();
+      expect(reportedDlqDepths(onArrival)).toEqual([1]);
+      expect(deadLetterAlerts(onArrival)).toHaveLength(1);
+      expect(deadLetterAlerts(onArrival)[0]).toContain('depth=1');
+
+      // Still non-empty: the depth is reported again, the alert is not repeated.
+      const whileStillNonEmpty = await logsOfOneTick();
+      expect(reportedDlqDepths(whileStillNonEmpty)).toEqual([1]);
+      expect(deadLetterAlerts(whileStillNonEmpty)).toEqual([]);
+    } finally {
+      if (sent) await removeFromDlq(eventId);
     }
   });
 });
