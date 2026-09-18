@@ -259,7 +259,7 @@ delivered normally.
       exactly one `ALERT dead_letter_arrived queue=...` log line on that transition, none on a
       subsequent tick while it remains non-empty, and the depth is logged every tick regardless
       (FR-014).
-- [ ] T033 [P] [US2] Integration test, same file: publish one message the stub always fails and one it
+- [X] T033 [P] [US2] Integration test, same file: publish one message the stub always fails and one it
       always succeeds on, to the same queue; assert the healthy message is still delivered while the
       poison one is being retried (User Story 2, acceptance scenario 4).
 

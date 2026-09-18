@@ -66,6 +66,14 @@ async function publishPoison(eventId: string): Promise<void> {
   });
 }
 
+async function publishHealthy(eventId: string): Promise<void> {
+  await publisher.send({
+    queueName: QUEUE,
+    body: envelopeFor(eventId, { note: 'T033' }),
+    deduplicationId: eventId,
+  });
+}
+
 /**
  * An in-memory ledger that also counts deliveries: `wasProcessed` runs exactly
  * once per message `SqsConsumer` receives, so its calls are the number of times
@@ -97,18 +105,19 @@ async function dlqHolds(eventId: string): Promise<boolean> {
 }
 
 /**
- * Leaves the DLQ as this test found it. ElasticMQ is shared and persistent, and
- * a message parked on the DLQ would otherwise outlive the run and make every
- * later "DLQ is empty" assertion depend on whether someone cleaned up.
+ * Leaves a queue as this test found it. ElasticMQ is shared and persistent, and
+ * a message left on the DLQ (or still cycling on the source queue) would
+ * outlive the run and make every later "the DLQ is empty" assertion depend on
+ * whether someone cleaned up.
  *
  * A consumer is the only way to delete a message through `@fp/platform`'s
  * exports: one that handles this event's id (and so acknowledges it) and fails
  * on everything else, leaving that untouched and immediately visible again.
  */
-async function removeFromDlq(eventId: string): Promise<void> {
+async function removeFromQueue(queueName: string, eventId: string): Promise<void> {
   const consumer = new SqsConsumer(
     {
-      queueName: DLQ,
+      queueName,
       handler: (envelope) =>
         eventIdOf(envelope) === eventId
           ? Promise.resolve('processed')
@@ -243,7 +252,7 @@ describe('a message no consumer can process is dead-lettered (US2, FR-013, SC-00
       const stillOnSource = await peekQueueMessages(client, QUEUE);
       expect(stillOnSource.some((body) => body.includes(eventId))).toBe(false);
     } finally {
-      await removeFromDlq(eventId);
+      await removeFromQueue(DLQ, eventId);
     }
   });
 
@@ -281,7 +290,56 @@ describe('a message no consumer can process is dead-lettered (US2, FR-013, SC-00
       expect(reportedDlqDepths(whileStillNonEmpty)).toEqual([1]);
       expect(deadLetterAlerts(whileStillNonEmpty)).toEqual([]);
     } finally {
-      if (sent) await removeFromDlq(eventId);
+      if (sent) await removeFromQueue(DLQ, eventId);
+    }
+  });
+
+  // T033 / User Story 2, acceptance scenario 4
+  it('still delivers a healthy message while a poison one on the same queue is being retried', async () => {
+    const poisonId = randomUUID();
+    const healthyId = randomUUID();
+    // Poison first, so the queue holds it ahead of the healthy message.
+    await publishPoison(poisonId);
+    await publishHealthy(healthyId);
+
+    const counters: StubConsumerCounters = { successes: 0, failures: 0 };
+    const stub = createStubConsumer(counters);
+    const deliveries = new Map<string, number>();
+    const ours = new Set<string>([poisonId, healthyId]);
+    const consumer = new SqsConsumer(
+      {
+        queueName: QUEUE,
+        // The stub only ever sees this test's two messages; see T031 for why.
+        handler: (envelope) =>
+          ours.has(eventIdOf(envelope))
+            ? stub(envelope)
+            : Promise.resolve('processed'),
+      },
+      countingProcessedEvents(deliveries),
+      impatientClient,
+    );
+
+    try {
+      // Until the healthy message has arrived AND the poison one has been handed
+      // out again after failing — the state "healthy delivered while poison retries".
+      const deadline = Date.now() + REDRIVE_BUDGET_MS;
+      do {
+        await consumer.pollOnce();
+      } while (
+        ((deliveries.get(healthyId) ?? 0) < 1 || (deliveries.get(poisonId) ?? 0) < 2) &&
+        Date.now() < deadline
+      );
+
+      expect(deliveries.get(healthyId)).toBe(1);
+      expect(counters.successes, 'the healthy message was handled').toBe(1);
+
+      // The poison message really was retried, and is still short of the limit —
+      // so it was the healthy one that got through *during* its retries.
+      expect(deliveries.get(poisonId)).toBeGreaterThanOrEqual(2);
+      expect(deliveries.get(poisonId)).toBeLessThan(MAX_RECEIVE_COUNT);
+      expect(counters.failures).toBe(deliveries.get(poisonId));
+    } finally {
+      await removeFromQueue(QUEUE, poisonId);
     }
   });
 });
