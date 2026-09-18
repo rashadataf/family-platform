@@ -290,7 +290,7 @@ no tick to stall).
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T035 [P] [US3] Integration test in `apps/worker/src/relay/outbox-lag.integration.spec.ts`, with
+- [X] T035 [P] [US3] Integration test in `apps/worker/src/relay/outbox-lag.integration.spec.ts`, with
       a fixed/injectable clock: seed rows old enough to exceed 300 s of lag, run a tick, assert the
       `ALERT outbox_lag_seconds=... threshold=300` line appears; run a second tick with lag now under
       threshold and assert it does not (SC-010, FR-016).

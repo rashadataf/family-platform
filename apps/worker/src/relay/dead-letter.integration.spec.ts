@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Clock, ProcessedEventPort } from '@fp/kernel';
 import { createSqsClient, peekQueueMessages, SqsConsumer, SqsMessagePublisher } from '@fp/platform';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { captureLogs } from '../test-support/capture-logs.js';
 import { createStubConsumer, type StubConsumerCounters } from '../test-support/stub-consumer.js';
 import { runOutboxRelaySweep } from './outbox-relay.sweep.js';
 import { QUEUE_TOPOLOGY } from './queue-topology.js';
@@ -153,28 +154,8 @@ async function emptyDlq(): Promise<void> {
   }
 }
 
-/**
- * Every line the sweep writes during one tick, whichever stream it uses: the
- * alert's severity, and so its stream, is the implementation's to choose; the
- * text of the line is what FR-014 fixes.
- */
 async function logsOfOneTick(): Promise<readonly string[]> {
-  const lines: string[] = [];
-  const originals = { log: console.log, warn: console.warn, error: console.error };
-  const capture = (...args: unknown[]) => {
-    lines.push(args.map((arg) => String(arg)).join(' '));
-  };
-  console.log = capture;
-  console.warn = capture;
-  console.error = capture;
-  try {
-    await runOutboxRelaySweep(realClock);
-  } finally {
-    console.log = originals.log;
-    console.warn = originals.warn;
-    console.error = originals.error;
-  }
-  return lines;
+  return captureLogs(() => runOutboxRelaySweep(realClock));
 }
 
 /** The depth the tick reported for this test's DLQ, one entry per `outbox_relay_dlq_depth` line. */
