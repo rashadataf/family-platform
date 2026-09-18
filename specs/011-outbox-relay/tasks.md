@@ -86,7 +86,7 @@ deliverable, built on top of what this phase provides.
 - [X] T004 [P] Create `packages/kernel/src/processed-event.port.ts`: `ProcessedEventPort` with
       `wasProcessed(queueName, eventId): Promise<boolean>` and
       `markProcessed(queueName, eventId): Promise<void>` (contracts/relay-interfaces.md §2).
-- [ ] T005 Update `packages/kernel/src/index.ts`: re-export `MessagePublisherPort`, `MessageToPublish`,
+- [X] T005 Update `packages/kernel/src/index.ts`: re-export `MessagePublisherPort`, `MessageToPublish`,
       `ProcessedEventPort`, alongside the existing `OutboxPort`/`IdempotencyPort` exports (depends on
       T003, T004).
 
