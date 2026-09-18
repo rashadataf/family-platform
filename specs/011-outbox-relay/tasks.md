@@ -208,7 +208,7 @@ published.
       seed a row via the outbox repository directly, run one tick, assert a message carrying the
       exact envelope fields (contracts/relay-interfaces.md §3) arrives on
       `outbox-relay-verification` within 5 s, and the row's `published_at` is set (SC-001).
-- [ ] T025 [P] [US1] Integration test, same file: simulate a crash between claim and mark (inject a
+- [X] T025 [P] [US1] Integration test, same file: simulate a crash between claim and mark (inject a
       failure after `send` succeeds but before the transaction commits, using a test-only hook
       mirroring `OverdueSweepHooks`'s interrupt seam), restart the tick, and assert the row ends up
       published with the event delivered — zero loss across the interruption (SC-002).

@@ -65,6 +65,13 @@ async function receiveEnvelope(eventId: string, deadline: number): Promise<unkno
   return undefined;
 }
 
+async function publishedAtOf(eventId: string): Promise<Date | null> {
+  const row = await withDatabase((tx) =>
+    tx.outboxEvent.findUniqueOrThrow({ where: { id: eventId } }),
+  );
+  return row.publishedAt;
+}
+
 /**
  * `claimUnpublishedOutboxEvents` takes a batch of the OLDEST unpublished rows,
  * cross-suite: other specs commit outbox rows and never publish them. Clearing
@@ -136,5 +143,43 @@ describe('the outbox relay sweep (US1, FR-001–FR-006)', () => {
       tx.outboxEvent.findUniqueOrThrow({ where: { id: eventId } }),
     );
     expect(row.publishedAt).not.toBeNull();
+  });
+
+  // T025 / SC-002, FR-006, FR-022
+  it('loses nothing when a tick is interrupted after the send and before the commit', async () => {
+    const { id: eventId } = await withDatabaseCommitted((tx) =>
+      seedOutboxEvent(tx, { eventType: PING, payload: { note: 'T025' } }),
+    );
+
+    // The crash: `send` has succeeded, the claim transaction has not committed.
+    // `afterSend` is the sweep's interrupt seam (mirroring `OverdueSweepHooks`);
+    // an exception escaping the tick is the closest a test gets to the process
+    // simply not coming back.
+    const sentBeforeCrash: string[] = [];
+    await expect(
+      runOutboxRelaySweep(realClock, {
+        afterSend(sentEventId: string) {
+          sentBeforeCrash.push(sentEventId);
+          throw new Error('simulated crash between send and commit');
+        },
+      }),
+    ).rejects.toThrow('simulated crash');
+    expect(sentBeforeCrash).toEqual([eventId]);
+
+    // The claim rolled back, so the row is still eligible for a later tick...
+    expect(await publishedAtOf(eventId)).toBeNull();
+    // ...and the send was real: the message is already on the queue.
+    expect(await receiveEnvelope(eventId, Date.now() + DELIVERY_BUDGET_MS)).toMatchObject({
+      eventId,
+    });
+
+    // "Restart": the next tick reclaims the row and finishes the job. It sends
+    // again — a duplicate is the documented cost of at-least-once delivery
+    // (quickstart.md Scenario 2), and SC-002 is about loss, not duplication.
+    await runOutboxRelaySweep(realClock);
+    expect(await publishedAtOf(eventId)).not.toBeNull();
+    expect(await receiveEnvelope(eventId, Date.now() + DELIVERY_BUDGET_MS)).toMatchObject({
+      eventId,
+    });
   });
 });
