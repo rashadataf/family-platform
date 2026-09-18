@@ -215,7 +215,7 @@ published.
 - [X] T026 [P] [US1] Integration test, same file: seed several rows, run two concurrent
       `claimUnpublishedOutboxEvents` calls against the same connection pool, and assert no row id
       appears in both result sets (SC-003, FR-023).
-- [ ] T027 [P] [US1] Unit test in `apps/worker/src/relay/queue-topology.spec.ts`: `resolveDestinations`
+- [X] T027 [P] [US1] Unit test in `apps/worker/src/relay/queue-topology.spec.ts`: `resolveDestinations`
       returns the one configured queue for `relay.VerificationPing.v1`, and an empty array for any
       other event type.
 - [ ] T028 [P] [US1] Integration test using the stub consumer (T022): force a duplicate delivery of
