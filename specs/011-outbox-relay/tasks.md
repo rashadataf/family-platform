@@ -60,7 +60,7 @@ feature: once for lag, once for dead-letter arrival).
       matching `packages/core/**` from importing `packages/platform/src/sqs-message-publisher` or
       `packages/platform/src/sqs-consumer` (or their barrel re-exports). Copy
       `tasks-repositories-are-private`'s shape exactly, citing FR-010 (spec 011) in its comment.
-- [ ] T002 [P] Add `@aws-sdk/client-sqs` to `packages/platform/package.json` dependencies, pinned to a
+- [X] T002 [P] Add `@aws-sdk/client-sqs` to `packages/platform/package.json` dependencies, pinned to a
       specific version (this repository's first AWS SDK dependency — ADR-018 pre-justifies it, no
       further approval needed). Run `pnpm install`.
 

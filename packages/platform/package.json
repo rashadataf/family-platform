@@ -17,6 +17,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "3.1135.0",
     "@fp/kernel": "workspace:*",
     "@node-rs/argon2": "^2.2.1",
     "nodemailer": "^10.0.7"
