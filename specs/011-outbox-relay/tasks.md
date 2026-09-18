@@ -140,31 +140,31 @@ deliverable, built on top of what this phase provides.
 
 ### Worker configuration, topology, and infrastructure
 
-- [ ] T014 [P] Extend `apps/worker/src/config/worker-env.ts`: add required, validated
+- [X] T014 [P] Extend `apps/worker/src/config/worker-env.ts`: add required, validated
       `RELAY_QUEUE_ENDPOINT` (non-empty string) and `RELAY_QUEUE_REGION` (non-empty string) to
       `WorkerEnv` and `WORKER_ENV_VARIABLES`, following the existing fail-loudly-at-boot pattern
       exactly (Principle II). Update `worker-env.spec.ts`.
-- [ ] T015 [P] Create `apps/worker/src/relay/queue-topology.ts`: `QueueDefinition` (`name`,
+- [X] T015 [P] Create `apps/worker/src/relay/queue-topology.ts`: `QueueDefinition` (`name`,
       `dlqName`, `maxReceiveCount`, `subscribedEventTypes`) and `QUEUE_TOPOLOGY`, containing exactly
       one entry — `outbox-relay-verification` / `outbox-relay-verification-dlq` / `maxReceiveCount:
       5` / `subscribedEventTypes: ['relay.VerificationPing.v1']` — per
       contracts/relay-interfaces.md §5. Also export a pure `resolveDestinations(eventType,
       topology)` helper.
-- [ ] T016 Create `apps/worker/src/relay/render-elasticmq-config.ts` (topology → HOCON, per
+- [X] T016 Create `apps/worker/src/relay/render-elasticmq-config.ts` (topology → HOCON, per
       contracts/relay-interfaces.md §5) and run it once to produce the committed
       `infrastructure/elasticmq/queues.conf`, including `messages-storage { enabled = true }`
       (depends on T015).
-- [ ] T017 Add a drift-check test (`apps/worker/src/relay/render-elasticmq-config.spec.ts`) that
+- [X] T017 Add a drift-check test (`apps/worker/src/relay/render-elasticmq-config.spec.ts`) that
       re-renders from `QUEUE_TOPOLOGY` and asserts the result equals the committed
       `infrastructure/elasticmq/queues.conf` byte-for-byte, mirroring spec 010 T079's image-tag
       agreement test (depends on T016).
-- [ ] T018 Add an `elasticmq` service to `docker-compose.yml`: image
+- [X] T018 Add an `elasticmq` service to `docker-compose.yml`: image
       `softwaremill/elasticmq-native`, pinned to the version confirmed current in research.md §3,
       `restart: unless-stopped`, a bind mount of `infrastructure/elasticmq/queues.conf`, and a
       healthcheck — mirrors the `mailpit` service's shape. Add `RELAY_QUEUE_ENDPOINT` (pointing at
       the `elasticmq` service) and `RELAY_QUEUE_REGION` (a fixed placeholder) to the `worker`
       service's `environment` block (depends on T016).
-- [ ] T019 Add an `elasticmq` override to `docker-compose.staging.yml`: `ports: !reset []`, mirroring
+- [X] T019 Add an `elasticmq` override to `docker-compose.staging.yml`: `ports: !reset []`, mirroring
       the existing `postgres` override — nothing outside the staging Docker network needs to reach it
       directly (depends on T018).
 

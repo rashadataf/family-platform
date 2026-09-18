@@ -131,6 +131,17 @@ services:
     networks:
       - staging
 
+  # Spec 011's event transport (ADR-018). Joins `staging` for the same reason
+  # `mailpit` above does: a service left off an explicit `networks:` override
+  # here stays on Compose's implicit default network instead, where `worker`
+  # (the one publisher and, later, consumer) could never resolve or reach it.
+  elasticmq:
+    # No public host port publication, matching `postgres`/`mailpit` above:
+    # nothing outside this Docker network needs to reach it directly.
+    ports: !reset []
+    networks:
+      - staging
+
 # A plain (non-`external`) network: Compose creates a fresh, isolated
 # network on first use, which is what satisfies FR-005 by construction
 # rather than by an additional isolation step (data-model.md).

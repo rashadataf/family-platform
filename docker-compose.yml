@@ -158,6 +158,17 @@ services:
       DATABASE_URL: postgresql://family_platform_app:${DB_APP_PASSWORD:-appdev}@postgres:5432/${POSTGRES_DB:-family_platform}
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      # ADR-018, contracts/relay-interfaces.md §6. ElasticMQ at Stage 0, a
+      # real SQS regional endpoint at Stage 1 — configuration, not code.
+      RELAY_QUEUE_ENDPOINT: http://elasticmq:9324
+      RELAY_QUEUE_REGION: elasticmq
+      # createSqsClient (packages/platform) passes no explicit credentials,
+      # relying on the AWS SDK's own default provider chain — it refuses to
+      # send a request with none configured at all, and ElasticMQ does not
+      # check them, so any non-empty value satisfies it here. Stage 1
+      # supplies real ones the same way, through its own deployment secrets.
+      AWS_ACCESS_KEY_ID: elasticmq-placeholder
+      AWS_SECRET_ACCESS_KEY: elasticmq-placeholder
     volumes:
       - .:/app
       - root_node_modules:/app/node_modules
@@ -199,6 +210,28 @@ services:
     ports:
       - '${MAILPIT_UI_PORT:-8025}:8025'
       - '${MAILPIT_SMTP_PORT:-1025}:1025'
+
+  # Stage 0 event transport (ADR-018, research.md §3). queues.conf is
+  # bind-mounted, not baked into the image, for the same reason the
+  # `migrate` service bind-mounts prisma/: a cached image must not run
+  # against a queue topology someone just edited (T017 catches the reverse
+  # drift — this catches the image serving a stale one).
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.5.7
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/elasticmq/queues.conf:/opt/elasticmq.conf
+    ports:
+      - '${ELASTICMQ_PORT:-9324}:9324'
+    healthcheck:
+      # No curl/node in this GraalVM-native Alpine image; `nc -z` (present)
+      # only proves the port accepts connections, the same property
+      # `pg_isready` proves for postgres below.
+      test: ['CMD-SHELL', 'nc -z localhost 9324 || exit 1']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
 
 volumes:
   # No explicit `name:` override: Compose namespaces these per the top-level
