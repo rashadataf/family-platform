@@ -333,11 +333,11 @@ and confirm the lag measure does not rise under a burst of such events.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T041 [P] [US4] Integration test, `outbox-relay.sweep.integration.spec.ts`: seed a row with an
+- [X] T041 [P] [US4] Integration test, `outbox-relay.sweep.integration.spec.ts`: seed a row with an
       event type absent from `QUEUE_TOPOLOGY`, run a tick, assert it is marked published, assert
       `MessagePublisherPort.send` was called zero times for it (a spy/fake), and assert a burst of 50
       such rows leaves `measureOutboxLag` at zero afterward (SC-006, FR-004).
-- [ ] T042 [P] [US4] Integration test, same file: publish an event of a type with no subscription,
+- [X] T042 [P] [US4] Integration test, same file: publish an event of a type with no subscription,
       then add that type to a queue's `subscribedEventTypes` (in the test's own topology fixture, not
       the committed one) and publish a second event of the same type; assert only the second event is
       ever delivered — the first is never retroactively sent (FR-020).

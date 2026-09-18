@@ -1,12 +1,40 @@
 import { randomUUID } from 'node:crypto';
 import type { Clock, ProcessedEventPort } from '@fp/kernel';
-import { claimUnpublishedOutboxEvents } from '@fp/persistence';
+import { claimUnpublishedOutboxEvents, measureOutboxLag } from '@fp/persistence';
 import { createSqsClient, SqsConsumer, SqsMessagePublisher } from '@fp/platform';
 import { seedOutboxEvent, withDatabase, withDatabaseCommitted } from '@fp/testing';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest';
 import { captureLogs } from '../test-support/capture-logs.js';
 import { runOutboxRelaySweep } from './outbox-relay.sweep.js';
-import { QUEUE_TOPOLOGY } from './queue-topology.js';
+import { QUEUE_TOPOLOGY, type QueueDefinition } from './queue-topology.js';
+
+/**
+ * This file runs against its OWN copy of the topology, so a test can change who
+ * subscribes to what (T042, FR-020) without touching the committed
+ * `QUEUE_TOPOLOGY`. The copy starts identical to it, and `resolveDestinations`
+ * is still the real one — only the data it resolves against is swapped, so
+ * every other test here sees exactly the committed topology.
+ */
+vi.mock('./queue-topology.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./queue-topology.js')>();
+  const topology: QueueDefinition[] = original.QUEUE_TOPOLOGY.map((queue) => ({ ...queue }));
+  return {
+    ...original,
+    QUEUE_TOPOLOGY: topology,
+    resolveDestinations: (eventType: string, against: readonly QueueDefinition[] = topology) =>
+      original.resolveDestinations(eventType, against),
+  };
+});
 
 const QUEUE = 'outbox-relay-verification';
 const PING = 'relay.VerificationPing.v1';
@@ -304,5 +332,108 @@ describe('the outbox relay sweep reports per-queue counts (US3, FR-017)', () => 
     expect(pending).toBeGreaterThanOrEqual(seeded);
     // DLQ depth: the DLQ's own depth, whatever it holds.
     expect(dlq).toBe(await depths.approximateDepth(verification.dlqName));
+  });
+});
+
+/**
+ * FR-004, FR-020, SC-006, User Story 4. Today every real event type has zero
+ * subscribers, so "an event nobody consumes" is the ordinary case, not an edge:
+ * it must be marked published on its first claim, send nothing, and never show
+ * up as lag — or the alarm would fire permanently on a healthy system.
+ */
+describe('the outbox relay sweep and events nobody subscribes to (US4, FR-004, FR-020, SC-006)', () => {
+  /** A real context's event, of a type that appears nowhere in `QUEUE_TOPOLOGY`. */
+  const UNSUBSCRIBED = 'tasks.TaskCreated.v1';
+
+  /** Every message the sweep tried to send: the spy calls through, so nothing is stubbed out. */
+  let send: MockInstance<SqsMessagePublisher['send']>;
+
+  const sentEventIds = (): string[] =>
+    send.mock.calls.map(([message]) => (JSON.parse(message.body) as { eventId: string }).eventId);
+
+  beforeAll(() => {
+    process.env.RELAY_QUEUE_ENDPOINT = ENDPOINT;
+    process.env.RELAY_QUEUE_REGION = REGION;
+    process.env.AWS_ACCESS_KEY_ID ??= 'elasticmq-placeholder';
+    process.env.AWS_SECRET_ACCESS_KEY ??= 'elasticmq-placeholder';
+  });
+
+  beforeEach(async () => {
+    await clearUnpublishedBacklog();
+    send = vi.spyOn(SqsMessagePublisher.prototype, 'send');
+  });
+
+  afterEach(() => {
+    send.mockRestore();
+  });
+
+  // T041 / SC-006, FR-004
+  it('marks a row with no subscriber published on its first claim, sends nothing, and leaves no lag', async () => {
+    const { id: eventId } = await withDatabaseCommitted((tx) =>
+      seedOutboxEvent(tx, { eventType: UNSUBSCRIBED, payload: { note: 'T041' } }),
+    );
+
+    const result = await runOutboxRelaySweep(realClock);
+
+    expect(result).toMatchObject({ claimed: 1, published: 1, sent: 0, failed: [] });
+    expect(await publishedAtOf(eventId)).not.toBeNull();
+    expect(send).not.toHaveBeenCalled();
+
+    // A burst of them, each old enough that leaving one behind would show as lag.
+    const oldEnough = new Date(Date.now() - 60_000);
+    const burst = 50;
+    await withDatabaseCommitted(async (tx) => {
+      for (let i = 0; i < burst; i += 1) {
+        await seedOutboxEvent(tx, { eventType: UNSUBSCRIBED, occurredAt: oldEnough });
+      }
+    });
+
+    const afterBurst = await runOutboxRelaySweep(realClock);
+
+    expect(afterBurst).toMatchObject({ claimed: burst, published: burst, sent: 0, failed: [] });
+    expect(send).not.toHaveBeenCalled();
+    expect(await measureOutboxLag(realClock.now())).toBe(0);
+  });
+
+  // T042 / FR-020
+  it('never sends a past event retroactively when its type later gains a subscriber', async () => {
+    const LATE = 'relay.LateSubscriber.v1';
+    // The file-local copy of the topology (see `vi.mock` above), not the committed one.
+    const topology = QUEUE_TOPOLOGY as QueueDefinition[];
+    const index = topology.findIndex((queue) => queue.name === QUEUE);
+    const original = topology[index];
+    expect(original, `${QUEUE} is in the topology`).toBeDefined();
+    if (original === undefined) return;
+
+    try {
+      const { id: before } = await withDatabaseCommitted((tx) =>
+        seedOutboxEvent(tx, { eventType: LATE, payload: { note: 'T042 before' } }),
+      );
+      await runOutboxRelaySweep(realClock);
+      expect(await publishedAtOf(before)).not.toBeNull();
+      expect(sentEventIds()).toEqual([]);
+
+      // The queue starts consuming LATE events. `before` is already published,
+      // so nothing should ever look at it again.
+      topology[index] = {
+        ...original,
+        subscribedEventTypes: [...original.subscribedEventTypes, LATE],
+      };
+
+      const { id: after } = await withDatabaseCommitted((tx) =>
+        seedOutboxEvent(tx, { eventType: LATE, payload: { note: 'T042 after' } }),
+      );
+      await runOutboxRelaySweep(realClock);
+      await runOutboxRelaySweep(realClock);
+
+      // Only the second event was ever sent — once — and it really is on the queue.
+      expect(sentEventIds()).toEqual([after]);
+      expect(await receiveEnvelope(after, Date.now() + DELIVERY_BUDGET_MS)).toMatchObject({
+        eventId: after,
+        eventType: LATE,
+      });
+    } finally {
+      topology[index] = original;
+    }
   });
 });
