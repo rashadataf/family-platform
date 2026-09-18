@@ -92,7 +92,7 @@ deliverable, built on top of what this phase provides.
 
 ### Schema and migration
 
-- [ ] T006 Add the `ProcessedEvent` model to `packages/persistence/prisma/schema.prisma` per
+- [X] T006 Add the `ProcessedEvent` model to `packages/persistence/prisma/schema.prisma` per
       [data-model.md](data-model.md): `id` (`uuid(7)`), `queueName`, `eventId`, `processedAt` (default
       `now()`), `@@unique([queueName, eventId])`, `@@map("processed_event")`. **Not** placed under
       `ENABLE`/`FORCE ROW LEVEL SECURITY` — it is not family-scoped, mirroring `IdempotencyKey`'s
