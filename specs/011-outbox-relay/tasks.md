@@ -103,7 +103,7 @@ deliverable, built on top of what this phase provides.
 
 ### Persistence repositories
 
-- [ ] T008 [P] Create `packages/persistence/src/repositories/processed-event.repository.ts`:
+- [X] T008 [P] Create `packages/persistence/src/repositories/processed-event.repository.ts`:
       `PrismaProcessedEventRepository implements ProcessedEventPort`, constructor taking
       `PrismaClient | Prisma.TransactionClient` (mirrors `PrismaOutboxRepository`'s constructor
       exactly, per contracts/relay-interfaces.md §4's atomicity note). `wasProcessed` is a
