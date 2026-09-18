@@ -75,6 +75,34 @@ It means that sweep has not completed successfully for more than three of its ow
 docker compose -p family-platform-staging logs worker | grep ALERT
 ```
 
+### Reading the relay's logs, and what `ALERT outbox_lag_seconds` and `ALERT dead_letter_arrived` mean
+
+The outbox relay is one more sweep, running every second: it claims events the API committed to the outbox, sends each to the queues subscribed to its type, and marks it published. One line per tick says what it did:
+
+```bash
+docker compose -p family-platform-staging logs --tail=200 worker | grep outbox_relay_run
+```
+
+```text
+outbox_relay_run claimed=3 published=3 sent=3 failed=0 queue=outbox-relay-verification delivered=3 pending=3 dlq=0 [correlationId=...]
+```
+
+`claimed`, `published` and `failed` count outbox rows; `failed` rows stay unpublished and are tried again next tick. `sent` counts messages, and a row whose event type nothing subscribes to is published having sent none. After those come one `queue=…` group per configured queue: how many messages this tick `delivered` to it, how many are `pending` on it now, and how many sit on its dead-letter queue (`dlq`). Like the sweep lines above, it carries identifiers and counts only — never an event's payload. Two more lines are written every tick, alert or not: `outbox_relay_lag_seconds=<n>` and one `outbox_relay_dlq_depth queue=<dlq> depth=<n>` per queue.
+
+Two alerts come from the relay, each emitted once per occurrence and cleared on recovery, like `ALERT sweep_stalled`:
+
+```text
+ALERT outbox_lag_seconds=642 threshold=300
+ALERT dead_letter_arrived queue=outbox-relay-verification-dlq depth=1
+```
+
+- `ALERT outbox_lag_seconds` — after a tick, the oldest event still unpublished is more than 300 seconds old. The tick could not clear it: its sends are failing (look for `outbox relay send failed` lines and check the `elasticmq` container), or more than 100 events are backed up and it is working through them a batch at a time. It fires again only after the lag has dropped back under the threshold.
+- `ALERT dead_letter_arrived` — a consumer failed on one message five times and the queue moved it to its dead-letter queue. It needs a person: it will not be retried. It fires when that dead-letter queue goes from empty to non-empty, not for each further message. `outbox_relay_dlq_depth` shows the depth every tick.
+
+Neither is the same signal as `ALERT sweep_stalled sweep=outbox-relay`. That one means the relay stopped *ticking successfully*; a stopped container has no ticks at all, so it raises nothing until the worker is running again. These two mean it is running and something is backing up.
+
+The staging worker image carries the built relay only, not the development tooling, so there is no way to read a queue's messages from it. The logs above are what staging offers; to see what a dead-lettered message actually was, reproduce it locally, where `pnpm --filter worker relay:peek <queue-name>` prints a queue's messages without consuming them.
+
 ### Changing a cadence
 
 Each sweep's interval is a variable in `docker-compose.staging.env`, transferred to the VPS as `.env` (`SWEEP_REPORT_OVERDUE_TASKS_INTERVAL_SECONDS` and friends). The worker validates all of them at boot and refuses to start on a zero, a negative or a non-numeric value, naming the variable — so a bad cadence is a failed deploy, not a sweep that silently never runs.

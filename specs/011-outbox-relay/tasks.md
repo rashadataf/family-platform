@@ -313,7 +313,7 @@ no tick to stall).
 - [X] T039 [US3] Extend `outbox-relay.sweep.ts`'s summary line to include, per queue, delivered /
       pending / DLQ-depth counts in the comma-joined shape `report-overdue-tasks.sweep.ts` already
       uses (depends on T038).
-- [ ] T040 [US3] Update `docs/staging-environment.md`: add a short section on reading the relay's
+- [X] T040 [US3] Update `docs/staging-environment.md`: add a short section on reading the relay's
       logs — `docker compose logs worker | grep outbox_relay_run`, and what
       `ALERT outbox_lag_seconds` / `ALERT dead_letter_arrived` mean — mirroring the existing
       `ALERT sweep_stalled` section exactly.
