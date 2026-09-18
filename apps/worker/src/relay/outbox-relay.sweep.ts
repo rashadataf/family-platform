@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Clock, MessagePublisherPort } from '@fp/kernel';
 import { claimUnpublishedOutboxEvents, type ClaimedOutboxEvent } from '@fp/persistence';
 import { createSqsClient, SqsMessagePublisher } from '@fp/platform';
-import { resolveDestinations } from './queue-topology.js';
+import { QUEUE_TOPOLOGY, resolveDestinations } from './queue-topology.js';
 
 /**
  * Rows claimed per tick. A tick's sends all run inside the one claim
@@ -66,6 +66,35 @@ function defaultPublisher(): MessagePublisherPort {
     };
   }
   return cachedPublisher.publisher;
+}
+
+/**
+ * FR-014: whether each DLQ held a message on the previous tick, so an alert
+ * fires once when one first does and not on every tick it stays that way —
+ * the same edge-triggered, clear-on-recovery shape as
+ * `SweepScheduler.checkStalled`. Module-level for the same reason the
+ * publisher is: the sweep is a function called every second, and this has to
+ * outlive a call.
+ */
+const dlqNonEmptyLastTick = new Map<string, boolean>();
+
+/**
+ * Reads every queue's DLQ depth, logs it (always), and raises
+ * `ALERT dead_letter_arrived` on the tick a DLQ first becomes non-empty.
+ * A message on a DLQ is one a consumer failed on `maxReceiveCount` times, so
+ * it needs a person (FR-013).
+ */
+async function reportDeadLetters(publisher: MessagePublisherPort): Promise<void> {
+  for (const queue of QUEUE_TOPOLOGY) {
+    const depth = await publisher.approximateDepth(queue.dlqName);
+    console.log(`outbox_relay_dlq_depth queue=${queue.dlqName} depth=${String(depth)}`);
+
+    const nonEmpty = depth > 0;
+    if (nonEmpty && dlqNonEmptyLastTick.get(queue.dlqName) !== true) {
+      console.warn(`ALERT dead_letter_arrived queue=${queue.dlqName} depth=${String(depth)}`);
+    }
+    dlqNonEmptyLastTick.set(queue.dlqName, nonEmpty);
+  }
 }
 
 /** contracts/relay-interfaces.md §3: exactly these seven fields, forwarded unchanged. */
@@ -151,6 +180,8 @@ export async function runOutboxRelaySweep(
   console.log(
     `outbox_relay_run claimed=${String(result.claimed)} published=${String(result.published)} sent=${String(result.sent)} failed=${String(result.failed.length)} [correlationId=${correlationId}]`,
   );
+
+  await reportDeadLetters(publisher);
 
   return result;
 }

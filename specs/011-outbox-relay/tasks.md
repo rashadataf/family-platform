@@ -265,7 +265,7 @@ delivered normally.
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Extend `outbox-relay.sweep.ts`: after the claim/publish/mark step, for every queue in
+- [X] T034 [US2] Extend `outbox-relay.sweep.ts`: after the claim/publish/mark step, for every queue in
       `QUEUE_TOPOLOGY` call `approximateDepth(dlqName)`. Hold module-level state — a `Map<string,
       boolean>` of "this DLQ was non-empty last tick" — mirroring `SweepScheduler.checkStalled`'s
       edge-triggered, clear-on-recovery pattern exactly: log `ALERT dead_letter_arrived
