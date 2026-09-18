@@ -5,3 +5,4 @@ export * as identity from './identity/index.js';
 export * as family from './family/index.js';
 export * as compliance from './compliance/index.js';
 export * as calendar from './calendar/index.js';
+export * as tasks from './tasks/index.js';

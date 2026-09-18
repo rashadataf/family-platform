@@ -32,3 +32,50 @@ See [`specs/003-vps-staging-deployment/contracts/cli-and-config.md`](../specs/00
 
 - Merging to `main` deploys automatically via CI. Nobody needs to run a manual command for an ordinary change to reach staging.
 - `pnpm staging:deploy` (ad hoc) and `pnpm staging:destroy` exist for the founder to run directly. Teardown is never triggered by CI or by a merge — it is a deliberate, manually-invoked action only.
+
+## The worker, and the sweeps it runs
+
+As of spec 010 the `worker` container is deployed alongside `api` (it was left out until then, because it had no staging runtime image and its module did nothing). It runs every scheduled sweep on its own cadence — retention, invitation expiry, guardian coverage, the calendar horizon, and overdue-task detection — with nothing invoking them by hand.
+
+Checking on it, over SSH, with the same Docker CLI model as everything else here:
+
+```bash
+# Is it up, and does Docker consider it healthy?
+docker compose -p family-platform-staging ps worker
+
+# What has it been doing? One line per sweep run.
+docker compose -p family-platform-staging logs --tail=200 worker | grep worker_sweep_run
+```
+
+A `worker_sweep_run` line carries the sweep's name, its outcome, how long it took and a correlation id — never a task title, a member's name or an email:
+
+```text
+worker_sweep_run sweep=report-overdue-tasks outcome=succeeded duration_ms=42.3 summary="reported 2, skipped 0, failed 0, lag 0s" [correlationId=...]
+```
+
+Three outcomes are worth knowing:
+
+- `succeeded` — the ordinary case.
+- `failed` — that pass threw. The other sweeps are unaffected, and this one is retried on its next tick. Repeated failures are what the stall alert below is for.
+- `skipped_overlap` — the previous pass of that same sweep was still running when the next tick came due, so the tick was dropped rather than run concurrently. One is unremarkable; a stream of them means a sweep is consistently slower than its cadence.
+
+### Health, and what `ALERT sweep_stalled` means
+
+The scheduler rewrites a heartbeat file after every tick, and the container's `HEALTHCHECK` fails when that file is more than 180 seconds old. So a worker whose process is alive but whose ticks have stopped shows as `unhealthy` in `docker compose ps` rather than sitting there looking fine.
+
+Separately, the scheduler tracks each sweep's last success in memory and emits one line when it goes stale:
+
+```text
+ALERT sweep_stalled sweep=report-overdue-tasks last_success_age_seconds=240 threshold_seconds=180
+```
+
+It means that sweep has not completed successfully for more than three of its own cadences. It is emitted once per stall, not once per tick, and clears on the next success. That is the platform's alerting convention at this stage — a structured log line, since there is no metrics pipeline yet.
+
+```bash
+docker compose -p family-platform-staging logs worker | grep ALERT
+```
+
+### Changing a cadence
+
+Each sweep's interval is a variable in `docker-compose.staging.env`, transferred to the VPS as `.env` (`SWEEP_REPORT_OVERDUE_TASKS_INTERVAL_SECONDS` and friends). The worker validates all of them at boot and refuses to start on a zero, a negative or a non-numeric value, naming the variable — so a bad cadence is a failed deploy, not a sweep that silently never runs.
+

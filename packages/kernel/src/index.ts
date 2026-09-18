@@ -9,6 +9,8 @@ export {
   asGuardianshipId,
   asCalendarEventId,
   asEventOccurrenceId,
+  asTaskId,
+  asTaskSeriesId,
   type Branded,
   type UserId,
   type SessionId,
@@ -19,6 +21,8 @@ export {
   type GuardianshipId,
   type CalendarEventId,
   type EventOccurrenceId,
+  type TaskId,
+  type TaskSeriesId,
 } from './branded-id.js';
 export { EmailAddress } from './email-address.vo.js';
 export { type DomainError } from './errors.js';

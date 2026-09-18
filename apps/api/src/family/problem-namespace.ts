@@ -7,9 +7,13 @@ import type { Reflector } from '@nestjs/core';
  * contract promises `calendar/not_found` and `calendar/capability_required`,
  * so a controller names its namespace once at class level and the guards
  * speak it. Absent, they speak `family`, exactly as before.
+ *
+ * Spec 010 adds `task` — singular, because the namespace is interpolated
+ * straight into the type (`task/not_found`) and that is what its contract
+ * declares.
  */
 export const PROBLEM_NAMESPACE = 'family:problemNamespace';
-export type ProblemNamespace = 'family' | 'calendar';
+export type ProblemNamespace = 'family' | 'calendar' | 'task';
 
 export const UsesProblemNamespace = (namespace: ProblemNamespace) =>
   SetMetadata(PROBLEM_NAMESPACE, namespace);

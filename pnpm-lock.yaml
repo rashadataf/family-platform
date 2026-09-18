@@ -213,6 +213,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       '@fp/config-eslint':
         specifier: workspace:*
@@ -220,6 +223,9 @@ importers:
       '@fp/config-typescript':
         specifier: workspace:*
         version: link:../../packages/config-typescript
+      '@fp/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3

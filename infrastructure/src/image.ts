@@ -9,16 +9,21 @@ import { local } from '@pulumi/command';
  */
 export const RUNTIME_IMAGE_TAG = 'fp-api:staging-runtime';
 export const MIGRATOR_IMAGE_TAG = 'fp-api:staging-migrator';
+/** Spec 010 FR-037: the worker is deployed, so its runtime target ships too. */
+export const WORKER_RUNTIME_IMAGE_TAG = 'fp-worker:staging-runtime';
 
 export const RUNTIME_TARBALL_NAME = 'fp-api-runtime.tar';
 export const MIGRATOR_TARBALL_NAME = 'fp-api-migrator.tar';
+export const WORKER_RUNTIME_TARBALL_NAME = 'fp-worker-runtime.tar';
 
 export interface StagingImages {
   runtime: dockerBuild.Image;
   migrator: dockerBuild.Image;
+  worker: dockerBuild.Image;
   /** The `docker save` step each image's tarball depends on (transfer.ts). */
   runtimeSaved: local.Command;
   migratorSaved: local.Command;
+  workerSaved: local.Command;
 }
 
 /**
@@ -62,9 +67,10 @@ function loadAndSave(
 }
 
 /**
- * Builds the same two Dockerfile targets CI's `image` job already builds and
- * health-checks on every pull request (FR-018) — this feature defines no
- * Dockerfile of its own. Built locally, on whichever machine runs
+ * Builds the api's two Dockerfile targets that CI's `image` job already builds
+ * and health-checks on every pull request (FR-018), plus the worker's
+ * `runtime` target (spec 010 FR-037) — neither this feature nor spec 010
+ * defines a Dockerfile of its own. Built locally, on whichever machine runs
  * `pulumi up` (the founder's laptop or the CI runner, research.md §1), then
  * saved to a local tarball rather than pushed anywhere (research.md §1's
  * "no registry" decision) — `transfer.ts` hands the tarball to the VPS over
@@ -139,5 +145,21 @@ export function buildStagingImages(): StagingImages {
     migrator,
   );
 
-  return { runtime, migrator, runtimeSaved, migratorSaved };
+  // The worker's own Dockerfile, mirroring the api build above. Its `runtime`
+  // target is the only one that ships; it declares no `migrator`, because
+  // apps/api's owns migrations (apps/worker/Dockerfile's own comment).
+  const worker = new dockerBuild.Image('staging-worker-runtime-image', {
+    ...common,
+    dockerfile: { location: '../apps/worker/Dockerfile' },
+    target: 'runtime',
+    tags: [WORKER_RUNTIME_IMAGE_TAG],
+  });
+  const workerSaved = loadAndSave(
+    'staging-worker-runtime-image',
+    WORKER_RUNTIME_IMAGE_TAG,
+    WORKER_RUNTIME_TARBALL_NAME,
+    worker,
+  );
+
+  return { runtime, migrator, worker, runtimeSaved, migratorSaved, workerSaved };
 }

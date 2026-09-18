@@ -196,6 +196,15 @@ module.exports = {
     },
 
     {
+      name: 'tasks-repositories-are-private',
+      severity: 'error',
+      comment:
+        "FR-030 (spec 010): Tasks' own tables are reachable only through Tasks' own application layer, exactly as calendar-repositories-are-private makes Calendar's. packages/persistence exposes narrow factories (createTasksUnitOfWork and friends); the repository implementations behind them are private to the package.",
+      from: { pathNot: '^packages/persistence/' },
+      to: { path: '^packages/persistence/src/repositories/tasks/' },
+    },
+
+    {
       name: 'no-cross-app',
       severity: 'error',
       comment:

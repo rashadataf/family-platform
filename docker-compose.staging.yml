@@ -29,10 +29,12 @@
 # URL-encoded variant right after reading the plain one from stdin.
 #
 # `image:` below must match the tag baked in by
-# infrastructure/src/image.ts's RUNTIME_IMAGE_TAG / MIGRATOR_IMAGE_TAG
-# constants — the two files have no shared source of truth for that string,
-# so a rename in one and not the other fails at `docker compose up` with
-# "image not found", not at review time.
+# infrastructure/src/image.ts's RUNTIME_IMAGE_TAG / MIGRATOR_IMAGE_TAG /
+# WORKER_RUNTIME_IMAGE_TAG constants — the two files have no shared source of
+# truth for that string, so a rename in one and not the other fails at
+# `docker compose up` with "image not found", not at review time.
+# `infrastructure/src/deploy.spec.ts` closes that gap by reading the tag from
+# both files and requiring them to agree (spec 010 T079).
 
 services:
   postgres:
@@ -88,6 +90,26 @@ services:
     # No source bind mount: the base file's `.:/app` and per-package
     # node_modules volumes exist for the `development` target's live-edit
     # workflow, which staging's `runtime` image target does not use at all.
+    volumes: !reset []
+    networks:
+      - staging
+
+  # Spec 010 FR-037: the worker runs the platform's scheduled sweeps, so it is
+  # deployed rather than left out. Until this feature it had no staging runtime
+  # image at all, which is why `deploy.ts` used to bring up only
+  # postgres/api/mailpit.
+  worker:
+    image: fp-worker:staging-runtime
+    build: !reset null
+    restart: unless-stopped
+    environment:
+      # The APPLICATION role, exactly as the `api` override above — never the
+      # owner, which would silently bypass every row-level security policy
+      # (ADR-017).
+      DATABASE_URL: postgresql://family_platform_app:${DB_APP_PASSWORD_URLENCODED}@postgres:5432/${POSTGRES_DB:-family_platform}
+    # No source bind mount, for the same reason as `api`: the base file's
+    # `.:/app` and per-package node_modules volumes serve the `development`
+    # target's live-edit workflow, which the `runtime` image does not use.
     volumes: !reset []
     networks:
       - staging
