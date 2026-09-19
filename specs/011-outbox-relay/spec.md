@@ -169,15 +169,25 @@ Today, every event Family, Calendar and Tasks publish has zero real subscribers.
 ### Measurable Outcomes
 
 - **SC-001**: Under normal operation, an outbox row written by any existing context is delivered to every one of its configured consumer queues within 5 seconds of being written, with no manual intervention.
+  - *Status: **Verified** — `outbox-relay.sweep.integration.spec.ts` (T024); quickstart Scenario 1 against the live stack.*
 - **SC-002**: A relay process killed at any point in its claim-publish-mark cycle and restarted loses zero events across 100% of rows that were in flight at the moment of the crash.
+  - *Status: **Verified** — deterministic interrupt between send and commit (T025); quickstart Scenario 2 (the live kill is racy, so T025 is the proof).*
 - **SC-003**: Running two relay instances concurrently against the same outbox produces zero duplicate claims of the same row.
+  - *Status: **Verified** — two concurrent claimers, provably overlapping (T026).*
 - **SC-004**: 100% of messages that exceed a queue's `maxReceiveCount` are found on that queue's dead-letter queue, never dropped and never retried indefinitely.
+  - *Status: **Verified** — exactly 5 receives, then on the DLQ and off the source queue (`dead-letter.integration.spec.ts`, T031); quickstart Scenario 3.*
 - **SC-005**: An operator can determine how far behind the relay is from a single observable number, in every environment, without reading application logs.
+  - *Status: **Partly verified** — the lag is one number, `outbox_relay_lag_seconds=<n>`, logged every tick (T035, T038). It is read from the worker's logs, as the Stage 0 convention has it; there is no metrics pipeline, so "without reading application logs" is not met.*
 - **SC-006**: Publishing an event type with no configured subscriber never causes the outbox-lag measure to grow because of it, across a sustained stream of such events.
+  - *Status: **Verified** — unsubscribed rows published on first claim, nothing sent, lag 0 after a burst of 50 (T041); quickstart Scenario 4 through the real Tasks API.*
 - **SC-007**: The relay's transport adapter runs unmodified against both the Stage 0 ElasticMQ endpoint and a real SQS endpoint in testing, so the Stage 0 to Stage 1 move is verified to be configuration-only.
+  - *Status: **Not verified** — the endpoint comes from configuration with no code branch, but nothing has been run against a real SQS endpoint.*
 - **SC-008**: 100% of duplicate deliveries of the same event id to the stub consumer produce zero duplicate side effects.
+  - *Status: **Verified** — a duplicate delivery runs the handler once (`stub-consumer.integration.spec.ts`, T028).*
 - **SC-009**: No event payload observed in transit or in logs contains anything beyond identifiers and correlation metadata.
+  - *Status: **Verified for logs** — no payload in any relay log line, statically (`telemetry.spec.ts`) and at runtime including a failing send (T044). Not checked for messages in transit: the relay forwards a payload unchanged (FR-005), so its content is each producing context's to keep to identifiers.*
 - **SC-010**: A relay stopped or falling behind for more than 5 minutes produces a high-severity alert; below that threshold, the rising lag is visible as a metric but does not page anyone.
+  - *Status: **Partly verified** — the alert fires once when the oldest unpublished row is over 300 s after a tick, and not again until recovery (T035); the scheduler flags a relay that stops succeeding (T036). It does **not** fire for a relay that was stopped and then catches up on restart: the lag is measured after the tick's own claim, so quickstart Scenario 5 fails as written (tasks.md T047).*
 
 ## Data Handling and Compliance
 

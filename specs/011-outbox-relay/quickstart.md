@@ -23,7 +23,7 @@ docker compose logs worker --tail=5   # confirm the scheduler has started; see w
 named queue — the one tool these scenarios use beyond `docker compose` and `psql`:
 
 ```sh
-pnpm --filter worker relay:peek outbox-relay-verification
+docker compose exec worker pnpm --filter @fp/worker relay:peek outbox-relay-verification
 ```
 
 `relay:seed`, also added by this feature, writes one `outbox_event` row directly, bypassing every
@@ -31,7 +31,7 @@ producing context — this is the only place in the codebase that writes an outb
 through a real command handler, and it exists only for these scenarios and the integration suite:
 
 ```sh
-pnpm --filter worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"hello"}'
+docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"hello"}'
 ```
 
 ---
@@ -39,9 +39,9 @@ pnpm --filter worker relay:seed --event-type relay.VerificationPing.v1 --payload
 ## Scenario 1: An event reaches its queue, quickly (User Story 1, FR-001–006)
 
 ```sh
-pnpm --filter worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"scenario-1"}'
+docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"scenario-1"}'
 sleep 6
-pnpm --filter worker relay:peek outbox-relay-verification
+docker compose exec worker pnpm --filter @fp/worker relay:peek outbox-relay-verification
 ```
 
 **Expect** the message on the queue within the sleep, carrying `eventId`, `eventType`
@@ -60,11 +60,11 @@ docker compose exec postgres psql -U family_platform_owner -d family_platform \
 ## Scenario 2: The relay survives being killed mid-cycle (User Story 1, FR-006, FR-022)
 
 ```sh
-pnpm --filter worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"scenario-2"}'
+docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"scenario-2"}'
 docker compose kill worker    # simulate a crash between claim and publish
 docker compose up -d worker
 sleep 8
-pnpm --filter worker relay:peek outbox-relay-verification
+docker compose exec worker pnpm --filter @fp/worker relay:peek outbox-relay-verification
 ```
 
 **Expect** the message present exactly once on the queue (at-least-once may occasionally show a
@@ -78,18 +78,18 @@ published_at from outbox_event order by occurred_at desc limit 1;` is non-null a
 ## Scenario 3: A poison message is quarantined, not lost, and an alert fires (User Story 2, FR-013–015)
 
 ```sh
-pnpm --filter worker relay:seed --event-type relay.VerificationPing.v1 \
+docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 \
   --payload '{"note":"scenario-3","forceFailure":true}'   # the stub consumer's test-support fixture
                                                             # is wired, in the integration suite only,
                                                             # to fail on forceFailure — see
                                                             # apps/worker/src/test-support/stub-consumer.ts.
                                                             # This manual scenario instead uses the
                                                             # integration test directly:
-pnpm --filter worker test:integration -- outbox-relay.dlq
+pnpm test:integration -- dead-letter
 ```
 
 **Expect** the test to assert: the message is redelivered up to `maxReceiveCount` (5), then appears on
-`outbox-relay-verification-dlq` (confirm with `pnpm --filter worker relay:peek
+`outbox-relay-verification-dlq` (confirm with `docker compose exec worker pnpm --filter @fp/worker relay:peek
 outbox-relay-verification-dlq`), and the worker log contains exactly one line matching
 `ALERT dead_letter_arrived queue=outbox-relay-verification`. A second message published to the same
 queue in the same test run is still delivered normally, proving one poison message does not block
@@ -129,12 +129,12 @@ published — the zero-subscriber path marks them published on the same tick it 
 ```sh
 docker compose stop worker
 for i in $(seq 1 20); do
-  pnpm --filter worker relay:seed --event-type relay.VerificationPing.v1 --payload "{\"note\":\"$i\"}"
+  docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload "{\"note\":\"$i\"}"
 done
 ```
 
 Wait past the 5-minute threshold (or, for a faster check, read the integration test that fixes the
-clock instead of sleeping five real minutes: `pnpm --filter worker test:integration -- outbox-relay.lag-alert`),
+clock instead of sleeping five real minutes: `pnpm test:integration -- outbox-lag`),
 then:
 
 ```sh
