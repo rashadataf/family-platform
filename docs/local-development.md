@@ -25,6 +25,8 @@ That is the supported path, and it is the one to use if you are new here.
 2. **`migrate`** — applies every committed migration, then exits. If a migration fails, **the API never starts.** That is deliberate: a partially migrated schema must never be served.
 3. **`api`** — the API, watching your source for changes.
 
+Alongside them run `worker` and **`elasticmq`**, the SQS-compatible queue the worker's outbox relay publishes to (ADR-018). To put an event through it and look at the result, run `docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload '{"note":"hi"}'`, then `docker compose exec worker pnpm --filter @fp/worker relay:peek outbox-relay-verification`.
+
 Once it is up:
 
 ```sh

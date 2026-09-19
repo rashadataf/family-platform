@@ -6,11 +6,27 @@ import {
   withDatabase,
   withDatabaseCommitted,
 } from '@fp/testing';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SWEEPS } from '../sweeps/registry.js';
 import { SweepScheduler, type SchedulerLogger } from './scheduler.js';
 
 const ONE_HOUR = 3_600;
+
+/**
+ * The relay is a registered sweep, so every scheduler running the real registry
+ * now builds its publisher. Host-run defaults for the compose `elasticmq`
+ * service, as `outbox-relay.sweep.integration.spec.ts` uses — without
+ * overriding anything the environment already sets.
+ */
+const RELAY_ENDPOINT = process.env.RELAY_QUEUE_ENDPOINT ?? 'http://localhost:9324';
+const RELAY_REGION = process.env.RELAY_QUEUE_REGION ?? 'elasticmq';
+
+beforeAll(() => {
+  process.env.RELAY_QUEUE_ENDPOINT = RELAY_ENDPOINT;
+  process.env.RELAY_QUEUE_REGION = RELAY_REGION;
+  process.env.AWS_ACCESS_KEY_ID ??= 'elasticmq-placeholder';
+  process.env.AWS_SECRET_ACCESS_KEY ??= 'elasticmq-placeholder';
+});
 
 /** Waits for `check` to hold, polling, up to `timeoutMs`. */
 async function eventually(
@@ -137,5 +153,96 @@ describe('the scheduler running the real registry (Phase 8, FR-037)', () => {
       tx.outboxEvent.count({ where: { eventType: 'tasks.TaskOverdue.v1' } }),
     );
     expect(after).toBe(before);
+  });
+});
+
+/**
+ * FR-025, User Story 3: the relay needs no scheduling or stall-detection code
+ * of its own — being a registered sweep is enough. Confirmed here against the
+ * real registry entry rather than assumed, because "no new code" is exactly the
+ * claim a later edit to `registry.ts` or `scheduler.ts` could quietly break.
+ */
+describe('the outbox relay under the scheduler (US3, FR-025)', () => {
+  const relay = SWEEPS.find((sweep) => sweep.name === 'outbox-relay');
+
+  function recordingLogger(lines: string[]): SchedulerLogger {
+    return {
+      log: (line) => lines.push(line),
+      warn: (line) => lines.push(line),
+      error: (line) => lines.push(line),
+    };
+  }
+
+  const succeededRuns = (lines: readonly string[]) =>
+    lines.filter(
+      (line) => line.includes('sweep=outbox-relay') && line.includes('outcome=succeeded'),
+    ).length;
+
+  // T036
+  it('is registered at a one-second cadence, and the scheduler runs it repeatedly on its own', async () => {
+    expect(relay, 'outbox-relay is in SWEEPS').toBeDefined();
+    if (relay === undefined) return;
+    expect(relay.defaultCadenceSeconds).toBe(1);
+
+    const lines: string[] = [];
+    const scheduler = new SweepScheduler({
+      sweeps: [relay],
+      cadences: { [relay.name]: relay.defaultCadenceSeconds },
+      clock: new SystemClock(),
+      heartbeatPath: '/tmp/fp-worker-heartbeat-test',
+      logger: recordingLogger(lines),
+      random: () => 0,
+    });
+
+    try {
+      scheduler.start();
+      // Three runs at a one-second cadence: it is ticking, not just started once.
+      const ticking = await eventually(() => Promise.resolve(succeededRuns(lines) >= 3), 8_000);
+      expect(ticking, `outbox-relay ran ${String(succeededRuns(lines))} time(s)`).toBe(true);
+    } finally {
+      await scheduler.stop(15_000);
+    }
+  });
+
+  // T036 / FR-025
+  it('is flagged by the scheduler’s existing stall alert once it stops succeeding', async () => {
+    expect(relay, 'outbox-relay is in SWEEPS').toBeDefined();
+    if (relay === undefined) return;
+
+    // A clock the test can move, so "three cadences without a success" does not
+    // have to be waited out in real time.
+    let offsetMs = 0;
+    const clock = { now: () => new Date(Date.now() + offsetMs) };
+
+    const lines: string[] = [];
+    const scheduler = new SweepScheduler({
+      sweeps: [relay],
+      cadences: { [relay.name]: relay.defaultCadenceSeconds },
+      clock,
+      heartbeatPath: '/tmp/fp-worker-heartbeat-test',
+      logger: recordingLogger(lines),
+      random: () => 0,
+    });
+
+    const stalledLines = () => lines.filter((line) => line.includes('ALERT sweep_stalled'));
+
+    try {
+      scheduler.start();
+      expect(await eventually(() => Promise.resolve(succeededRuns(lines) >= 1), 8_000)).toBe(true);
+      expect(stalledLines(), 'no stall while it is succeeding').toEqual([]);
+
+      // Break the relay the way an outage would: its queue endpoint stops answering.
+      process.env.RELAY_QUEUE_ENDPOINT = 'http://127.0.0.1:1';
+      // Three cadences (STALL_CADENCE_MULTIPLE) plus a margin, with no success in between.
+      offsetMs += 10_000;
+
+      const flagged = await eventually(() => Promise.resolve(stalledLines().length >= 1), 15_000);
+      expect(flagged, 'ALERT sweep_stalled for outbox-relay').toBe(true);
+      expect(stalledLines()).toHaveLength(1);
+      expect(stalledLines()[0]).toContain('sweep=outbox-relay');
+    } finally {
+      process.env.RELAY_QUEUE_ENDPOINT = RELAY_ENDPOINT;
+      await scheduler.stop(15_000);
+    }
   });
 });

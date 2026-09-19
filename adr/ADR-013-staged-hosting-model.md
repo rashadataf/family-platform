@@ -1,8 +1,14 @@
 # ADR-013: Staged Hosting Model — VPS-First Pre-Launch, AWS at Real-User Data
 
-- **Status:** Accepted
+- **Status:** Amended by ADR-018
 - **Date:** 2026-09-08
 - **Deciders:** Principal Engineer
+
+> **Scope of the amendment.** [ADR-018](ADR-018-stage-0-event-transport.md) adds one container,
+> ElasticMQ, to the Stage 0 container set described below, so the outbox relay (ADR-005 Layer 3) has
+> something to publish to before Stage 1's real SQS exists. Everything else here — the VPS-first
+> topology, the trigger that moves hosting to the AWS topology ADR-004 specifies, and the rest of the
+> Stage 0 container set — **remains in full effect and is unamended**.
 
 ## Context
 

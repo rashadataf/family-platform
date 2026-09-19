@@ -32,3 +32,5 @@ export { type TokenGeneratorPort } from './token-generator.port.js';
 export { type MailerPort } from './mailer.port.js';
 export { type OutboxPort, type OutboxEventToAppend, type JsonValue } from './outbox.port.js';
 export { type IdempotencyPort, type IdempotencyRecord } from './idempotency.port.js';
+export { type MessagePublisherPort, type MessageToPublish } from './message-publisher.port.js';
+export { type ProcessedEventPort } from './processed-event.port.js';

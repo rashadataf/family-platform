@@ -10,14 +10,15 @@ An ADR records a decision that is expensive to reverse, together with the altern
 | [002](ADR-002-modular-monolith.md) | Modular monolith with a separate asynchronous worker | Accepted | 2026-09-08 |
 | [003](ADR-003-database-orm.md) | PostgreSQL with Prisma, and the query-builder escape hatch | Amended by ADR-017 | 2026-09-08 |
 | [004](ADR-004-infrastructure-as-code.md) | Infrastructure as Code with Pulumi | Amended by ADR-013 | 2026-09-08 |
-| [005](ADR-005-event-system.md) | Domain events, transactional outbox, SQS | Accepted | 2026-09-08 |
+| [005](ADR-005-event-system.md) | Domain events, transactional outbox, SQS | Amended by ADR-018 | 2026-09-08 |
 | [006](ADR-006-api-style-and-type-safety.md) | REST API with ts-rest and Zod contracts | Accepted | 2026-09-08 |
-| [013](ADR-013-staged-hosting-model.md) | Staged hosting model: VPS-first pre-launch, AWS at real-user data | Accepted | 2026-09-08 |
+| [013](ADR-013-staged-hosting-model.md) | Staged hosting model: VPS-first pre-launch, AWS at real-user data | Amended by ADR-018 | 2026-09-08 |
 | [014](ADR-014-containerized-development.md) | The container image is the unit of truth, including on a developer's laptop | Accepted | 2026-09-08 |
 | [015](ADR-015-repository-visibility.md) | Repository visibility: public, chosen deliberately | Accepted | 2026-09-09 |
 | [007](ADR-007-authentication.md) | Authentication: managed identity provider versus self-hosted | Accepted | 2026-09-11 |
 | [016](ADR-016-mobile-client-and-styling.md) | Mobile client: React Native via Expo, with a dependency-free styling layer | Accepted | 2026-09-12 |
 | [017](ADR-017-tenant-isolation-at-the-database.md) | Tenant isolation at the database: the application role and `FORCE ROW LEVEL SECURITY` | Accepted | 2026-09-13 |
+| [018](ADR-018-stage-0-event-transport.md) | The outbox relay's transport at Stage 0: ElasticMQ, then SQS at Stage 1 | Accepted | 2026-09-18 |
 
 ## Planned
 

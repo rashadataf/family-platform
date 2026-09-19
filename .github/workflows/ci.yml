@@ -97,12 +97,35 @@ jobs:
       BOOTSTRAP_DATABASE_URL: postgresql://postgres:localdev@127.0.0.1:5432/family_platform
       DB_OWNER_PASSWORD: ownerci
       DB_APP_PASSWORD: appci
+      # Spec 011: the relay's integration tests drive a real queue. ElasticMQ is
+      # published on the runner itself (the suite runs on the host, not in a
+      # container), so `localhost`, where Compose gives the worker `elasticmq`.
+      RELAY_QUEUE_ENDPOINT: http://localhost:9324
+      RELAY_QUEUE_REGION: elasticmq
+      # The AWS SDK refuses to send a request with no credentials configured at
+      # all; ElasticMQ does not check them. Same placeholders as Compose.
+      AWS_ACCESS_KEY_ID: elasticmq-placeholder
+      AWS_SECRET_ACCESS_KEY: elasticmq-placeholder
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Started as a step, not a `services:` container, because ElasticMQ has to
+      # mount `infrastructure/elasticmq/queues.conf` — which declares the queues
+      # and their redrive policies — and service containers start BEFORE the
+      # checkout that would provide it. Going through Compose rather than a bare
+      # `docker run` keeps the image tag, the mount and the healthcheck in the
+      # one file that already defines them, so CI cannot drift from local.
+      # `--wait` blocks until that healthcheck passes.
+      - name: Start ElasticMQ
+        run: docker compose up -d --wait elasticmq
       - uses: ./.github/actions/setup
         with:
           turbo-cache-key: test-integration
       - run: pnpm test:integration
+      # Deliberately no teardown step. The runner is destroyed with the job, so
+      # stopping the container buys nothing — and `docker compose down` resolves
+      # the whole project model, including `api` and `worker`'s `env_file: .env`,
+      # which does not exist in CI and is not wanted there. `up <service>` only
+      # resolves the one service, which is why starting works without it.
 
   # Constitution Principle III: "Architecture Boundaries Are Enforced, Not
   # Suggested". The principle names dependency-cruiser explicitly and until now

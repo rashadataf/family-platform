@@ -38,3 +38,9 @@ export {
   seedWeeklyRecurringTask,
   type SeededTask,
 } from './tasks-factories.js';
+export {
+  seedOutboxEvent,
+  seedProcessedEvent,
+  type SeededOutboxEvent,
+  type SeededProcessedEvent,
+} from './relay-factories.js';
