@@ -9,7 +9,9 @@ import { QUEUE_TOPOLOGY } from './queue-topology.js';
 
 const PING = 'relay.VerificationPing.v1';
 
-const VERIFICATION_QUEUE = QUEUE_TOPOLOGY.find((queue) => queue.subscribedEventTypes.includes(PING));
+const VERIFICATION_QUEUE = QUEUE_TOPOLOGY.find((queue) =>
+  queue.subscribedEventTypes.includes(PING),
+);
 if (VERIFICATION_QUEUE === undefined) {
   throw new Error(`no queue in QUEUE_TOPOLOGY subscribes to ${PING}`);
 }
@@ -218,10 +220,7 @@ describe('a message no consumer can process is dead-lettered (US2, FR-013, SC-00
       const deadline = Date.now() + REDRIVE_BUDGET_MS;
       do {
         await consumer.pollOnce();
-      } while (
-        (await publisher.approximateDepth(DLQ)) <= dlqDepthBefore &&
-        Date.now() < deadline
-      );
+      } while ((await publisher.approximateDepth(DLQ)) <= dlqDepthBefore && Date.now() < deadline);
 
       // Received, and failed on, exactly the configured number of times — neither
       // giving up early nor retrying past the limit...
@@ -292,9 +291,7 @@ describe('a message no consumer can process is dead-lettered (US2, FR-013, SC-00
         queueName: QUEUE,
         // The stub only ever sees this test's two messages; see T031 for why.
         handler: (envelope) =>
-          ours.has(eventIdOf(envelope))
-            ? stub(envelope)
-            : Promise.resolve('processed'),
+          ours.has(eventIdOf(envelope)) ? stub(envelope) : Promise.resolve('processed'),
       },
       countingProcessedEvents(deliveries),
       impatientClient,

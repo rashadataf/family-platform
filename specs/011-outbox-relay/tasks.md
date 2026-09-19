@@ -357,7 +357,7 @@ and confirm the lag measure does not rise under a burst of such events.
 
 **Purpose**: the properties that span every story, not any one of them.
 
-- [ ] T044 [P] Add a telemetry test (`apps/worker/src/relay/telemetry.spec.ts` or extending an
+- [X] T044 [P] Add a telemetry test (`apps/worker/src/relay/telemetry.spec.ts` or extending an
       existing suite) asserting no log line emitted anywhere in `apps/worker/src/relay/` contains a
       payload body — only identifiers and the fixed envelope fields — mirroring spec 010's SC-011
       test (FR-018, SC-009).

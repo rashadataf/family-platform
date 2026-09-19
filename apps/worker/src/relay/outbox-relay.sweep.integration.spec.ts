@@ -320,9 +320,9 @@ describe('the outbox relay sweep reports per-queue counts (US3, FR-017)', () => 
       );
     }
 
-    const match = new RegExp(
-      `queue=${QUEUE} delivered=(\\d+) pending=(\\d+) dlq=(\\d+)`,
-    ).exec(summary);
+    const match = new RegExp(`queue=${QUEUE} delivered=(\\d+) pending=(\\d+) dlq=(\\d+)`).exec(
+      summary,
+    );
     const [delivered, pending, dlq] = [1, 2, 3].map((group) => Number(match?.[group]));
 
     // Delivered: what this tick put on the queue — the two rows it just claimed.
@@ -434,6 +434,83 @@ describe('the outbox relay sweep and events nobody subscribes to (US4, FR-004, F
       });
     } finally {
       topology[index] = original;
+    }
+  });
+});
+
+/**
+ * FR-018, SC-009, Principle VI: the relay's own log lines carry identifiers and
+ * counts, never what an event says. `telemetry.spec.ts` checks the code; this
+ * checks the output, on the paths a tick really takes — including the one where
+ * a send fails and the error is logged.
+ */
+describe('the outbox relay sweep never logs event contents (FR-018, SC-009)', () => {
+  /** Stands in for authored text a payload must never leak into a log. */
+  const SENTINEL = 'SENTINEL-birthday-present-for-Charlie';
+
+  let send: MockInstance<SqsMessagePublisher['send']>;
+
+  beforeAll(() => {
+    process.env.RELAY_QUEUE_ENDPOINT = ENDPOINT;
+    process.env.RELAY_QUEUE_REGION = REGION;
+    process.env.AWS_ACCESS_KEY_ID ??= 'elasticmq-placeholder';
+    process.env.AWS_SECRET_ACCESS_KEY ??= 'elasticmq-placeholder';
+  });
+
+  beforeEach(async () => {
+    await clearUnpublishedBacklog();
+    send = vi.spyOn(SqsMessagePublisher.prototype, 'send');
+  });
+
+  afterEach(() => {
+    send.mockRestore();
+  });
+
+  async function seedRowsCarryingTheSentinel(): Promise<string[]> {
+    return withDatabaseCommitted(async (tx) => {
+      const ids: string[] = [];
+      // One that is routed to a queue, one that nothing subscribes to.
+      for (const eventType of [PING, 'tasks.TaskCreated.v1']) {
+        const { id } = await seedOutboxEvent(tx, { eventType, payload: { note: SENTINEL } });
+        ids.push(id);
+      }
+      return ids;
+    });
+  }
+
+  // T044 / FR-018, SC-009
+  it('writes no payload content to any log line when sends succeed', async () => {
+    // Resolves instead of calling through: the payload is still built and handed
+    // to `send`, but nothing is left on the shared queue.
+    send.mockResolvedValue(undefined);
+    const ids = await seedRowsCarryingTheSentinel();
+
+    const lines = await captureLogs(() => runOutboxRelaySweep(realClock));
+
+    // The harness saw the tick — and the payload really did reach `send`.
+    expect(lines.some((line) => line.startsWith('outbox_relay_run'))).toBe(true);
+    expect(send.mock.calls.map(([message]) => message.body).join('')).toContain(SENTINEL);
+    for (const line of lines) {
+      expect(line).not.toContain(SENTINEL);
+    }
+    expect(ids.length).toBe(2);
+  });
+
+  // T044 / FR-018, SC-009
+  it('writes no payload content to any log line when a send fails, even if the error mentions it', async () => {
+    // Worst case: an error whose own message repeats the payload it was sending.
+    send.mockRejectedValue(new Error(`could not send ${SENTINEL}`));
+    const [failingId] = await seedRowsCarryingTheSentinel();
+
+    const lines = await captureLogs(() => runOutboxRelaySweep(realClock));
+
+    // The failure was logged, by identifier...
+    const failureLines = lines.filter((line) => line.includes('outbox relay send failed'));
+    expect(failureLines).toHaveLength(1);
+    expect(failureLines[0]).toContain(`event=${failingId ?? ''}`);
+    // ...and nothing anywhere carried what the event said.
+    for (const line of lines) {
+      expect(line).not.toContain(SENTINEL);
     }
   });
 });
