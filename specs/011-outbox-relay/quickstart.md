@@ -129,7 +129,7 @@ published — the zero-subscriber path marks them published on the same tick it 
 ```sh
 docker compose stop worker
 for i in $(seq 1 20); do
-  docker compose exec worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload "{\"note\":\"$i\"}"
+  docker compose run --rm worker pnpm --filter @fp/worker relay:seed --event-type relay.VerificationPing.v1 --payload "{\"note\":\"$i\"}"
 done
 ```
 
