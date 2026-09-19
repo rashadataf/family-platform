@@ -43,7 +43,7 @@ const SDK_MESSAGE =
   'The AWS SDK belongs to packages/platform/src/sqs-*.ts only (spec 011 FR-010, ADR-018). Depend on MessagePublisherPort from @fp/kernel instead.';
 
 const CLIENT_MESSAGE =
-  'Queue clients are the relay\'s (apps/worker/src/relay/). A bounded context reaches the queue by writing an outbox_event row in its own transaction — never by publishing or consuming directly (Principle VIII, ADR-005 Layer 3, spec 011 FR-010).';
+  "Queue clients are the relay's (apps/worker/src/relay/). A bounded context reaches the queue by writing an outbox_event row in its own transaction — never by publishing or consuming directly (Principle VIII, ADR-005 Layer 3, spec 011 FR-010).";
 
 /**
  * The exception, spread by the two packages whose stated job is to own the

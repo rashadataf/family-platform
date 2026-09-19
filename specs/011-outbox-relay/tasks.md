@@ -380,7 +380,7 @@ and confirm the lag measure does not rise under a burst of such events.
       in each owning package's own config, because a flat-config `files` glob resolves against its
       own directory and a central one silently matches nothing under Turborepo. Was missing entirely
       (FR-010, Principle VIII).
-- [ ] T050 Make CI able to run the relay's integration tests: `.github/workflows/ci.yml`'s
+- [X] T050 Make CI able to run the relay's integration tests: `.github/workflows/ci.yml`'s
       `test-integration` job has no `elasticmq`, and `RELAY_QUEUE_ENDPOINT`/`RELAY_QUEUE_REGION` are
       in neither `.env.example` nor the job's env, so every relay integration spec would fail on
       push. A service container cannot mount `infrastructure/elasticmq/queues.conf` (checkout runs
