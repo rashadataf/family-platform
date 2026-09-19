@@ -361,7 +361,7 @@ and confirm the lag measure does not rise under a burst of such events.
       existing suite) asserting no log line emitted anywhere in `apps/worker/src/relay/` contains a
       payload body — only identifiers and the fixed envelope fields — mirroring spec 010's SC-011
       test (FR-018, SC-009).
-- [ ] T045 [P] Add a one-line mention of the `elasticmq` service and the `relay:seed`/`relay:peek`
+- [X] T045 [P] Add a one-line mention of the `elasticmq` service and the `relay:seed`/`relay:peek`
       scripts to `docs/local-development.md`, alongside the existing service list.
 - [ ] T046 Run `pnpm lint`, `pnpm typecheck`, and `pnpm boundaries` across the whole workspace; fix
       anything the new code introduces.
