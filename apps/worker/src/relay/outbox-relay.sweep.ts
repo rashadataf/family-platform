@@ -101,12 +101,14 @@ let lagAlertRaised = false;
  * Logs how far behind the relay is (always) and raises `ALERT
  * outbox_lag_seconds` on the tick it first exceeds the threshold.
  *
- * Measured after the tick's own claim has committed, so it is what the tick
- * could NOT fix — rows a send failed on, or a backlog beyond one batch —
- * not what it was about to (`measureOutboxLag`).
+ * `lagSeconds` is measured BEFORE this tick's claim, by `runOutboxRelaySweep`,
+ * so it is how far behind the relay was found — not what it managed to fix on
+ * the way past. Measuring afterwards would make the one case ADR-005 built this
+ * metric for invisible: a relay that was stopped for an hour publishes its
+ * backlog on the first tick after a restart and would report a lag of zero,
+ * having just been an hour behind (FR-016, SC-010, quickstart Scenario 5).
  */
-async function reportLag(clock: Clock): Promise<void> {
-  const lagSeconds = await measureOutboxLag(clock.now());
+function reportLag(lagSeconds: number): void {
   console.log(`outbox_relay_lag_seconds=${String(lagSeconds)}`);
 
   const over = lagSeconds > OUTBOX_LAG_ALERT_SECONDS;
@@ -215,6 +217,10 @@ export async function runOutboxRelaySweep(
   /** Messages this tick put on each queue (FR-017). Counted as they are sent, not as rows finish. */
   const delivered = new Map<string, number>();
 
+  // Before the claim, deliberately: see `reportLag`. Reported after the summary
+  // line below, so a tick's output still reads in one order.
+  const lagSeconds = await measureOutboxLag(clock.now());
+
   const result = await claimUnpublishedOutboxEvents(
     RELAY_BATCH_SIZE,
     async (claimed, markPublished) => {
@@ -267,7 +273,7 @@ export async function runOutboxRelaySweep(
     `outbox_relay_run claimed=${String(result.claimed)} published=${String(result.published)} sent=${String(result.sent)} failed=${String(result.failed.length)} ${formatQueueCounts(delivered, depths)} [correlationId=${correlationId}]`,
   );
 
-  await reportLag(clock);
+  reportLag(lagSeconds);
   reportDeadLetters(depths);
 
   return result;

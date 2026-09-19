@@ -47,12 +47,23 @@ async function clearUnpublishedBacklog(): Promise<void> {
   );
 }
 
+/** Seeds `count` unpublished rows, all as old as the fixed clock's threshold breach. */
+async function seedAgedRows(count: number): Promise<void> {
+  const occurredAt = new Date(NOW.getTime() - ROW_AGE_SECONDS * 1_000);
+  await withDatabaseCommitted(async (tx) => {
+    for (let i = 0; i < count; i += 1) {
+      await seedOutboxEvent(tx, { eventType: UNSUBSCRIBED, aggregateId: randomUUID(), occurredAt });
+    }
+  });
+}
+
 /**
- * FR-016, SC-010, User Story 3. Lag is what a tick could NOT fix — a tick marks
- * everything it claims — so the only way to observe it is a backlog bigger than
- * one batch. `2 × RELAY_BATCH_SIZE + 1` old rows take three ticks to clear and
- * leave the oldest unpublished row over the threshold after the first two:
- * alert, no repeat, then cleared.
+ * FR-016, SC-010, User Story 3. The lag is measured BEFORE each tick's claim, so
+ * it reports how far behind the relay was found rather than what it fixed on the
+ * way past. That distinction is the whole of SC-010: a relay stopped for ten
+ * minutes clears its backlog on the first tick after a restart, and measuring
+ * afterwards would report zero for the one situation ADR-005 calls the most
+ * important to see.
  */
 describe('the outbox relay sweep reports how far behind it is (US3, FR-016, SC-010)', () => {
   beforeAll(() => {
@@ -64,43 +75,54 @@ describe('the outbox relay sweep reports how far behind it is (US3, FR-016, SC-0
 
   beforeEach(clearUnpublishedBacklog);
 
-  // T035 / SC-010, FR-016
-  it('alerts once when the oldest unpublished row is over 300 s old, and not again until it recovers', async () => {
-    const occurredAt = new Date(NOW.getTime() - ROW_AGE_SECONDS * 1_000);
-    await withDatabaseCommitted(async (tx) => {
-      for (let i = 0; i < 2 * RELAY_BATCH_SIZE + 1; i += 1) {
-        await seedOutboxEvent(tx, {
-          eventType: UNSUBSCRIBED,
-          aggregateId: randomUUID(),
-          occurredAt,
-        });
-      }
-    });
+  // T035 / SC-010, FR-016 — quickstart Scenario 5, without the five-minute wait.
+  it('alerts on the first tick after a stopped relay restarts, even though that tick clears the backlog', async () => {
+    // Small enough that ONE tick publishes all of it: the restart case exactly.
+    await seedAgedRows(20);
 
-    // First tick: a batch is cleared, the rest are as old as ever. The alert fires.
-    const crossing = await captureLogs(() => runOutboxRelaySweep(fixedClock));
-    expect(await unpublishedCount()).toBe(RELAY_BATCH_SIZE + 1);
-    expect(alertLines(crossing)).toHaveLength(1);
-    expect(alertLines(crossing)[0]).toContain(
-      `ALERT outbox_lag_seconds=${String(ROW_AGE_SECONDS)} threshold=${String(LAG_ALERT_SECONDS)}`,
-    );
-    // The lag is reported on every tick, alert or not.
-    expect(lagLines(crossing).map((line) => line.trim())).toEqual([
+    const firstTick = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+
+    // The tick did clear the backlog...
+    expect(await unpublishedCount()).toBe(0);
+    // ...and still reported the ten-minute lag it found on arrival, and alerted.
+    expect(lagLines(firstTick).map((line) => line.trim())).toEqual([
       `outbox_relay_lag_seconds=${String(ROW_AGE_SECONDS)}`,
     ]);
+    expect(alertLines(firstTick)).toHaveLength(1);
+    expect(alertLines(firstTick)[0]).toContain(
+      `ALERT outbox_lag_seconds=${String(ROW_AGE_SECONDS)} threshold=${String(LAG_ALERT_SECONDS)}`,
+    );
 
-    // Second tick: still over the threshold, and still reported — but already alerted.
-    const stillBehind = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    // Caught up: the lag is still reported every tick, and the alert clears.
+    const caughtUp = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    expect(alertLines(caughtUp)).toEqual([]);
+    expect(lagLines(caughtUp).map((line) => line.trim())).toEqual(['outbox_relay_lag_seconds=0']);
+  });
+
+  // T035 / FR-016 — edge-triggered, like `SweepScheduler.checkStalled`.
+  it('does not repeat the alert while the relay stays behind, and raises it again after a recovery', async () => {
+    // More than one batch, so the backlog outlives the tick that first alerts.
+    await seedAgedRows(RELAY_BATCH_SIZE + 1);
+
+    const crossing = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    expect(alertLines(crossing)).toHaveLength(1);
     expect(await unpublishedCount()).toBe(1);
+
+    // Still behind on arrival, so still reported — but not alerted a second time.
+    const stillBehind = await captureLogs(() => runOutboxRelaySweep(fixedClock));
     expect(alertLines(stillBehind)).toEqual([]);
     expect(lagLines(stillBehind).map((line) => line.trim())).toEqual([
       `outbox_relay_lag_seconds=${String(ROW_AGE_SECONDS)}`,
     ]);
-
-    // Third tick claims the last row: nothing outstanding, so nothing to alert on.
-    const caughtUp = await captureLogs(() => runOutboxRelaySweep(fixedClock));
     expect(await unpublishedCount()).toBe(0);
-    expect(alertLines(caughtUp)).toEqual([]);
-    expect(lagLines(caughtUp).map((line) => line.trim())).toEqual(['outbox_relay_lag_seconds=0']);
+
+    // Recovered, which clears the flag...
+    const recovered = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    expect(alertLines(recovered)).toEqual([]);
+
+    // ...so a fresh backlog alerts again rather than staying silent.
+    await seedAgedRows(1);
+    const secondCrossing = await captureLogs(() => runOutboxRelaySweep(fixedClock));
+    expect(alertLines(secondCrossing)).toHaveLength(1);
   });
 });
