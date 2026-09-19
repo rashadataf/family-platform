@@ -208,7 +208,7 @@ module.exports = {
       name: 'no-direct-sqs-access',
       severity: 'error',
       comment:
-        "FR-010 (spec 011): a bounded context reaches SQS/ElasticMQ only by writing to the outbox, never by importing the queue client itself. packages/platform/src/sqs-message-publisher.ts and sqs-consumer.ts are the only concrete channel to that transport, reachable today only from apps/worker; packages/platform/src/index.ts is included too because it re-exports both, and dependency-cruiser resolves a barrel import to that one file rather than to the names pulled through it.",
+        'FR-010 (spec 011): a bounded context reaches SQS/ElasticMQ only by writing to the outbox, never by importing the queue client itself. packages/platform/src/sqs-message-publisher.ts and sqs-consumer.ts are the only concrete channel to that transport, reachable today only from apps/worker; packages/platform/src/index.ts is included too because it re-exports both, and dependency-cruiser resolves a barrel import to that one file rather than to the names pulled through it.',
       from: { path: '^packages/core/' },
       to: { path: '^packages/platform/src/(sqs-message-publisher|sqs-consumer|index)(\\.ts)?$' },
     },

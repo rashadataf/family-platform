@@ -363,7 +363,7 @@ and confirm the lag measure does not rise under a burst of such events.
       test (FR-018, SC-009).
 - [X] T045 [P] Add a one-line mention of the `elasticmq` service and the `relay:seed`/`relay:peek`
       scripts to `docs/local-development.md`, alongside the existing service list.
-- [ ] T046 Run `pnpm lint`, `pnpm typecheck`, and `pnpm boundaries` across the whole workspace; fix
+- [X] T046 Run `pnpm lint`, `pnpm typecheck`, and `pnpm boundaries` across the whole workspace; fix
       anything the new code introduces.
 - [ ] T047 Manually run every scenario in [quickstart.md](quickstart.md) end to end against
       `docker compose up`; record the outcome of each in the PR description.
