@@ -187,7 +187,7 @@ Today, every event Family, Calendar and Tasks publish has zero real subscribers.
 - **SC-009**: No event payload observed in transit or in logs contains anything beyond identifiers and correlation metadata.
   - *Status: **Verified for logs** — no payload in any relay log line, statically (`telemetry.spec.ts`) and at runtime including a failing send (T044). Not checked for messages in transit: the relay forwards a payload unchanged (FR-005), so its content is each producing context's to keep to identifiers.*
 - **SC-010**: A relay stopped or falling behind for more than 5 minutes produces a high-severity alert; below that threshold, the rising lag is visible as a metric but does not page anyone.
-  - *Status: **Partly verified** — the alert fires once when the oldest unpublished row is over 300 s after a tick, and not again until recovery (T035); the scheduler flags a relay that stops succeeding (T036). It does **not** fire for a relay that was stopped and then catches up on restart: the lag is measured after the tick's own claim, so quickstart Scenario 5 fails as written (tasks.md T047).*
+  - *Status: **Verified** — lag is measured before each tick's claim, so a relay that was stopped alerts on its first tick back even though that tick clears the backlog (T035, and quickstart Scenario 5 run live: `ALERT outbox_lag_seconds=614 threshold=300`). Edge-triggered: no repeat while it stays behind, and it raises again after a recovery. The scheduler separately flags a relay that stops succeeding (T036, FR-025).*
 
 ## Data Handling and Compliance
 

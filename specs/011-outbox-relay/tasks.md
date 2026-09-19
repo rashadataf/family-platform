@@ -367,7 +367,7 @@ and confirm the lag measure does not rise under a burst of such events.
       anything the new code introduces.
 - [ ] T047 Manually run every scenario in [quickstart.md](quickstart.md) end to end against
       `docker compose up`; record the outcome of each in the PR description.
-- [ ] T048 Re-read plan.md's Constitution Check and Complexity Tracking against what was actually
+- [X] T048 Re-read plan.md's Constitution Check and Complexity Tracking against what was actually
       built; confirm both still hold with no new deviation, and update spec.md's Success Criteria
       section to note each SC is now verified (not just specified), per this repository's ticking
       rule.

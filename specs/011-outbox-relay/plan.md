@@ -245,13 +245,14 @@ would be evidence that ADR-005's design does not actually fit this codebase, and
 
 ## Complexity Tracking
 
-*Recorded at implementation (T048). Each is a place where what was built differs from what this plan says; none was decided in advance.*
+*Recorded at implementation (T048). Each is a place where what was built differed from what this plan
+says. Four were found by running the quickstart and re-reading this section against the code; all four
+were then fixed rather than accepted, so what remains is one deliberate deviation.*
 
 | Deviation | Where the plan says otherwise | Status |
 |---|---|---|
-| **No ESLint rule restricts queue-client construction to the relay.** No task in `tasks.md` builds one, and no ESLint config mentions SQS. | Principle VIII row above, and spec.md's Input: "the ESLint rule … is added here for the first time" | Open. Only the dependency-cruiser rule exists |
-| **`no-direct-sqs-access` blocks `packages/core/` only.** `apps/api` (or any other package) could import the SQS exports without a violation. | Constraints: "No package other than `apps/worker` may import `packages/platform`'s SQS exports" (FR-010) | Open. Nothing imports them today |
-| **The sweep reads `RELAY_QUEUE_ENDPOINT` / `_REGION` from `process.env` itself**, not from the parsed `parseWorkerEnv()` result (importing it would be circular via the sweep registry). Both are still validated at boot. | Principle II row: parsed once, at boot | Accepted; documented in `outbox-relay.sweep.ts` |
-| **`RELAY_QUEUE_*` are in neither `.env.example` nor CI.** Compose sets them for the container; a host-run `relay:peek` or a `pnpm test:integration` that does not supply defaults fails. CI's `test-integration` job has no ElasticMQ service, so every relay integration spec would fail there. | Testing: integration tier "against a real ElasticMQ container" | Open — needs a decision on how CI gets the queue |
-| **The lag alert measures after the tick's own claim**, so a relay that was stopped and catches up never alerts. | FR-016, SC-010, quickstart Scenario 5 | Open — a design decision; see spec.md SC-010 |
-
+| **The sweep reads `RELAY_QUEUE_ENDPOINT` / `_REGION` from `process.env` itself**, not from the parsed `parseWorkerEnv()` result — importing it would be circular, since `worker-env.ts` imports the sweep registry, which imports the sweep. Both are still validated at worker boot. | Principle II row: parsed once, at boot | **Accepted.** The one standing deviation; documented at the call site in `outbox-relay.sweep.ts` |
+| ~~No ESLint rule restricts queue-client construction to the relay.~~ | Principle VIII row, and spec.md's Input | **Closed** by T049: `packages/config-eslint/queue-access.js` |
+| ~~`no-direct-sqs-access` blocks `packages/core/` only, so `apps/api` could import the SQS exports.~~ | Constraints, FR-010 | **Closed** by T049 — the ESLint rule covers every package, with exceptions declared only by `packages/platform`'s adapter and `apps/worker`'s relay. The dependency-cruiser gate still covers `packages/core/` and stays authoritative |
+| ~~`RELAY_QUEUE_*` in neither `.env.example` nor CI, and CI has no ElasticMQ, so every relay integration spec would fail on push.~~ | Testing: integration tier "against a real ElasticMQ container" | **Closed** by T050 |
+| ~~The lag alert measures after the tick's own claim, so a relay that was stopped and catches up never alerts.~~ | FR-016, SC-010, quickstart Scenario 5 | **Closed**: lag is measured before the claim. Verified by test and by running Scenario 5 (`ALERT outbox_lag_seconds=614 threshold=300` on the first tick after a restart) |
