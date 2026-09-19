@@ -372,6 +372,20 @@ and confirm the lag measure does not rise under a burst of such events.
       section to note each SC is now verified (not just specified), per this repository's ticking
       rule.
 
+- [X] T049 Add the ESLint rule Principle VIII's enforcement list names and spec.md's Input requires:
+      queue-client imports restricted to the relay. `packages/config-eslint/queue-access.js` forbids
+      `@aws-sdk/client-sqs` outside `packages/platform`'s two adapter modules, and `@fp/platform`'s
+      client exports (`SqsMessagePublisher`, `SqsConsumer`, `createSqsClient`, `peekQueueMessages`)
+      outside `apps/worker/src/relay/`; the handler *types* stay importable. Exceptions are declared
+      in each owning package's own config, because a flat-config `files` glob resolves against its
+      own directory and a central one silently matches nothing under Turborepo. Was missing entirely
+      (FR-010, Principle VIII).
+- [ ] T050 Make CI able to run the relay's integration tests: `.github/workflows/ci.yml`'s
+      `test-integration` job has no `elasticmq`, and `RELAY_QUEUE_ENDPOINT`/`RELAY_QUEUE_REGION` are
+      in neither `.env.example` nor the job's env, so every relay integration spec would fail on
+      push. A service container cannot mount `infrastructure/elasticmq/queues.conf` (checkout runs
+      after services start), so start it as a step instead.
+
 ---
 
 ## Dependencies & Execution Order

@@ -1,6 +1,7 @@
 // @ts-check
 import typescript from './typescript.js';
 import boundaries from './boundaries.js';
+import queueAccess from './queue-access.js';
 
 /**
  * The default configuration every package extends: TypeScript hygiene plus the
@@ -12,4 +13,4 @@ import boundaries from './boundaries.js';
  * which is the whole point of establishing them now instead of retrofitting
  * them onto code already written against no rules.
  */
-export default [...typescript, ...boundaries];
+export default [...typescript, ...boundaries, ...queueAccess];
