@@ -365,7 +365,7 @@ and confirm the lag measure does not rise under a burst of such events.
       scripts to `docs/local-development.md`, alongside the existing service list.
 - [X] T046 Run `pnpm lint`, `pnpm typecheck`, and `pnpm boundaries` across the whole workspace; fix
       anything the new code introduces.
-- [ ] T047 Manually run every scenario in [quickstart.md](quickstart.md) end to end against
+- [X] T047 Manually run every scenario in [quickstart.md](quickstart.md) end to end against
       `docker compose up`; record the outcome of each in the PR description.
 - [X] T048 Re-read plan.md's Constitution Check and Complexity Tracking against what was actually
       built; confirm both still hold with no new deviation, and update spec.md's Success Criteria

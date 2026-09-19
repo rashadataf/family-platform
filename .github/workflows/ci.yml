@@ -121,9 +121,11 @@ jobs:
         with:
           turbo-cache-key: test-integration
       - run: pnpm test:integration
-      - name: Stop ElasticMQ
-        if: always()
-        run: docker compose down elasticmq
+      # Deliberately no teardown step. The runner is destroyed with the job, so
+      # stopping the container buys nothing — and `docker compose down` resolves
+      # the whole project model, including `api` and `worker`'s `env_file: .env`,
+      # which does not exist in CI and is not wanted there. `up <service>` only
+      # resolves the one service, which is why starting works without it.
 
   # Constitution Principle III: "Architecture Boundaries Are Enforced, Not
   # Suggested". The principle names dependency-cruiser explicitly and until now
