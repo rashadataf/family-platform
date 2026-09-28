@@ -13,20 +13,20 @@
   "dependencies": {
     "@fp/ui": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "~57.0.22",
-    "expo-constants": "~57.0.18",
-    "expo-linking": "~57.0.10",
-    "expo-router": "~57.0.21",
+    "expo": "~57.0.25",
+    "expo-constants": "~57.0.19",
+    "expo-linking": "~57.0.11",
+    "expo-router": "~57.0.23",
     "expo-status-bar": "~57.0.1",
-    "react": "19.2.3",
-    "react-native": "0.86.3",
+    "react": "19.3.0",
+    "react-native": "0.87.1",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-safe-area-context": "~5.10.0",
+    "react-native-screens": "~4.28.0"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
-    "@types/react": "~19.2.2",
+    "@types/react": "~19.3.0",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3"
   }
