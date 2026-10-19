@@ -10,7 +10,7 @@
   "dependencies": {
     "@pulumi/command": "^1.2.1",
     "@pulumi/docker-build": "^0.0.22",
-    "@pulumi/pulumi": "^3.261.0",
+    "@pulumi/pulumi": "^3.268.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
