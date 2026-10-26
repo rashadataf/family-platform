@@ -17,10 +17,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "3.1135.0",
+    "@aws-sdk/client-sqs": "3.1156.0",
     "@fp/kernel": "workspace:*",
-    "@node-rs/argon2": "^2.2.1",
-    "nodemailer": "^10.0.7"
+    "@node-rs/argon2": "^2.2.2",
+    "nodemailer": "^10.2.1"
   },
   "devDependencies": {
     "@fp/config-eslint": "workspace:*",
